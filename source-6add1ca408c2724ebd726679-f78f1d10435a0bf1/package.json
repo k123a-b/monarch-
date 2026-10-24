@@ -1,0 +1,28 @@
+{
+  "name": "card-monarchs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "test": "node --import tsx --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@netlify/database": "latest",
+    "@netlify/identity": "latest",
+    "drizzle-orm": "beta"
+  },
+  "devDependencies": {
+    "@google/genai": "latest",
+    "@netlify/functions": "latest",
+    "@types/node": "latest",
+    "cheerio": "latest",
+    "drizzle-kit": "beta",
+    "prettier": "^3.9.10",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
+    "typescript": "latest",
+    "vite": "^6.3.5"
+  }
+}

@@ -1,0 +1,17 @@
+ALTER TABLE accounts ADD CONSTRAINT accounts_balance_nonnegative CHECK (balance >= 0);
+ALTER TABLE ledger ADD CONSTRAINT ledger_balance_nonnegative CHECK (balance >= 0);
+ALTER TABLE wagers ADD CONSTRAINT wagers_amount_positive CHECK (amount > 0);
+ALTER TABLE friend_tables ADD CONSTRAINT friend_table_stake_positive CHECK (stake > 0);
+ALTER TABLE friend_tables ADD CONSTRAINT friend_table_distinct_players CHECK (host_id IS DISTINCT FROM guest_id);
+ALTER TABLE friends ADD CONSTRAINT friends_distinct_players CHECK (user_a <> user_b);
+ALTER TABLE trades ADD CONSTRAINT trade_distinct_players CHECK (user_a <> user_b);
+ALTER TABLE inventory ADD CONSTRAINT inventory_value_nonnegative CHECK (value >= 0);
+ALTER TABLE inventory ADD CONSTRAINT inventory_trade_fk FOREIGN KEY (trade_id) REFERENCES trades(id);
+CREATE UNIQUE INDEX friend_pair_unique ON friends (LEAST(user_a,user_b),GREATEST(user_a,user_b));
+CREATE UNIQUE INDEX inventory_alpha_serial_unique ON inventory(serial) WHERE serial IS NOT NULL;
+CREATE INDEX inventory_owner_idx ON inventory(owner_id,id DESC);
+CREATE INDEX ledger_user_idx ON ledger(user_id,id DESC);
+CREATE INDEX wagers_round_idx ON wagers(round_id);
+CREATE INDEX rounds_settlement_idx ON rounds(ends_at) WHERE settled=false;
+CREATE INDEX tables_settlement_idx ON friend_tables(ends_at) WHERE settled=false;
+CREATE INDEX inventory_trade_idx ON inventory(trade_id) WHERE trade_id IS NOT NULL;

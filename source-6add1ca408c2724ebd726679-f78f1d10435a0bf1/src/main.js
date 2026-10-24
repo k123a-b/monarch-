@@ -1,0 +1,1217 @@
+import { imageSource, presentedCard } from "../shared/presentation.mjs";
+import "./style.css";
+import {
+  getUser,
+  login,
+  signup,
+  logout,
+  oauthLogin,
+  handleAuthCallback,
+  getSettings,
+  requestPasswordRecovery,
+  updateUser,
+} from "@netlify/identity";
+import {
+  catalog,
+  cardMap,
+  packs,
+  money,
+  rarities,
+  leaderSource,
+  packProgress,
+  packValueRange,
+} from "../shared/catalog.mjs";
+const $ = (s, root = document) => root.querySelector(s);
+const esc = (s) =>
+  String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+const icons = {
+  crown: '<path d="m3 6 5 4 4-7 4 7 5-4-3 13H6L3 6Z"/><path d="M7 22h10"/>',
+  packs: '<path d="M6 3h12v18H6zM6 7h12M6 17h12m-8-5 2-2 2 2-2 2z"/>',
+  collection:
+    '<rect x="7" y="5" width="13" height="16" rx="2"/><path d="M4 17V3h12M11 10h5m-5 4h5"/>',
+  pot: '<path d="M8 4h8v4c0 8-8 8-8 0V4Zm4 10v6m-4 1h8M8 6H4v3c0 3 4 3 4 3m8-6h4v3c0 3-4 3-4 3"/>',
+  friends:
+    '<circle cx="9" cy="7" r="3"/><path d="M3 21v-4c0-5 12-5 12 0v4m3-17c5 0 5 7 0 7m1 4c3 0 3 3 3 6"/>',
+  rewards:
+    '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13m0-13C1 8 7-2 12 8Zm0 0C23 8 17-2 12 8Z"/>',
+  leaderboards: '<path d="M3 21V11h6v10m0 0V4h6v17m0 0v-7h6v7M1 21h22"/>',
+  wallet:
+    '<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 8V5l14-3v3m-2 6h6v5h-6z"/>',
+  arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
+  sound:
+    '<path d="M3 9h4l5-5v16l-5-5H3V9Zm13-2c4 3 4 7 0 10m3-13c6 5 6 11 0 16"/>',
+  close: '<path d="m6 6 12 12M6 18 18 6"/>',
+  lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6c0-6 8-6 8 0v4m-4 4v3"/>',
+  check: '<path d="m5 12 4 4L19 6"/>',
+  globe:
+    '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 7h14M5 17h14"/>',
+  spark:
+    '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>',
+  chevron: '<path d="m9 5 7 7-7 7"/>',
+  coin: '<circle cx="12" cy="12" r="9"/><path d="M15 7h-3a3 3 0 0 0-3 3v7m-2-5h7m-6 5h8"/>',
+};
+const icon = (n, cls = "") =>
+  `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[n] || icons.crown}</svg>`;
+let state = {
+  view: "packs",
+  filter: "all",
+  user: null,
+  account: null,
+  inventory: [],
+  pot: null,
+  friends: null,
+  board: "wealth",
+  selected: new Set(),
+  rarity: "all",
+  set: "all",
+  sort: "recent",
+  search: "",
+  rosterSearch: "",
+  rosterLimit: 40,
+  muted: false,
+  busy: false,
+};
+const app = $("#app"),
+  modal = $("#modal");
+let toastTimer, modalFocus;
+let lastActivity = Date.now();
+let renderVersion = 0;
+let viewRequest = 0;
+let syncRequest = 0;
+const image = (src, w = 500) => {
+  const source = imageSource(src);
+  return source.startsWith("/") && source.endsWith(".svg")
+    ? source
+    : `/.netlify/images?url=${encodeURIComponent(source)}&w=${w}&fm=webp`;
+};
+const art = (pack) =>
+  image(
+    pack.art === "world"
+      ? "/img/mystery-leader.svg"
+      : "/img/" + pack.art + ".png",
+  );
+// Retry the original if image transformation fails, then use a bundled fallback.
+document.addEventListener(
+  "error",
+  (event) => {
+    const img = event.target;
+    if (!(img instanceof HTMLImageElement)) return;
+    if (
+      !img.dataset.originalTried &&
+      img.getAttribute("src")?.startsWith("/.netlify/images?")
+    ) {
+      img.dataset.originalTried = "true";
+      const original = new URL(img.src).searchParams.get("url");
+      if (original) {
+        img.src = original;
+        return;
+      }
+    }
+    if (!img.dataset.fallbackTried) {
+      img.dataset.fallbackTried = "true";
+      img.src = "/img/leader-placeholder.svg";
+      img.alt += " (portrait unavailable)";
+    }
+  },
+  true,
+);
+function toast(message) {
+  $("#toast").textContent = message;
+  $("#toast").classList.add("visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("#toast").classList.remove("visible"), 4500);
+}
+async function api(path, data) {
+  const r = await fetch("/api/" + path, {
+    method: data === undefined ? "GET" : "POST",
+    headers: data === undefined ? {} : { "Content-Type": "application/json" },
+    body: data === undefined ? undefined : JSON.stringify(data),
+    ...(data === undefined ? { signal: AbortSignal.timeout(30000) } : {}),
+  });
+  let out;
+  try {
+    out = await r.json();
+  } catch {
+    throw Error("The court is temporarily unavailable. Please try again.");
+  }
+  if (!r.ok) throw Error(out.error || "Request failed.");
+  return out;
+}
+async function sync() {
+  if (!state.user) return;
+  const userId = state.user.id;
+  const request = ++syncRequest;
+  const r = await api("me");
+  if (request !== syncRequest || state.user?.id !== userId) return;
+  state.account = r.account;
+  state.inventory = r.inventory;
+  updateWallet();
+}
+function updateWallet() {
+  const el = $("#wallet-value");
+  if (el) el.textContent = money(state.account?.balance || 0);
+  document.querySelectorAll("[data-pack-progress]").forEach((node) => {
+    node.outerHTML = guaranteeProgress();
+  });
+}
+function showModal(content, cls = "") {
+  modalFocus = document.activeElement;
+  modal.className = cls;
+  modal.innerHTML = `<button class="modal-close icon-button" data-action="close" aria-label="Close dialog">${icon("close")}</button>${content}`;
+  if (!modal.open) modal.showModal();
+}
+function closeModal() {
+  if (state.busy) return;
+  modal.close();
+  modalFocus?.focus();
+}
+modal.addEventListener("cancel", (e) => {
+  if (state.busy) e.preventDefault();
+});
+modal.addEventListener("click", (e) => {
+  if (e.target === modal && !state.busy) closeModal();
+});
+function requireUser() {
+  if (state.user) return true;
+  authModal();
+  return false;
+}
+const tabs = [
+  "packs",
+  "collection",
+  "pot",
+  "friends",
+  "rewards",
+  "leaderboards",
+];
+function shell() {
+  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${state.view === n ? "active" : ""}">${icon(n)}<span>${n === "pot" ? "The Pot" : n[0].toUpperCase() + n.slice(1)}</span></a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
+}
+function title(eyebrow, heading, text) {
+  return `<div class="page-heading"><span class="eyebrow">${eyebrow}</span><h1>${heading}</h1><p>${text}</p></div>`;
+}
+function packArt(p, extra = "") {
+  return `<div class="foil-pack ${p.id} ${extra}" style="--pack-color:${p.color}"><img src="${art(p)}" alt="${esc(p.name)} artwork" loading="${extra ? "eager" : "lazy"}"><div class="pack-sheen"></div><div class="pack-brand">${icon("crown")} CARD MONARCHS</div><div class="pack-label"><span>${p.id === "brainrot" ? "THE ORIGINAL COLLECTION" : p.id === "apex" ? "THE ULTIMATE COLLECTION" : "THE ROYAL COLLECTION"}</span><strong>${p.short.replace(" ", "<br>")}</strong><small>${p.count} CARDS INSIDE</small></div><div class="pack-crimp"></div></div>`;
+}
+function guaranteeProgress() {
+  const { progress, remaining, nextGuaranteed } = packProgress(
+    Number(state.account?.packs || 0),
+  );
+  return `<aside class="epic-progress ${nextGuaranteed ? "guarantee-ready" : ""}" data-pack-progress><div>${icon("spark")}<span class="eyebrow">THE TENTH-PACK PROMISE</span><strong>${state.user ? (nextGuaranteed ? "Next pack: Epic or better" : `${remaining} packs to your guaranteed Epic`) : "An Epic or better every 10 packs"}</strong></div><progress max="10" value="${progress}" aria-label="Packs toward your next guaranteed Epic">${progress} / 10</progress><p>${state.user ? `${progress} / 10 packs · ` : "Sign in to track your progress. "}All pack types count. Every tenth successful purchase contains an Epic or better. Earlier lucky pulls never reset this promise. Rarity does not guarantee profit.</p></aside>`;
+}
+function shop() {
+  const visible = packs.filter((p) =>
+    state.filter === "all"
+      ? true
+      : state.filter === "brainrot"
+        ? p.set === "brainrot"
+        : state.filter === "royal"
+          ? p.set === "royal"
+          : p.set === "world",
+  );
+  $("#main").innerHTML =
+    `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="tiny-crown">${icon("crown")}</span> WELCOME TO YOUR KINGDOM</div><h1>Chaos is<br><span>collectible.</span></h1><p>Ridiculous cards. Royal-level pulls.<br>Open packs, trade with your court, and play for the pot.</p><div class="hero-buttons"><a href="#shop" class="button" data-action="scroll-shop">Explore packs ${icon("arrow")}</a><button class="button ghost" data-action="how">How it works ${icon("info")}</button></div><div class="hero-note"><span class="green-dot"></span> Real fun. Fictional money. <span>Always.</span></div></div><div class="hero-stage" aria-label="Featured collectible cards"><div class="orbital"></div><span class="stage-star s1">✦</span><span class="stage-star s2">✧</span><div class="hero-card back-left"><div class="ornate-corner"></div><img src="${image("/img/royal.png")}" alt="Royal crown"><span>THE ROYAL COURT</span><strong>Crown of Eternity</strong><b>CROWN • ${money(6000)}</b></div><div class="hero-card back-right"><img src="${image("/img/apex.png")}" alt="Mystery Gold crown"><span>THE ONE. THE ONLY.</span><strong>Mystery Gold</strong><b>ALPHA • SERIAL № 001</b></div><div class="hero-card front"><div class="hero-card-top">${icon("crown")} THE BRAINROT COLLECTION <span>001</span></div><img src="${image("/img/brainrot.png", 650)}" alt="Tralalero Tralala, a crowned shark wearing blue sneakers"><div class="hero-card-bottom"><span>COMMON</span><strong>Tralalero<br>Tralala</strong><small>All hail the king of absolutely nothing.</small><div><span>SELL VALUE</span><b>£0.28</b></div></div></div><div class="floating-label">${icon("spark")} Your next legendary pull?</div></div></section><section class="trust-strip"><div>${icon("rewards")}<span><strong>£5 on the house</strong><small>Your welcome bonus awaits.</small></span></div><div>${icon("collection")}<span><strong>Collect. Trade. Reign.</strong><small>Build a collection fit for a monarch.</small></span></div><div>${icon("coin")}<span><strong>Play more, earn more</strong><small>£0.50 every 10 active minutes.</small></span></div><span class="play-label">100% VIRTUAL<br><strong>0% REAL MONEY</strong></span></section><section id="shop" class="shop-section"><div class="section-heading"><div><span class="eyebrow">THE ROYAL PACK SHOP</span><h2>Pick your poison.<span> Or your crown.</span></h2></div><button class="text-button odds-link" data-action="all-odds">${icon("info")} Transparent odds. Always.</button></div>${guaranteeProgress()}<div class="shop-filters" role="group" aria-label="Pack collection"><div>${[
+      ["all", "All packs"],
+      ["brainrot", "Brainrot collection"],
+      ["royal", "The royal court"],
+      ["world", "World leaders"],
+    ]
+      .map(
+        ([id, label]) =>
+          `<button data-action="filter" data-filter="${id}" class="filter-button ${state.filter === id ? "active" : ""}">${label}${id === "world" ? '<span class="new-tag">NEW</span>' : ""}</button>`,
+      )
+      .join(
+        "",
+      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase and Alpha values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>Open pack ${icon("arrow")}</span><b>${money(p.price)}</b></button>${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack" : `Chase pull · 1 in ${p.chaseOdds.toLocaleString()}`}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£210,000</strong><small>Mystery leader · virtual sell value</small><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("arrow")}</a>${icon("collection", "large-icon")}</div></section>`;
+}
+function gameCard(
+  row,
+  { selectable = false, actions = false, owned = false } = {},
+) {
+  const template = cardMap[row.template_id || row.id] || row;
+  const t = presentedCard(
+    template,
+    owned ||
+      Boolean(row.template_id) ||
+      state.inventory.some((c) => c.template_id === template.id),
+  );
+  const val = Number(row.value ?? t.value);
+  const rarity = t.rarity.toLowerCase();
+  return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div><div class="card-portrait"><img src="${image(t.image || (t.set === "world" ? "/img/leader-placeholder.svg" : "/img/apex.png"), 400)}" loading="lazy" alt="${t.id === "locked-world-chase" ? "Locked mystery leader" : "Portrait of " + esc(t.name)}"></div><div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3><p>${esc(t.flavor || "The court approves. Probably.")}</p><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${!owned && t.page ? `<a class="portrait-source" href="${esc(t.page)}" target="_blank" rel="noopener noreferrer">${esc(t.role || "Portrait source")} ↗</a>` : ""}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}</article>`;
+}
+function collection() {
+  const mine = state.inventory;
+  let filtered = mine.filter((c) => {
+    const t = cardMap[c.template_id];
+    return (
+      t &&
+      (state.rarity === "all" || t.rarity === state.rarity) &&
+      (state.set === "all" || t.set === state.set) &&
+      t.name.toLowerCase().includes(state.search.toLowerCase())
+    );
+  });
+  filtered.sort((a, b) =>
+    state.sort === "value" ? Number(b.value) - Number(a.value) : b.id - a.id,
+  );
+  $("#main").innerHTML =
+    title(
+      "THE ROYAL ARCHIVES",
+      "Your collection.",
+      "A kingdom is only as good as its questionable possessions.",
+    ) +
+    `<div class="stats-row"><div><span>CARDS COLLECTED</span><strong>${mine.length}</strong></div><div><span>COLLECTION VALUE</span><strong>${money(mine.reduce((s, c) => s + Number(c.value), 0))}</strong></div><div><span>UNIQUE TEMPLATES</span><strong>${new Set(mine.map((c) => c.template_id)).size}</strong></div><div><span>SAFELY VAULTED</span><strong>${mine.filter((c) => c.vaulted).length}</strong></div></div><div class="toolbar"><input id="card-search" aria-label="Search cards" placeholder="Search your collection…" value="${esc(state.search)}"><select id="rarity-filter" aria-label="Filter rarity"><option value="all">All rarities</option>${[...rarities, "Chase"].map((r) => `<option ${state.rarity === r ? "selected" : ""}>${r}</option>`).join("")}</select><select id="set-filter" aria-label="Filter collection">${[
+      ["all", "All collections"],
+      ["brainrot", "Brainrot"],
+      ["royal", "Royal court"],
+      ["world", "World leaders"],
+      ["alpha", "Mystery Gold"],
+    ]
+      .map(
+        ([v, t]) =>
+          `<option value="${v}" ${state.set === v ? "selected" : ""}>${t}</option>`,
+      )
+      .join(
+        "",
+      )}</select><select id="sort-filter" aria-label="Sort cards"><option value="recent">Most recent</option><option value="value" ${state.sort === "value" ? "selected" : ""}>Highest value</option></select><button class="button ghost small" data-action="sell-selected" ${state.selected.size ? "" : "disabled"}>Sell selected (${state.selected.size})</button></div>${filtered.length ? `<p class="muted">${filtered.length} cards · Click cards to select for a bulk sale. Duplicates: ${mine.length - new Set(mine.map((c) => c.template_id)).size}</p><div class="collection-grid">${filtered.map((row) => gameCard(row, { selectable: !row.vaulted && !row.trade_id, actions: true, owned: true })).join("")}</div>` : empty("collection", state.user ? "Your court is looking a little empty." : "Your collection starts with a crown.", "Open a pack to discover your first cards.", state.user ? "Explore packs" : "Join the court", state.user ? "go-packs" : "auth")}`;
+}
+function empty(symbol, heading, text, button, action) {
+  return `<div class="empty-state">${icon(symbol)}<h2>${heading}</h2><p>${text}</p>${button ? `<button class="button" data-action="${action}">${button} ${icon("arrow")}</button>` : ""}</div>`;
+}
+function loading() {
+  return '<div class="loading-panel"><span></span><span></span><span></span></div>';
+}
+function countdown(time) {
+  const n = Math.max(0, Math.floor((new Date(time) - Date.now()) / 1000));
+  return `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+}
+async function potView() {
+  const v = renderVersion,
+    request = ++viewRequest;
+  $("#main").innerHTML =
+    title(
+      "THE GLOBAL POT",
+      "One pot. One monarch.",
+      "A bigger stake buys a bigger chance. Even a penny can take the crown.",
+    ) + loading();
+  try {
+    const p = await api("pot");
+    if (v !== renderVersion || request !== viewRequest) return;
+    const previous = state.pot;
+    state.pot = p;
+    if (
+      previous &&
+      Number(previous.round.id) !== Number(p.round.id) &&
+      p.history[0]
+    ) {
+      toast(
+        `${p.history[0].username} won ${money(Number(p.history[0].total))} in the global pot!`,
+      );
+      sound("Crown");
+    }
+    const total = Number(p.round.total);
+    const own = p.entrants.find((e) => e.user_id === state.user?.id);
+    $("#main").innerHTML =
+      title(
+        "THE GLOBAL POT",
+        "One pot. One monarch.",
+        "A bigger stake buys a bigger chance. Even a penny can take the crown.",
+      ) +
+      `<div class="pot-layout"><section class="pot-main panel"><span class="live-badge"><i></i> ROUND #${p.round.id}</span><div class="pot-trophy">${icon("pot")}</div><span class="eyebrow">THE ROYAL POT</span><div class="pot-total">${money(total)}</div><span class="muted">Entirely virtual. Entirely up for grabs.</span><div class="countdown" data-countdown="${p.round.ends_at}">${countdown(p.round.ends_at)}</div><span class="eyebrow">UNTIL THE NEXT CORONATION</span><div class="pot-progress"><span style="width:${Math.max(0, 100 - ((new Date(p.round.ends_at) - Date.now()) / 600000) * 100)}%"></span></div><div class="pot-summary"><span>${p.entrants.length} entrants</span><span>Your chance: ${total && own ? ((Number(own.amount) / total) * 100).toFixed(2) : "0"}%</span></div><form id="wager-form"><label for="stake">Your wager (virtual GBP)</label><div class="input-button"><input id="stake" name="stake" type="number" min="0.01" step="0.01" placeholder="0.01" required><button class="button">Take a seat ${icon("arrow")}</button></div></form><small class="muted">Winner takes the full pot. Wagers cannot be cancelled.</small></section><section class="panel entrants"><h2>The court is in session</h2><p class="muted">Every penny is a ticket to the throne.</p>${p.entrants.length ? p.entrants.map((e) => `<div class="list-row"><span class="avatar">${esc(e.username.slice(0, 1))}</span><div><strong>${esc(e.username)}</strong><small>${((Number(e.amount) / total) * 100).toFixed(2)}% chance</small></div><b>${money(Number(e.amount))}</b></div>`).join("") : empty("pot", "An empty throne.", "Be the first to enter this round.", "", "")}</section></div>${p.history[0] ? `<div class="coronation panel">${icon("crown")}<div><span class="eyebrow">THE LATEST CORONATION</span><h2>${esc(p.history[0].username)} takes the throne.</h2><p>${money(Number(p.history[0].total))} in fictional GBP · Round #${p.history[0].id}</p></div></div>` : ""}<section class="panel history"><h2>Recent coronations</h2>${p.history.length ? p.history.map((h) => `<div class="list-row"><span>${icon("crown")} ${esc(h.username)}</span><small>Round #${h.id}</small><b>${money(Number(h.total))}</b></div>`).join("") : '<p class="muted">Completed rounds appear here. No monarch has been crowned yet.</p>'}</section>`;
+  } catch (e) {
+    if (v === renderVersion && request === viewRequest) errorView(e);
+  }
+}
+function rewardsView() {
+  const a = state.account;
+  const earned =
+    a?.reward_day === new Date().toISOString().slice(0, 10)
+      ? a.daily_reward
+      : 0;
+  const seconds =
+    a?.reward_day === new Date().toISOString().slice(0, 10)
+      ? a.active_seconds
+      : 0;
+  $("#main").innerHTML =
+    title(
+      "A LITTLE ROYAL ALLOWANCE",
+      "Good things come to players.",
+      "Keep playing. The treasury picks up the tab.",
+    ) +
+    `<div class="rewards-layout"><section class="panel reward-card">${icon("rewards", "reward-icon")}<span class="eyebrow">YOUR DAILY PLAY REWARD</span><h2>£0.50 <span>/ 10 minutes</span></h2><p>For every ten minutes of active play, a little more for your next pack.</p><div class="reward-track">${Array.from({ length: 6 }, (_, i) => `<span class="${earned > i * 50 ? "claimed" : ""}">${earned > i * 50 ? icon("check") : icon("coin")}<small>£0.50</small></span>`).join("")}</div><div class="pot-progress"><span style="width:${Math.min(100, (seconds / 600) * 100)}%"></span></div><div class="pot-summary"><span>${Math.floor(seconds / 60)} / 10 active minutes</span><span>${money(earned)} / £3.00 today</span></div><p class="muted">${earned >= 300 ? "Today’s £3.00 allowance is complete. Come back after midnight UTC." : "Rewards land in your balance automatically. Keep this tab visible and interact to count active time."}</p>${!state.user ? '<button class="button" data-action="auth">Start earning ' + icon("arrow") + "</button>" : ""}</section><section class="panel"><span class="eyebrow">YOUR FIRST ROYAL DECREE</span><h2>A £5.00 welcome.</h2><p>Every new account gets £5.00 of virtual cash. That’s five Brainrot Packs, or your first Royalty Booster.</p><div class="welcome-amount">£5<span>.00</span></div><button class="button ghost" data-action="${state.user ? "go-packs" : "auth"}">${state.user ? "Browse packs" : "Claim your welcome bonus"} ${icon("arrow")}</button><div class="fine-print">${icon("info")} Virtual currency only. Resets and daily limits use UTC. Background tabs earn nothing.</div></section></div>`;
+}
+async function friendsView() {
+  const v = renderVersion,
+    request = ++viewRequest;
+  $("#main").innerHTML = title(
+    "YOUR INNER CIRCLE",
+    "Build your royal court.",
+    "Good friends. Questionable trades. Perfectly friendly wagers.",
+  );
+  if (!state.user) {
+    $("#main").innerHTML += empty(
+      "friends",
+      "Every monarch needs a court.",
+      "Sign in to add friends, trade cards, and create private tables.",
+      "Join the court",
+      "auth",
+    );
+    return;
+  }
+  $("#main").innerHTML += loading();
+  try {
+    const data = await api("friends");
+    if (v !== renderVersion || request !== viewRequest) return;
+    state.friends = data;
+    $("#main").innerHTML =
+      title(
+        "YOUR INNER CIRCLE",
+        "Build your royal court.",
+        "Good friends. Questionable trades. Perfectly friendly wagers.",
+      ) +
+      `<div class="friend-code panel"><div><span class="eyebrow">YOUR FRIEND CODE</span><strong>${esc(state.account.friend_code)}</strong><small>Share this code with your friends.</small></div><button class="button ghost small" data-action="copy-code">Copy code</button><form id="add-friend" class="input-button"><input name="code" aria-label="Friend code" placeholder="Enter a friend’s code" minlength="6" maxlength="6" required><button class="button">Add friend ${icon("arrow")}</button></form></div><div class="friends-layout"><section class="panel"><h2>Your court <span class="count">${data.friends.length}</span></h2>${data.friends.length ? data.friends.map((f) => `<div class="list-row friend-row"><span class="avatar">${esc(f.username[0])}</span><div><strong>${esc(f.username)}</strong><small>${esc(f.friend_code)}</small></div><button class="text-button" data-action="trade-create" data-id="${esc(f.id)}">Trade ${icon("arrow")}</button><button class="icon-button" data-action="unfriend" data-id="${esc(f.id)}" aria-label="Unfriend ${esc(f.username)}">${icon("close")}</button></div>`).join("") : empty("friends", "No friends. Yet.", "Swap codes and bring your friends into the court.", "", "")}</section><section class="panel"><h2>Private tables</h2><p class="muted">Five minutes. Two friends. Matched stakes. Winner takes 2×.</p><div class="table-controls"><button class="button ghost small" data-action="table-create">Create a table</button><form id="join-table" class="input-button"><input aria-label="Table join code" name="code" placeholder="Join code" required maxlength="6"><button class="button small">Join</button></form></div>${data.tables.map((t) => `<div class="list-row"><div><strong>${esc(t.code)} · ${money(Number(t.stake))}</strong><small>${esc(t.host_name)} ${t.guest_name ? "vs " + esc(t.guest_name) : "· waiting for a friend"}</small></div><span>${t.settled ? (t.winner_id ? (t.winner_id === state.user.id ? "You won!" : "Round complete") : "Expired · refunded") : `<span data-countdown="${t.ends_at}">${countdown(t.ends_at)}</span>`}</span></div>`).join("")}</section></div><section class="panel history"><div class="section-heading"><h2>The trading floor</h2><button class="text-button" data-action="refresh">Refresh ${icon("arrow")}</button></div><p class="muted">Offered cards are reserved. Updating an offer resets both confirmations. Both players must confirm.</p>${data.trades.length ? data.trades.map((t) => `<div class="list-row"><div><strong>${esc(t.name_a)} ↔ ${esc(t.name_b)}</strong><small>${t.offer_a.length} cards for ${t.offer_b.length} cards · ${esc(t.status)}</small></div>${t.status === "open" ? `<button class="button ghost small" data-action="trade-open" data-id="${t.id}">Open trade</button>` : icon("check")}</div>`).join("") : '<p class="muted">Start a trade from your friends list.</p>'}</section>`;
+  } catch (e) {
+    if (v === renderVersion && request === viewRequest) errorView(e);
+  }
+}
+async function leaderboardView() {
+  const v = renderVersion,
+    request = ++viewRequest;
+  $("#main").innerHTML =
+    title(
+      "LONG LIVE THE LEADERBOARD",
+      "A very public flex.",
+      "The richest, the luckiest, and the royally obsessed.",
+    ) +
+    `<div class="board-tabs">${[
+      ["wealth", "Richest monarchs"],
+      ["seller", "Heaviest sellers"],
+      ["packs", "Packs opened"],
+      ["cards", "Cards pulled"],
+      ["alpha", "Alpha collectors"],
+    ]
+      .map(
+        ([id, label]) =>
+          `<button class="filter-button ${state.board === id ? "active" : ""}" data-action="board" data-id="${id}">${label}</button>`,
+      )
+      .join(
+        "",
+      )}<button class="text-button" data-action="refresh">Refresh ${icon("arrow")}</button></div><div id="ranking">${loading()}</div>`;
+  try {
+    const rows = await api("leaderboards?board=" + state.board);
+    if (v !== renderVersion || request !== viewRequest) return;
+    const own = rows.findIndex((r) => r.id === state.user?.id);
+    const score = (r) =>
+      ["wealth", "seller"].includes(state.board)
+        ? money(Number(r.score))
+        : Number(r.score).toLocaleString();
+    $("#ranking").innerHTML =
+      `${own >= 0 ? `<div class="pinned-rank panel">${icon("crown")} Your rank <strong>#${rows[own].rank || own + 1}</strong><span>${esc(rows[own].username)}</span><b>${score(rows[own])}</b></div>` : ""}<section class="panel">${rows.length ? `<div class="ranking-row ranking-header"><span>RANK</span><span>MONARCH</span><span>${state.board === "wealth" ? "CASH + COLLECTION" : "TOTAL"}</span></div>${rows.map((r, i) => `<div class="ranking-row ${r.id === state.user?.id ? "is-you" : ""}"><span class="rank-number">${i < 3 ? icon("crown") : ""} ${r.rank || i + 1}</span><strong>${esc(r.username)} ${r.id === state.user?.id ? "<small>YOU</small>" : ""}</strong><b>${score(r)}</b></div>`).join("")}` : empty("leaderboards", "An unclaimed throne.", "Create an account and start your climb.", "Join the court", "auth")}</section>`;
+  } catch (e) {
+    if (v === renderVersion && request === viewRequest) errorView(e);
+  }
+}
+async function profileView() {
+  const version = renderVersion,
+    request = ++viewRequest;
+  if (!state.user) {
+    $("#main").innerHTML =
+      title(
+        "YOUR ROYAL RECORD",
+        "A kingdom of your own.",
+        "Join the court to build your collection and track your virtual cash.",
+      ) +
+      empty(
+        "crown",
+        "Your throne awaits.",
+        "Create an account to receive your £5 welcome bonus.",
+        "Join the court",
+        "auth",
+      );
+    return;
+  }
+  $("#main").innerHTML =
+    title(
+      "YOUR ROYAL RECORD",
+      esc(state.account?.username || "Monarch"),
+      "Every penny accounted for. Every questionable decision, documented.",
+    ) + loading();
+  try {
+    const rows = await api("ledger");
+    if (version !== renderVersion || request !== viewRequest) return;
+    $("#main").innerHTML =
+      title(
+        "YOUR ROYAL RECORD",
+        esc(state.account.username),
+        "Every penny accounted for. Every questionable decision, documented.",
+      ) +
+      `<div class="stats-row"><div><span>VIRTUAL BALANCE</span><strong>${money(state.account.balance)}</strong></div><div><span>PACKS OPENED</span><strong>${state.account.packs}</strong></div><div><span>ALL-TIME SALES</span><strong>${money(state.account.sold)}</strong></div><div><span>FRIEND CODE</span><strong>${esc(state.account.friend_code)}</strong></div></div><div class="section-heading"><h2>Your accounting ledger</h2><button class="button ghost small" data-action="logout">Sign out</button></div><section class="panel ledger">${rows.map((r) => `<div class="list-row"><div><strong>${esc(r.reason)}</strong><small>${new Date(r.created_at).toLocaleString("en-GB")}</small></div><b class="${Number(r.amount) > 0 ? "positive" : "negative"}">${Number(r.amount) > 0 ? "+" : ""}${money(Number(r.amount))}</b><span>Balance ${money(Number(r.balance))}</span></div>`).join("")}</section>`;
+  } catch (e) {
+    if (version === renderVersion && request === viewRequest) errorView(e);
+  }
+}
+function errorView(e) {
+  $("#main").innerHTML +=
+    `<div class="error-box" role="alert">${esc(e.message)} <button class="text-button" data-action="refresh">Try again</button></div>`;
+  $(".loading-panel")?.remove();
+}
+function render() {
+  renderVersion++;
+  shell();
+  (
+    ({
+      packs: shop,
+      collection,
+      rewards: rewardsView,
+      pot: potView,
+      friends: friendsView,
+      leaderboards: leaderboardView,
+      profile: profileView,
+      codex: codexView,
+    })[state.view] || shop
+  )();
+}
+function navigate(view) {
+  if (location.hash === "#" + view) {
+    state.view = view;
+    render();
+  } else location.hash = view;
+}
+window.addEventListener("hashchange", () => {
+  const v = location.hash.slice(1);
+  if ([...tabs, "profile", "codex"].includes(v)) {
+    state.view = v;
+    state.selected.clear();
+    render();
+    if (state.user && ["collection", "profile", "friends"].includes(v))
+      sync()
+        .then(() => {
+          if (state.view === v) render();
+        })
+        .catch((e) => toast(e.message));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
+function authModal(mode = "signup") {
+  showModal(
+    `<div class="auth-heading">${icon("crown")}<span class="eyebrow">YOUR KINGDOM AWAITS</span><h2>${mode === "signup" ? "Join the court." : "Welcome back, monarch."}</h2><p>${mode === "signup" ? "Your first £5.00 of virtual cash is on us." : "Your collection missed you. Probably."}</p></div><div class="auth-tabs"><button data-action="auth-signup" class="${mode === "signup" ? "active" : ""}">Create account</button><button data-action="auth-login" class="${mode === "login" ? "active" : ""}">Sign in</button></div><form id="auth-form" data-mode="${mode}">${mode === "signup" ? '<label>Username<input name="username" autocomplete="nickname" minlength="3" maxlength="24" required placeholder="Your royal name"></label>' : ""}<label>Email<input name="email" type="email" autocomplete="email" placeholder="you@yourkingdom.com" required></label><label>Password<input name="password" type="password" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" minlength="8" required placeholder="At least 8 characters"></label><p class="form-error" role="alert"></p><button class="button full" type="submit">${mode === "signup" ? "Create account & claim £5" : "Enter your kingdom"} ${icon("arrow")}</button></form>${mode === "login" ? '<button class="text-button forgot" data-action="forgot">Forgot password?</button>' : ""}<div class="or-divider">or</div><button class="button google full" data-action="google"><span class="google-g">G</span> Continue with Google</button><p id="oauth-note" class="fine-print"></p><p class="fine-print">Just a game. All money is fictional virtual GBP. No purchases, deposits, or withdrawals.</p>`,
+    "auth-modal",
+  );
+  getSettings()
+    .then((settings) => {
+      if (!modal.open) return;
+      const btn = $("[data-action=google]", modal);
+      if (btn && !settings.providers?.google) {
+        $("#oauth-note").textContent =
+          "Google sign-in is awaiting provider configuration. You can create an account with email now.";
+        btn.disabled = true;
+      }
+    })
+    .catch(() => {});
+}
+function oddsModal(id) {
+  const list = id ? packs.filter((p) => p.id === id) : packs;
+  showModal(
+    `<span class="eyebrow">NOTHING UP OUR ROYAL SLEEVES</span><h2>Know your odds.</h2><p>These are the base odds per card. Every tenth successful pack purchase across all types contains an Epic or better; a low card is upgraded if needed. Apex also keeps its Crown guarantee. These guarantees improve the final outcome beyond the base odds. A pack’s sell value can be lower or higher than its price.</p>${list
+      .map(
+        (p) =>
+          `<div class="odds-section"><h3>${p.name} <span>${money(p.price)} · ${p.count} cards</span></h3>${rarities.map((r, i) => `<div class="odds-row"><span class="rarity-dot rarity-${r.toLowerCase()}"></span><span>${r === "Alpha" ? "Mystery Gold (Alpha)" : r}</span><b>${p.odds[i] / 1000000}%</b></div>`).join("")}<p>${esc(
+            presentedCard(
+              cardMap[p.chase],
+              state.inventory.some((c) => c.template_id === p.chase),
+            ).name,
+          )} · 1 in ${p.chaseOdds.toLocaleString()} packs · ${money(cardMap[p.chase].value)}</p>${p.guarantee ? "<small>Crown or better guaranteed: the lowest card is replaced if needed.</small>" : ""}</div>`,
+      )
+      .join(
+        "",
+      )}<p class="fine-print">Chase rolls are separate and replace the lowest-value eligible card. Alpha cards are never replaced. No duplicate template unless its rarity pool is exhausted. Mystery Gold: £10,000 base value, globally numbered. All values are fictional.</p>`,
+    "odds-modal",
+  );
+}
+function sound(rarity) {
+  if (state.muted) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(),
+      g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(260, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(
+      ["Alpha", "Chase", "Crown"].includes(rarity) ? 1040 : 520,
+      ctx.currentTime + 0.25,
+    );
+    g.gain.setValueAtTime(0.065, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.6);
+    o.onended = () => ctx.close();
+  } catch {}
+}
+async function buyPack(id) {
+  if (!requireUser()) return;
+  await sync();
+  const p = packs.find((p) => p.id === id);
+  if (Number(state.account?.balance) < p.price) {
+    toast("Not enough virtual cash. Sell cards or earn active-play rewards.");
+    return;
+  }
+  showModal(
+    `<span class="eyebrow">YOUR NEXT ROYAL MISTAKE</span><h2>Open ${p.name}?</h2><p>${p.count} cards. Independent random rolls. One pack costs ${money(p.price)} of virtual cash.</p>${guaranteeProgress()}<div class="purchase-preview">${packArt(p)}</div><p class="fine-print">You might pull less than you spend, or something worth much more. Chase odds: 1 in ${p.chaseOdds.toLocaleString()}.${p.id === "world" ? " Includes former leaders and a satirical −£25 Keir Starmer card. Negative cards reduce collection value; discarding one charges its penalty. No automatic penalty debit on opening." : ""}</p><button class="button full" data-action="confirm-buy" data-id="${p.id}">Open for ${money(p.price)} ${icon("arrow")}</button>`,
+    "purchase-modal",
+  );
+}
+async function openPack(id) {
+  if (state.busy) return;
+  state.busy = true;
+  const p = packs.find((p) => p.id === id);
+  showModal(
+    `<span class="eyebrow">THE COURT HOLDS ITS BREATH</span><h2>A little suspense…</h2><div class="opening-pack">${packArt(p)}</div><p class="muted">Opening your ${p.name}.</p>`,
+    "opening-modal",
+  );
+  try {
+    const [result] = await Promise.all([
+      api("open", { pack: id }),
+      new Promise((resolve) => setTimeout(resolve, 950)),
+    ]);
+    state.account = result.account;
+    state.inventory = [...result.cards, ...state.inventory];
+    updateWallet();
+    state.busy = false;
+    let revealed = 0;
+    const cards = result.cards;
+    const total = cards.reduce((s, c) => s + Number(c.value), 0);
+    function revealMarkup() {
+      showModal(
+        `<span class="eyebrow">${esc(p.name.toUpperCase())} · ${revealed} / ${cards.length} REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= p.price ? "positive" : "negative"}">${total >= p.price ? "+" : ""}${money(total - p.price)} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div><button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "To my collection" : "Reveal all cards"} ${icon("arrow")}</button>`,
+        "reveal-modal",
+      );
+    }
+    revealMarkup();
+    let animationTimer;
+    let releaseEffects = () => {};
+    let animating = false;
+    const handler = (e) => {
+      if (animating) return;
+      const b = e.target.closest("[data-action]");
+      if (!b) return;
+      if (["reveal-card", "reveal-all"].includes(b.dataset.action)) {
+        if (
+          b.dataset.action === "reveal-card" &&
+          Number(b.dataset.index) !== revealed
+        ) {
+          toast("Reveal your cards from left to right.");
+          return;
+        }
+        const start = revealed;
+        revealed =
+          b.dataset.action === "reveal-all" ? cards.length : revealed + 1;
+        const newCards = cards.slice(start, revealed);
+        const ranks = ["Common", "Uncommon", "Epic", "Crown", "Chase", "Alpha"];
+        sound(
+          newCards.reduce(
+            (best, c) =>
+              ranks.indexOf(c.rarity) > ranks.indexOf(best) ? c.rarity : best,
+            "Common",
+          ),
+        );
+        releaseEffects();
+        revealMarkup();
+        const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        newCards.forEach((c) => {
+          const target = $(".reveal-cards", modal).children[cards.indexOf(c)];
+          target.classList.add("new-reveal");
+          if (c.rarity === "Epic") target.classList.add("epic-reveal");
+        });
+        const trumpIndex = cards.findIndex(
+          (c) =>
+            newCards.includes(c) &&
+            cardMap[c.template_id]?.name === "Donald Trump",
+        );
+        if (trumpIndex >= 0 && !reduced) {
+          const target = $(".reveal-cards", modal).children[trumpIndex];
+          target.classList.add("presidential-reveal");
+          target.insertAdjacentHTML(
+            "beforeend",
+            '<div class="missile-salute" aria-hidden="true"><i></i><i></i><i></i><b></b></div>',
+          );
+        }
+        if (newCards.some((c) => ["Alpha", "Chase"].includes(c.rarity))) {
+          modal.insertAdjacentHTML(
+            "beforeend",
+            `<div class="celebration" aria-hidden="true">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i};--x:${((i % 6) - 2.5) * 80}px;--y:${Math.floor(i / 6) % 2 ? -240 : 200}px"></i>`).join("")}</div>`,
+          );
+        }
+        if (newCards.some((c) => c.id === "kim" || c.template_id === "kim")) {
+          const kimIndex = cards.findIndex(
+            (c) => newCards.includes(c) && c.template_id === "kim",
+          );
+          if (kimIndex >= 0) {
+            const target = $(".reveal-cards", modal).children[kimIndex];
+            target.classList.add("supreme-reveal");
+            target.insertAdjacentHTML(
+              "beforeend",
+              '<div class="supreme-salute" aria-hidden="true"><span>☭</span><span>☭</span><span>☭</span><span>☭</span></div>',
+            );
+          }
+          if (!reduced) modal.classList.add("supreme-shake");
+        } else if (
+          newCards.some((c) => ["Alpha", "Chase", "Crown"].includes(c.rarity))
+        ) {
+          modal.classList.add("legendary-flash");
+        }
+        const hasKim = newCards.some((c) => c.template_id === "kim");
+        const duration = reduced
+          ? 0
+          : trumpIndex >= 0
+            ? 2000
+            : hasKim
+              ? 1800
+              : newCards.some((c) =>
+                    ["Epic", "Crown", "Chase", "Alpha"].includes(c.rarity),
+                  )
+                ? 1800
+                : 550;
+        const controls = [...modal.querySelectorAll("button")].map((button) => [
+          button,
+          button.disabled,
+        ]);
+        releaseEffects = () => {
+          clearTimeout(animationTimer);
+          animating = false;
+          controls.forEach(([button, disabled]) => {
+            button.disabled = disabled;
+          });
+          modal.classList.remove("supreme-shake", "legendary-flash");
+          modal
+            .querySelectorAll(".celebration,.supreme-salute,.missile-salute")
+            .forEach((node) => node.remove());
+        };
+        if (duration) {
+          animating = true;
+          controls.forEach(([button]) => {
+            button.disabled = true;
+          });
+          animationTimer = setTimeout(() => {
+            releaseEffects();
+            if (hasKim && modal.open)
+              toast("SUPREME PULL · KIM JONG UN · £210,000 VIRTUAL");
+          }, duration);
+        } else {
+          releaseEffects();
+          if (hasKim) toast("SUPREME PULL · KIM JONG UN · £210,000 VIRTUAL");
+        }
+      }
+      if (b.dataset.action === "reveal-done") {
+        modal.removeEventListener("click", handler);
+        closeModal();
+        navigate("collection");
+      }
+    };
+    modal.addEventListener("click", handler);
+    modal.addEventListener(
+      "close",
+      () => {
+        releaseEffects();
+        modal.removeEventListener("click", handler);
+      },
+      { once: true },
+    );
+  } catch (e) {
+    state.busy = false;
+    closeModal();
+    toast(e.message);
+  }
+}
+function sellModal(selected) {
+  const rows = state.inventory.filter((r) => selected.includes(r.id));
+  if (!rows.length) {
+    toast("Select cards to sell first.");
+    return;
+  }
+  if (rows.some((r) => r.vaulted || r.trade_id)) {
+    toast("Unvault cards or cancel their trade before selling.");
+    return;
+  }
+  showModal(
+    `<span class="eyebrow">A CONTRIBUTION TO THE TREASURY</span><h2>Sell ${rows.length} card${rows.length === 1 ? "" : "s"}?</h2><p>These cards leave your collection permanently.</p><div class="sale-list">${rows.map((r) => `<div class="list-row"><span>${esc(cardMap[r.template_id]?.name)}</span><b>${money(Number(r.value))}</b></div>`).join("")}</div><div class="sale-total">${rows.reduce((s, r) => s + Number(r.value), 0) < 0 ? "You pay (penalty)" : "You receive"} <strong>${money(Math.abs(rows.reduce((s, r) => s + Number(r.value), 0)))}</strong></div><button class="button full" data-action="confirm-sell" data-ids="${rows.map((r) => r.id).join(",")}">Confirm sale ${icon("arrow")}</button>`,
+  );
+}
+async function tradeModal(id) {
+  const t = state.friends?.trades.find((t) => t.id === Number(id));
+  if (!t) return;
+  const side = t.user_a === state.user.id ? "a" : "b";
+  const rows = await api("trades/cards?id=" + id);
+  const otherRows = rows.filter((r) => r.owner_id !== state.user.id);
+  const mine = state.inventory.filter(
+    (r) => !r.vaulted && (!r.trade_id || r.trade_id === t.id),
+  );
+  showModal(
+    `<span class="eyebrow">FRIEND-TO-FRIEND · TRADE #${t.id}</span><h2>${esc(t.name_a)} ↔ ${esc(t.name_b)}</h2><p>Your offered cards are reserved until this trade ends.</p><form id="trade-offer" data-id="${t.id}"><h3>Your offer</h3><div class="trade-picker">${mine.length ? mine.map((r) => `<label><input type="checkbox" name="cards" value="${r.id}" ${t["offer_" + side].includes(r.id) ? "checked" : ""}><span>${esc(cardMap[r.template_id]?.name)} <small>${money(Number(r.value))}</small></span></label>`).join("") : "<p>No available cards. Unvault a card or open a pack.</p>"}</div><button class="button ghost small">Save offer & reserve cards</button></form><h3>Their offer</h3>${otherRows.length ? otherRows.map((r) => `<div class="list-row"><span>${esc(cardMap[r.template_id]?.name)}</span><b>${money(Number(r.value))}</b></div>`).join("") : '<p class="muted">Waiting for their offer.</p>'}<p class="fine-print">You: ${t["confirm_" + side] ? "confirmed" : "not confirmed"} · Friend: ${t["confirm_" + (side === "a" ? "b" : "a")] ? "confirmed" : "not confirmed"}. Saving either offer resets both confirmations.</p><div class="modal-buttons"><button class="button" data-action="trade-confirm" data-id="${t.id}" data-offera="${esc(JSON.stringify(t.offer_a))}" data-offerb="${esc(JSON.stringify(t.offer_b))}" ${t["confirm_" + side] ? "disabled" : ""}>Confirm this exchange</button><button class="text-button" data-action="trade-cancel" data-id="${t.id}">Cancel trade</button><button class="text-button" data-action="trade-reload" data-id="${t.id}">Refresh</button></div>`,
+    "trade-modal",
+  );
+}
+document.addEventListener("click", async (e) => {
+  const target = e.target.closest("[data-action]");
+  if (!target || target.disabled) return;
+  const action = target.dataset.action,
+    id = target.dataset.id;
+  try {
+    if (action === "codex") return navigate("codex");
+    if (action === "roster-more") {
+      state.rosterLimit += 40;
+      codexView();
+      return;
+    }
+    if (action === "close") return closeModal();
+    if (action === "auth") return authModal();
+    if (action === "auth-login") return authModal("login");
+    if (action === "auth-signup") return authModal("signup");
+    if (action === "google") {
+      await oauthLogin("google");
+      return;
+    }
+    if (action === "forgot") {
+      const email = $("[name=email]", modal)?.value;
+      if (!email) {
+        toast("Enter your email address first.");
+        return;
+      }
+      await requestPasswordRecovery(email);
+      toast("Check your email for a password reset link.");
+      return;
+    }
+    if (action === "logout") {
+      await logout();
+      state.user = null;
+      state.account = null;
+      state.inventory = [];
+      navigate("packs");
+      render();
+      return;
+    }
+    if (action === "profile") return navigate("profile");
+    if (action === "go-packs") return navigate("packs");
+    if (action === "mute") {
+      state.muted = !state.muted;
+      target.innerHTML =
+        icon("sound") + `<span>${state.muted ? "Off" : "On"}</span>`;
+      target.setAttribute(
+        "aria-label",
+        state.muted ? "Unmute sound" : "Mute sound",
+      );
+      return;
+    }
+    if (action === "how") {
+      showModal(
+        `<span class="eyebrow">THE ROYAL HANDBOOK</span><h2>Welcome to the chaos.</h2><div class="how-steps">${[
+          [
+            "01",
+            "Join the court",
+            "Create an account and receive £5.00 in fictional virtual GBP.",
+          ],
+          [
+            "02",
+            "Pick a pack",
+            "Open individually randomized cards. Some packs return less than they cost; lucky pulls return more.",
+          ],
+          [
+            "03",
+            "Build your kingdom",
+            "Keep and vault your favourites. Sell the rest, or trade cards directly with friends.",
+          ],
+          [
+            "04",
+            "Take your chances",
+            "Enter the weighted global pot, or play equal-stake double-or-nothing at a friend’s private table.",
+          ],
+          [
+            "05",
+            "Earn your allowance",
+            "Earn £0.50 per 10 active minutes, up to £3.00 daily. Background tabs do not count.",
+          ],
+        ]
+          .map(
+            ([n, h, p]) =>
+              `<div><span>${n}</span><section><h3>${h}</h3><p>${p}</p></section></div>`,
+          )
+          .join(
+            "",
+          )}</div><p class="fine-print">All money is fictional. There are no payments, deposits, withdrawals, or cash prizes.</p>`,
+      );
+      return;
+    }
+    if (action === "scroll-shop") {
+      e.preventDefault();
+      $("#shop")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    if (action === "filter") {
+      state.filter = target.dataset.filter;
+      shop();
+      $("#shop")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (action === "world") {
+      state.filter = "world";
+      shop();
+      $("#shop")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+    if (action === "odds") return oddsModal(id);
+    if (action === "all-odds") return oddsModal();
+    if (action === "buy") return buyPack(id);
+    if (action === "confirm-buy") return openPack(id);
+    if (action === "select-card") {
+      if (e.target.closest("button")) return;
+      if (state.selected.has(Number(id))) state.selected.delete(Number(id));
+      else if (state.selected.size < 200) state.selected.add(Number(id));
+      else toast("Select up to 200 cards.");
+      collection();
+      return;
+    }
+    if (action === "sell-one") {
+      e.stopPropagation();
+      return sellModal([Number(id)]);
+    }
+    if (action === "sell-selected") return sellModal([...state.selected]);
+    if (action === "confirm-sell") {
+      if (state.busy) return;
+      target.disabled = true;
+      await api("sell", { ids: target.dataset.ids.split(",").map(Number) });
+      state.selected.clear();
+      await sync();
+      closeModal();
+      navigate("collection");
+      toast("Cards sold. The treasury thanks you.");
+      return;
+    }
+    if (action === "vault") {
+      e.stopPropagation();
+      await api("vault", { id: Number(id) });
+      await sync();
+      collection();
+      return;
+    }
+    if (action === "copy-code") {
+      await navigator.clipboard.writeText(state.account.friend_code);
+      toast("Friend code copied.");
+      return;
+    }
+    if (action === "unfriend") {
+      showModal(
+        `<h2>Leave this court?</h2><p>Open trades with this friend are cancelled and reserved cards are released.</p><button class="button" data-action="confirm-unfriend" data-id="${esc(id)}">Remove friend</button>`,
+      );
+      return;
+    }
+    if (action === "confirm-unfriend") {
+      await api("friends/remove", { id });
+      await sync();
+      closeModal();
+      friendsView();
+      return;
+    }
+    if (action === "table-create") {
+      showModal(
+        `<span class="eyebrow">A FRIENDLY LITTLE WAGER</span><h2>Set the table.</h2><p>Your friend matches your stake. After five minutes, the winner gets twice the stake. An unjoined table is refunded.</p><form id="create-table"><label>Your stake (virtual GBP)<input name="stake" type="number" min="0.01" step="0.01" required placeholder="1.00"></label><button class="button full">Create a 5-minute table ${icon("arrow")}</button></form>`,
+      );
+      return;
+    }
+    if (action === "trade-create") {
+      await api("trades/create", { friend: id });
+      await sync();
+      await friendsView();
+      toast("Trade opened. Pick your offer on the trading floor.");
+      return;
+    }
+    if (action === "trade-open") return tradeModal(id);
+    if (action === "trade-reload") {
+      const d = await api("friends");
+      state.friends = d;
+      await sync();
+      return tradeModal(id);
+    }
+    if (action === "trade-confirm" || action === "trade-cancel") {
+      target.disabled = true;
+      await api(
+        action === "trade-confirm" ? "trades/confirm" : "trades/cancel",
+        {
+          id: Number(id),
+          ...(action === "trade-confirm"
+            ? {
+                offerA: JSON.parse(target.dataset.offera),
+                offerB: JSON.parse(target.dataset.offerb),
+              }
+            : {}),
+        },
+      );
+      await sync();
+      closeModal();
+      await friendsView();
+      toast(
+        action === "trade-confirm"
+          ? "Confirmation saved. Cards swap when both friends confirm."
+          : "Trade cancelled. Cards released.",
+      );
+      return;
+    }
+    if (action === "board") {
+      state.board = id;
+      leaderboardView();
+      return;
+    }
+    if (action === "refresh") {
+      await sync();
+      render();
+      return;
+    }
+  } catch (err) {
+    toast(err.message);
+    target.disabled = false;
+  }
+});
+document.addEventListener("submit", async (e) => {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  e.preventDefault();
+  if (form.dataset.submitting) return;
+  form.dataset.submitting = "true";
+  const submit = $("button[type=submit],button:not([type])", form);
+  if (submit) submit.disabled = true;
+  const data = new FormData(form);
+  const pence = (key) => {
+    const raw = String(data.get(key) || "");
+    if (!/^\d+(\.\d{1,2})?$/.test(raw))
+      throw Error("Enter a GBP amount with at most two decimal places.");
+    const n = Math.round(Number(raw) * 100);
+    if (!Number.isSafeInteger(n) || n < 1)
+      throw Error("The minimum stake is £0.01.");
+    return n;
+  };
+  try {
+    if (form.id === "auth-form") {
+      const email = String(data.get("email")),
+        password = String(data.get("password"));
+      if (form.dataset.mode === "signup") {
+        const user = await signup(email, password, {
+          full_name: String(data.get("username")),
+        });
+        if (!user.emailVerified) {
+          $(".form-error", form).classList.add("positive");
+          $(".form-error", form).textContent =
+            "Check your email to confirm your account, then sign in to collect your £5 bonus.";
+          return;
+        }
+      } else await login(email, password);
+      state.user = await getUser();
+      await sync();
+      closeModal();
+      render();
+      toast("Welcome to the court.");
+    }
+    if (form.id === "wager-form") {
+      if (!requireUser()) return;
+      await api("wager", {
+        amount: pence("stake"),
+        round: Number(state.pot.round.id),
+      });
+      await sync();
+      potView();
+      toast("Your stake is in. May the odds be royal.");
+    }
+    if (form.id === "add-friend") {
+      await api("friends/add", { code: String(data.get("code")) });
+      friendsView();
+      toast("Your court just got bigger.");
+    }
+    if (form.id === "join-table") {
+      await api("tables/join", { code: String(data.get("code")) });
+      await sync();
+      friendsView();
+      toast("You joined the table. The draw happens at its deadline.");
+    }
+    if (form.id === "create-table") {
+      const t = await api("tables/create", { stake: pence("stake") });
+      await sync();
+      closeModal();
+      friendsView();
+      toast(`Table created. Share code ${t.code} with a friend.`);
+    }
+    if (form.id === "trade-offer") {
+      await api("trades/offer", {
+        id: Number(form.dataset.id),
+        ids: data.getAll("cards").map(Number),
+      });
+      await sync();
+      const d = await api("friends");
+      state.friends = d;
+      await tradeModal(form.dataset.id);
+      toast("Offer saved. Both confirmations reset.");
+    }
+    if (form.id === "reset-password") {
+      await updateUser({ password: String(data.get("password")) });
+      closeModal();
+      toast("Password updated.");
+      state.user = await getUser();
+      await sync();
+      render();
+    }
+  } catch (err) {
+    const inline = $(".form-error", form);
+    if (inline) inline.textContent = err.message;
+    else toast(err.message);
+  } finally {
+    delete form.dataset.submitting;
+    if (submit) submit.disabled = false;
+  }
+});
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.id === "rarity-filter") state.rarity = el.value;
+  else if (el.id === "set-filter") state.set = el.value;
+  else if (el.id === "sort-filter") state.sort = el.value;
+  else return;
+  collection();
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "roster-search") {
+    const pos = e.target.selectionStart;
+    state.rosterSearch = e.target.value;
+    state.rosterLimit = 40;
+    codexView();
+    $("#roster-search")?.focus();
+    $("#roster-search")?.setSelectionRange(pos, pos);
+    return;
+  }
+  if (e.target.id === "card-search") {
+    const pos = e.target.selectionStart;
+    state.search = e.target.value;
+    collection();
+    $("#card-search")?.focus();
+    $("#card-search")?.setSelectionRange(pos, pos);
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (
+    (e.key === "Enter" || e.key === " ") &&
+    e.target.matches("[data-action=select-card]")
+  ) {
+    e.preventDefault();
+    e.target.click();
+  }
+});
+["pointerdown", "keydown", "wheel", "touchstart"].forEach((event) =>
+  document.addEventListener(
+    event,
+    () => {
+      lastActivity = Date.now();
+    },
+    { passive: true },
+  ),
+);
+setInterval(() => {
+  document
+    .querySelectorAll("[data-countdown]")
+    .forEach((el) => (el.textContent = countdown(el.dataset.countdown)));
+}, 1000);
+let heartbeatPending = false;
+setInterval(async () => {
+  if (!state.user || heartbeatPending) return;
+  const userId = state.user.id;
+  heartbeatPending = true;
+  try {
+    const r = await api("heartbeat", {
+      visible: !document.hidden && Date.now() - lastActivity < 60000,
+    });
+    if (state.user?.id !== userId) return;
+    state.account = r.account;
+    updateWallet();
+    if (r.reward) {
+      toast(`Royal allowance received: ${money(r.reward)}.`);
+    }
+    if (state.view === "rewards") rewardsView();
+  } catch {
+  } finally {
+    heartbeatPending = false;
+  }
+}, 30000);
+let refreshPending = false;
+setInterval(async () => {
+  if (
+    refreshPending ||
+    document.hidden ||
+    modal.open ||
+    document.activeElement?.closest("form")
+  )
+    return;
+  const view = state.view;
+  refreshPending = true;
+  try {
+    if (view === "pot") await potView();
+    if (view === "friends") {
+      await sync();
+      if (state.view === view && !modal.open) await friendsView();
+    }
+    if (view === "leaderboards") await leaderboardView();
+  } catch (e) {
+    if (state.view === view) toast(e.message);
+  } finally {
+    refreshPending = false;
+  }
+}, 15000);
+async function boot() {
+  const initial = location.hash.slice(1);
+  if ([...tabs, "profile", "codex"].includes(initial)) state.view = initial;
+  render();
+  try {
+    const callback = await handleAuthCallback();
+    state.user = await getUser();
+    if (state.user) {
+      await sync();
+      render();
+    }
+    if (callback?.type === "recovery") {
+      showModal(
+        '<h2>A fresh royal password.</h2><form id="reset-password"><label>New password<input name="password" type="password" minlength="8" required autocomplete="new-password"></label><button class="button full">Save password</button></form>',
+      );
+    }
+    if (callback?.type === "confirmation")
+      toast("Email confirmed. Welcome to the court.");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+boot();
+function codexView() {
+  const all = catalog
+    .filter((c) => c.set === "world")
+    .map((c) =>
+      presentedCard(
+        c,
+        state.inventory.some((r) => r.template_id === c.id),
+      ),
+    );
+  const search = state.rosterSearch.toLowerCase();
+  const matched = all.filter((c) =>
+    `${c.name} ${c.country} ${c.role}`.toLowerCase().includes(search),
+  );
+  $("#main").innerHTML =
+    title(
+      "THE WORLD LEADERS COLLECTION",
+      "A world of questionable power.",
+      `${all.length} collectible leaders and collective offices from 195 countries, covering both heads of state and heads of government.`,
+    ) +
+    `<div class="codex-intro panel"><div><h2>Every leader has a price. A fictional one.</h2><p>The £10 World Leaders Pack contains four independently rolled cards. The mystery chase leader is isolated from normal pools: a separate 1-in-45,000 pack roll, with a £210,000 virtual sell value and a special unlock animation. Its identity stays hidden until you reveal the card. Trump returns £70. The former-leaders collection includes a satirical −£25 Keir Starmer card: it reduces collection value, and discarding it costs £25 (confirmed before charging).</p></div><button class="button" data-action="buy" data-id="world">Open for £10 ${icon("arrow")}</button></div><div class="toolbar"><input id="roster-search" aria-label="Search leaders or countries" placeholder="Search by leader, country, or role…" value="${esc(state.rosterSearch)}"><button class="button ghost small" data-action="odds" data-id="world">Pack odds ${icon("info")}</button></div><p class="source-note">Roster snapshot: ${esc(leaderSource.retrieved)}. <a href="${esc(leaderSource.source)}" target="_blank" rel="noopener noreferrer">Current heads of state and government ↗</a>. Leadership can change. Portrait links on each card provide individual image sources and licensing information. Values and rarities are fictional game assignments, unrelated to real-world wealth or status. Some offices have no available portrait; those cards use clearly labelled fallback artwork.</p><p class="muted">${matched.length} matching cards · Showing ${Math.min(matched.length, state.rosterLimit)}</p><div class="collection-grid">${matched
+      .slice(0, state.rosterLimit)
+      .map((c) => gameCard(c))
+      .join(
+        "",
+      )}</div>${matched.length > state.rosterLimit ? '<button class="button ghost full" data-action="roster-more">Show more leaders ' + icon("arrow") + "</button>" : ""}`;
+}
