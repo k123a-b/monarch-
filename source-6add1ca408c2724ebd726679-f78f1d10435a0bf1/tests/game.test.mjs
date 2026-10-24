@@ -25,6 +25,16 @@ const rng =
           ? 0
           : max - 1
         : 0;
+test("Brainrot Pack: Common is 74% per card and every tier scales together", () => {
+  const p = packs.find((p) => p.id === "brainrot");
+  assert.equal(p.odds[0], 74000000);
+  // Non-Common tiers keep their original relative proportions (26% / 8% = 3.25x).
+  const original = [7500000, 499900, 80, 20];
+  p.odds.slice(1).forEach((w, i) => assert.equal(w, original[i] * 3.25));
+  // Roll just inside and just outside the Common band.
+  assert.equal(rollPack(p, rng(73999999))[0].rarity, "Common");
+  assert.equal(rollPack(p, rng(74000000))[0].rarity, "Uncommon");
+});
 for (const p of packs) {
   test(`${p.name}: integer odds sum to exactly 100%`, () =>
     assert.equal(
@@ -222,7 +232,7 @@ test("world packs can return less or more than their purchase price", () => {
 
 for (const pack of packs) {
   test(`${pack.name}: tenth-pack floor preserves count, unique cards and an Epic or better`, () => {
-    for (const rarityRoll of [0, 92000000, 99500000, 99999800, 99999999]) {
+    for (const rarityRoll of [0, 92000000, 99500000, 99999600, 99999999]) {
       for (const chase of [false, true]) {
         const cards = rollPack(pack, rng(rarityRoll, chase), {
           guaranteedEpic: true,
