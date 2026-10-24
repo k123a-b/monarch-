@@ -205,7 +205,7 @@ export const packs = [
     price: 100,
     count: 4,
     set: "brainrot",
-    odds: [92000000, 7500000, 499900, 80, 20],
+    odds: [74000000, 24375000, 1624675, 260, 65],
     chase: "crocodilo",
     chaseOdds: 400,
     art: "brainrot",
