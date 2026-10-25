@@ -59,6 +59,19 @@ test(
         );
       });
       await t.test(
+        "new accounts choose a public username before continuing",
+        async () => {
+          assert.equal(aa.username_set, false);
+          const response = await request(a, "account/username", {
+            username: "Court " + suffix,
+          });
+          assert.equal(response.status, 200);
+          assert.equal(response.data.account.username, "Court " + suffix);
+          assert.equal(response.data.account.username_set, true);
+          aa = response.data.account;
+        },
+      );
+      await t.test(
         "authentication boundary rejects absent or expired Identity sessions",
         async () => {
           assert.equal((await request(null, "me")).status, 401);
@@ -107,6 +120,40 @@ test(
             assert.equal(Number(card.value), cardMap[card.template_id].value);
             assert.equal(card.rarity, cardMap[card.template_id].rarity);
           }
+        },
+      );
+      await t.test(
+        "starter reward grants one free card once and does not count as a paid pack",
+        async () => {
+          const before = (await request(a, "me")).data.account;
+          const claim = await request(a, "rewards/starter", {});
+          assert.equal(claim.status, 200);
+          assert.ok(
+            ["brainrot", "royal", "world"].includes(claim.data.card.set),
+          );
+          assert.ok(
+            ["Common", "Uncommon", "Epic", "Crown"].includes(
+              claim.data.card.rarity,
+            ),
+          );
+          assert.equal(claim.data.account.starter_claimed, true);
+          assert.equal(Number(claim.data.account.packs), Number(before.packs));
+          assert.equal(
+            Number(claim.data.account.balance),
+            Number(before.balance),
+          );
+          assert.equal((await request(a, "rewards/starter", {})).status, 409);
+          assert.equal(
+            Number(
+              (
+                await query(
+                  "SELECT COUNT(*) AS n FROM inventory WHERE owner_id=$1",
+                  [a.id],
+                )
+              ).rows[0].n,
+            ),
+            5,
+          );
         },
       );
       const ca = (
@@ -423,7 +470,10 @@ test(
           assert.equal(Number(joined.data.round.total), 150);
           assert.ok(joined.data.entrants.every((entry) => !entry.bot));
           assert.deepEqual(
-            joined.data.entrants.map((entry) => [entry.user_id, Number(entry.amount)]),
+            joined.data.entrants.map((entry) => [
+              entry.user_id,
+              Number(entry.amount),
+            ]),
             [
               [a.id, 100],
               [b.id, 50],

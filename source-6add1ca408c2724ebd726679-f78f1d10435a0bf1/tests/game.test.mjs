@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import {
   packs,
   rollPack,
+  rollStarterPack,
   weightedWinner,
   catalog,
   cardMap,
@@ -18,6 +20,8 @@ import {
   validUsername,
   randomBelow,
 } from "../shared/rules.mjs";
+import { rateLeader } from "../shared/leader-ratings.mjs";
+import leaderData from "../shared/leaders.json" with { type: "json" };
 const rng =
   (rarityRoll, chase = false) =>
   (max) =>
@@ -44,6 +48,37 @@ for (const p of packs) {
       p.odds.reduce((s, n) => s + n, 0),
       100000000,
     ));
+  test("starter pack grants one common-heavy card from every regular collection", () => {
+    const roll = (rarityRoll) =>
+      rollStarterPack((max) => (max === 100000000 ? rarityRoll : 0));
+    assert.equal(roll(0).rarity, "Common");
+    assert.equal(roll(84999999).rarity, "Common");
+    assert.equal(roll(85000000).rarity, "Uncommon");
+    assert.equal(roll(97000000).rarity, "Epic");
+    assert.equal(roll(99500000).rarity, "Crown");
+    for (let n = 0; n < 100; n++) {
+      const card = rollStarterPack((max) => (n * 104729) % max);
+      assert.ok(["brainrot", "royal", "world"].includes(card.set));
+      assert.ok(["Common", "Uncommon", "Epic", "Crown"].includes(card.rarity));
+      assert.ok(card.value >= 0);
+      assert.notEqual(card.rarity, "Alpha");
+      assert.notEqual(card.rarity, "Chase");
+    }
+    for (const [setIndex, set] of ["brainrot", "royal", "world"].entries()) {
+      let call = 0;
+      const card = rollStarterPack((max) => {
+        call++;
+        if (call === 1) return 0;
+        if (call === 2) return setIndex;
+        return max - 1;
+      });
+      assert.equal(
+        card.set,
+        set,
+        "each regular collection is present in the pool",
+      );
+    }
+  });
   test(`${p.name}: exactly ${p.count} cards, no duplicates with a non-exhausted pool`, () => {
     const pull = rollPack(p, rng(0));
     assert.equal(pull.length, p.count);
@@ -133,8 +168,14 @@ test("a sole player and matching bot have equal odds in the weighted draw", () =
     { user_id: "player", amount: 725 },
     { user_id: "bot", amount: 725 },
   ];
-  assert.equal(weightedWinner(entries, () => 0), "player");
-  assert.equal(weightedWinner(entries, () => 725), "bot");
+  assert.equal(
+    weightedWinner(entries, () => 0),
+    "player",
+  );
+  assert.equal(
+    weightedWinner(entries, () => 725),
+    "bot",
+  );
 });
 test("friend table winner receives twice the stake while an unjoined table is refunded", () => {
   assert.equal(friendTablePayout(250, true), 500);
@@ -143,7 +184,8 @@ test("friend table winner receives twice the stake while an unjoined table is re
   assert.throws(() => friendTablePayout(Number.MAX_SAFE_INTEGER, true));
 });
 test("usernames are case-friendly public names with strict length and character bounds", () => {
-  for (const name of ["Monarch 7", "Lady_Gold", "A-B"]) assert.ok(validUsername(name));
+  for (const name of ["Monarch 7", "Lady_Gold", "A-B"])
+    assert.ok(validUsername(name));
   for (const name of ["", "ab", "a".repeat(25), "bad/name", "👑King"])
     assert.ok(!validUsername(name));
 });
@@ -159,6 +201,7 @@ const account = {
   reward_day: "2026-10-24",
   active_seconds: 570,
   daily_reward: 0,
+  reward_steps: 0,
   last_heartbeat: new Date(now - 30000),
 };
 test("active 10-minute threshold pays 50 pence", () =>
@@ -167,6 +210,7 @@ test("active 10-minute threshold pays 50 pence", () =>
     reward: 50,
     active: 0,
     paid: 50,
+    steps: 1,
   }));
 test("background tabs earn no additional time", () =>
   assert.equal(activityReward(account, false, now).reward, 0));
@@ -192,14 +236,36 @@ test("replayed simultaneous heartbeats earn no additional time", () =>
     ).active,
     0,
   ));
-test("daily rewards stop at 300 pence", () => {
-  const result = activityReward({ ...account, daily_reward: 300 }, true, now);
+test("play rewards step up by 25 pence and cap at five pounds per day", () => {
+  let progress = { ...account, active_seconds: 570 };
+  const rewards = [];
+  for (let steps = 0; steps < 5; steps++) {
+    const result = activityReward(progress, true, now);
+    rewards.push(result.reward);
+    progress = {
+      ...progress,
+      active_seconds: 570,
+      daily_reward: result.paid,
+      reward_steps: result.steps,
+    };
+  }
+  assert.deepEqual(rewards, [50, 75, 100, 125, 150]);
+  const result = activityReward(
+    { ...progress, daily_reward: 500, reward_steps: 5 },
+    true,
+    now,
+  );
   assert.equal(result.reward, 0);
-  assert.equal(result.paid, 300);
+  assert.equal(result.paid, 500);
 });
 test("UTC midnight resets both daily earnings and progress", () => {
   const result = activityReward(
-    { ...account, reward_day: "2026-10-23", daily_reward: 300 },
+    {
+      ...account,
+      reward_day: "2026-10-23",
+      daily_reward: 500,
+      reward_steps: 5,
+    },
     true,
     now,
   );
@@ -246,18 +312,131 @@ test("every country in the world collection has a flag and stable template IDs",
   assert.equal(new Set(catalog.map((c) => c.id)).size, catalog.length);
   for (const c of leaders)
     assert.match(c.flag, /^\p{Regional_Indicator}{2}$/u, c.country);
+  assert.ok(
+    leaders.every(
+      (card) =>
+        card.image &&
+        (!card.image.startsWith("/") ||
+          existsSync(new URL(`../public${card.image}`, import.meta.url))),
+    ),
+    "every World Leaders card has a bundled or remote image",
+  );
+  const placeholders = leaders.filter((card) => card.portraitPlaceholder);
+  assert.equal(placeholders.length, 3);
+  assert.ok(
+    placeholders.every((card) => card.image === "/img/leader-placeholder.svg"),
+    "unavailable portraits use the clearly labeled neutral placeholder",
+  );
 });
 test("World Leaders includes 40 unique standalone national flag cards", () => {
   const flags = catalog.filter((card) => card.role === "National flag");
   assert.equal(flags.length, 40);
   assert.equal(new Set(flags.map((card) => card.country)).size, 40);
   assert.equal(new Set(flags.map((card) => card.value)).size, 40);
-  assert.ok(flags.every((card) => /^\p{Regional_Indicator}{2}$/u.test(card.flag)));
+  assert.ok(
+    flags.every((card) => /^\p{Regional_Indicator}{2}$/u.test(card.flag)),
+  );
+  assert.ok(
+    flags.every(
+      (card) =>
+        card.image.startsWith("/img/flags/") &&
+        existsSync(new URL(`../public${card.image}`, import.meta.url)) &&
+        card.page.startsWith("https://flagcdn.com/w320/"),
+    ),
+    "each flag card has a bundled image",
+  );
+  assert.ok(
+    flags.every((card) => {
+      const bytes = readFileSync(
+        new URL(`../public${card.image}`, import.meta.url),
+      );
+      return bytes
+        .subarray(0, 8)
+        .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    }),
+    "each bundled flag asset is a real PNG image",
+  );
   assert.equal(cardMap["world-israel-flag"].value, 5000);
   assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
-  assert.ok(cardMap["world-flag-united-states"].value > cardMap["world-flag-greece"].value);
+  assert.ok(
+    cardMap["world-flag-united-states"].value >
+      cardMap["world-flag-greece"].value,
+  );
   assert.ok(cardMap["world-flag-united-states"].rarity === "Crown");
   assert.ok(cardMap["world-flag-greece"].rarity === "Common");
+});
+test("World Leaders shifts 1.08 percentage points from Common to Epic", () => {
+  const world = packs.find((pack) => pack.id === "world");
+  assert.deepEqual(world.odds, [74920000, 19200000, 5560000, 319840, 160]);
+  assert.equal(
+    world.odds.reduce((sum, odds) => sum + odds, 0),
+    100000000,
+  );
+  assert.equal(76000000 - world.odds[0], 1080000);
+  assert.equal(world.odds[2] - 4480000, 1080000);
+  assert.ok(
+    world.odds
+      .slice(1)
+      .every((odds, index) => odds > [12000000, 2800000, 199900, 100][index]),
+  );
+});
+test("leader ratings reflect country GDP and recognition while preserving featured values", () => {
+  const americanLeader = rateLeader({
+    name: "Unlisted American Leader",
+    country: "United States",
+    rarity: "Common",
+    value: 100,
+  });
+  const greekLeader = rateLeader({
+    name: "Unlisted Greek Leader",
+    country: "Greece",
+    rarity: "Crown",
+    value: 999999,
+  });
+  assert.equal(americanLeader.rarity, "Crown");
+  assert.equal(greekLeader.rarity, "Uncommon");
+  assert.ok(americanLeader.value > greekLeader.value);
+  assert.deepEqual(
+    [
+      rateLeader({ name: "Donald Trump", country: "United States" }).rarity,
+      rateLeader({ name: "Donald Trump", country: "United States" }).value,
+    ],
+    ["Epic", 23000],
+  );
+  assert.deepEqual(
+    [
+      rateLeader({ name: "King Charles III", country: "United Kingdom" })
+        .rarity,
+      rateLeader({ name: "King Charles III", country: "United Kingdom" }).value,
+    ],
+    ["Epic", 7500],
+  );
+  assert.ok(
+    catalog
+      .filter((card) => card.set === "world")
+      .every((card) => card.rarity && Number.isInteger(card.value)),
+  );
+  const macronCards = catalog.filter((card) => card.name === "Emmanuel Macron");
+  assert.ok(macronCards.length > 0);
+  assert.ok(macronCards.every((card) => card.rarity === "Epic"));
+  const andy = catalog.find((card) => card.name === "Andy Burnham");
+  assert.equal(andy.rarity, "Epic");
+  assert.equal(andy.role, "MP · Greater Manchester");
+  assert.ok(andy.image.includes("Official_portrait_of_Andy_Burnham_MP_2026"));
+  assert.match(andy.imageSource, /commons\.wikimedia\.org/);
+  assert.ok(
+    leaderData.cards
+      .filter((card) => card.image)
+      .every(
+        (card) =>
+          card.image.startsWith("/img/") ||
+          (card.page.startsWith("https://en.wikipedia.org/wiki/") &&
+            ["thumb.wikimedia.org", "upload.wikimedia.org"].includes(
+              new URL(card.image).hostname,
+            )),
+      ),
+    "each leader portrait comes from the referenced leader biography",
+  );
 });
 test("requested featured cards keep their fictional GBP values and flags", () => {
   const king = cardMap["world-38b1a8656815ee75"];
@@ -283,6 +462,39 @@ test("world packs can return less or more than their purchase price", () => {
   const high = rollPack(p, rng(99800000)).reduce((sum, c) => sum + c.value, 0);
   assert.ok(low < p.price);
   assert.ok(high > p.price);
+});
+test("every pack can lose, win modestly, or produce a 10x jackpot", () => {
+  for (const pack of packs) {
+    let seed = [...pack.id].reduce(
+      (n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) >>> 0,
+      8374201,
+    );
+    const randomInt = (max) => {
+      const limit = 2 ** 32 - (2 ** 32 % max);
+      let value;
+      do {
+        seed ^= seed << 13;
+        seed ^= seed >>> 17;
+        seed ^= seed << 5;
+        value = seed >>> 0;
+      } while (value >= limit);
+      return value % max;
+    };
+    const outcomes = { loss: 0, smallWin: 0, bigWin: 0, jackpot: 0 };
+    for (let i = 1; i <= 10000; i++) {
+      const total = rollPack(pack, randomInt, {
+        guaranteedEpic: i % 10 === 0,
+      }).reduce((sum, card) => sum + card.value, 0);
+      if (total < pack.price) outcomes.loss++;
+      else if (total < pack.price * 2) outcomes.smallWin++;
+      else outcomes.bigWin++;
+      if (total >= pack.price * 10) outcomes.jackpot++;
+    }
+    assert.ok(outcomes.loss > 0, `${pack.name} can return less than its cost`);
+    assert.ok(outcomes.smallWin > 0, `${pack.name} can return a small win`);
+    assert.ok(outcomes.bigWin > 0, `${pack.name} can return at least 2x`);
+    assert.ok(outcomes.jackpot > 0, `${pack.name} can return at least 10x`);
+  }
 });
 
 for (const pack of packs) {
@@ -380,12 +592,13 @@ test("weighted pots allocate exactly one ticket per staked penny without a house
     wins[weightedWinner(entries, () => ticket)]++;
   assert.deepEqual(wins, { one: 1, two: 2, seven: 7 });
 });
-test("simultaneous tabs cannot multiply a full day of play rewards", () => {
+test("simultaneous tabs cannot multiply the five-pound daily play reward", () => {
   const start = Date.parse("2026-10-24T12:00:00Z");
   let a = {
     reward_day: "2026-10-24",
     active_seconds: 0,
     daily_reward: 0,
+    reward_steps: 0,
     last_heartbeat: new Date(start),
   };
   let credited = 0;
@@ -399,12 +612,13 @@ test("simultaneous tabs cannot multiply a full day of play rewards", () => {
         reward_day: result.day,
         active_seconds: result.active,
         daily_reward: result.paid,
+        reward_steps: result.steps,
         last_heartbeat: new Date(at),
       };
     }
   }
-  assert.equal(credited, 300);
-  assert.equal(a.daily_reward, 300);
+  assert.equal(credited, 500);
+  assert.equal(a.daily_reward, 500);
 });
 test("a heartbeat crossing UTC midnight credits only the new day’s seconds", () => {
   const result = activityReward(
@@ -422,5 +636,6 @@ test("a heartbeat crossing UTC midnight credits only the new day’s seconds", (
     active: 5,
     paid: 0,
     reward: 0,
+    steps: 0,
   });
 });

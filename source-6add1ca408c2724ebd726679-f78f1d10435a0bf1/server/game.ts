@@ -3,6 +3,7 @@ import {
   packs,
   cardMap,
   rollPack,
+  rollStarterPack,
   weightedWinner,
   packProgress,
 } from "../shared/catalog.mjs";
@@ -129,17 +130,12 @@ export async function settle(c: Client) {
         fail("The pot contains an invalid contribution.");
       return sum + amount;
     }, 0);
-    if (!Number.isSafeInteger(total)) fail("The pot total is too large to settle.");
+    if (!Number.isSafeInteger(total))
+      fail("The pot total is too large to settle.");
     const winner = weightedWinner(entries, (max: number) =>
       randomBelow(max, randomBytes),
     );
-    if (winner)
-      await change(
-        c,
-        winner,
-        total,
-        `Global pot #${round.id} won`,
-      );
+    if (winner) await change(c, winner, total, `Global pot #${round.id} won`);
     await c.query(
       "UPDATE rounds SET settled=true,winner_id=$2,total=$3 WHERE id=$1",
       [round.id, winner, total],
@@ -182,9 +178,7 @@ async function ensureAccount(c: Client, user: SessionUser) {
   ).rows[0];
   if (existing) return existing;
   let name =
-    String(
-      user.name || "Monarch",
-    )
+    String(user.name || "Monarch")
       .replace(/[^a-zA-Z0-9_ -]/g, "")
       .trim()
       .slice(0, 24) || "Monarch";
@@ -352,16 +346,18 @@ export async function handle(
           const username =
             typeof body.username === "string" ? body.username.trim() : "";
           if (!validUsername(username))
-            fail("Choose a username with 3–24 letters, numbers, spaces, _ or -.");
+            fail(
+              "Choose a username with 3–24 letters, numbers, spaces, _ or -.",
+            );
           const taken = await c.query(
             "SELECT id FROM accounts WHERE lower(username)=lower($1) AND id<>$2",
             [username, id],
           );
           if (taken.rows.length) fail("That username is already taken.", 409);
-          await c.query("UPDATE accounts SET username=$2 WHERE id=$1", [
-            id,
-            username,
-          ]);
+          await c.query(
+            "UPDATE accounts SET username=$2,username_set=true WHERE id=$1",
+            [id, username],
+          );
           return { account: await account() };
         }
         if (route === "ledger" && req.method === "GET")
@@ -412,6 +408,25 @@ export async function handle(
             [id, cards.length],
           );
           return { cards: result, account: await account(), epicGuaranteed };
+        }
+        if (route === "rewards/starter" && req.method === "POST") {
+          const card = rollStarterPack(randomInt);
+          const claimed = await c.query(
+            "UPDATE accounts SET starter_claimed=true,pulled=pulled+1 WHERE id=$1 AND starter_claimed=false RETURNING id",
+            [id],
+          );
+          if (!claimed.rows.length)
+            fail("Your one-time starter pack has already been claimed.", 409);
+          const stored = (
+            await c.query(
+              "INSERT INTO inventory(owner_id,template_id,value,rarity) VALUES($1,$2,$3,$4) RETURNING *",
+              [id, card.id, card.value, card.rarity],
+            )
+          ).rows[0];
+          return {
+            card: { ...card, ...stored },
+            account: await account(),
+          };
         }
         if (route === "sell" && req.method === "POST") {
           const selected = ids(body.ids);
@@ -480,8 +495,8 @@ export async function handle(
           if (result.reward)
             await change(c, id, result.reward, "Active play reward");
           await c.query(
-            "UPDATE accounts SET last_heartbeat=NOW(),active_seconds=$2,daily_reward=$3,reward_day=$4 WHERE id=$1",
-            [id, result.active, result.paid, result.day],
+            "UPDATE accounts SET last_heartbeat=NOW(),active_seconds=$2,daily_reward=$3,reward_day=$4,reward_steps=$5 WHERE id=$1",
+            [id, result.active, result.paid, result.day, result.steps],
           );
           return { account: await account(), reward: result.reward };
         }

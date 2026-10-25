@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "test": "node --import tsx --test tests/*.test.mjs",
+    "test": "node --import tsx --test",
     "migrate": "node scripts/migrate.mjs",
+    "sync:flags": "node scripts/flags.mjs",
+    "sync:country-gdp": "node scripts/sync-country-gdp.mjs",
     "dev:vercel": "vercel dev"
   },
   "dependencies": {

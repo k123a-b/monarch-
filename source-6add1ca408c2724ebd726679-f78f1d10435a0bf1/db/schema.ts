@@ -11,6 +11,7 @@ import {
 export const accounts = pgTable("accounts", {
   id: text().primaryKey(),
   username: text().notNull().unique(),
+  usernameSet: boolean("username_set").notNull().default(false),
   friendCode: text("friend_code").notNull().unique(),
   balance: bigint({ mode: "number" }).notNull().default(500),
   sold: bigint({ mode: "number" }).notNull().default(0),
@@ -21,6 +22,8 @@ export const accounts = pgTable("accounts", {
   activeSeconds: integer("active_seconds").notNull().default(0),
   rewardDay: text("reward_day").notNull().default(""),
   dailyReward: integer("daily_reward").notNull().default(0),
+  rewardSteps: integer("reward_steps").notNull().default(0),
+  starterClaimed: boolean("starter_claimed").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

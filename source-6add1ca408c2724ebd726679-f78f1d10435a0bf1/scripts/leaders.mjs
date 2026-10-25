@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { load } from "cheerio";
 import { createHash } from "node:crypto";
+import { rateLeader } from "../shared/leader-ratings.mjs";
 const source =
   "https://en.wikipedia.org/wiki/List_of_current_heads_of_state_and_government";
 const html = await readFile("/tmp/leaders.html", "utf8");
@@ -17,6 +18,16 @@ const portraitMap = new Map(
     .filter(Boolean)
     .map((c) => [c.page, c.image]),
 );
+const featuredDetails = {
+  "Andy Burnham": {
+    role: "MP · Greater Manchester",
+    officialSource: "https://members.parliament.uk/member/1427",
+    imageSource:
+      "https://commons.wikimedia.org/wiki/File:Official_portrait_of_Andy_Burnham_MP_2026_(cropped_3x4).jpg",
+    image:
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6b/Official_portrait_of_Andy_Burnham_MP_2026_%28cropped_3x4%29.jpg/500px-Official_portrait_of_Andy_Burnham_MP_2026_%28cropped_3x4%29.jpg",
+  },
+};
 $("table")
   .eq(1)
   .find("tr")
@@ -116,19 +127,13 @@ for (let i = 0; i < filtered.length; i++) {
       .update(c.country + "|" + c.name)
       .digest("hex")
       .slice(0, 16);
-  const seed = parseInt(c.id.slice(-6), 16);
   c.set = "world";
-  c.rarity = ["Common", "Uncommon", "Epic", "Crown"][
-    seed % 20 < 12 ? 0 : seed % 20 < 17 ? 1 : seed % 20 < 19 ? 2 : 3
-  ];
-  c.value =
-    c.rarity === "Common"
-      ? 80 + (seed % 9) * 25
-      : c.rarity === "Uncommon"
-        ? 250 + (seed % 9) * 60
-        : c.rarity === "Epic"
-          ? 1400 + (seed % 7) * 200
-          : 5000 + (seed % 5) * 1000;
+  Object.assign(c, featuredDetails[c.name]);
+  if (!c.image) {
+    c.image = "/img/leader-placeholder.svg";
+    c.portraitPlaceholder = true;
+  }
+  Object.assign(c, rateLeader(c));
   c.emoji = "🌍";
   c.pattern = "grid";
   c.colors = ["#33495e", "#c8a96a"];
