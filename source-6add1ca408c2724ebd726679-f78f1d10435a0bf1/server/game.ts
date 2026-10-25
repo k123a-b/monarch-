@@ -625,6 +625,11 @@ export async function handle(
   } catch (e: any) {
     const busy = ["55P03", "57014", "53300", "57P03"].includes(e?.code);
     const status = e instanceof GameError ? e.status : busy ? 503 : 500;
+    // Unexpected failures are shown to players only as a generic message, so
+    // record the cause in the server logs (code and message only, never request
+    // data or environment values).
+    if (status === 500 || busy)
+      console.error("api error", req.method, route, e?.code, e?.message);
     return Response.json(
       {
         error:
