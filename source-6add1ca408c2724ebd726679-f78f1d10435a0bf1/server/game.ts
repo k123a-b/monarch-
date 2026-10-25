@@ -15,6 +15,9 @@ import {
   activityReward,
   validTradeCards,
   validFriendCode,
+  validUsername,
+  friendTablePayout,
+  matchedPotBotStake,
   FRIEND_ALPHABET,
   randomBelow,
 } from "../shared/rules.mjs";
@@ -36,6 +39,7 @@ const code = () =>
     randomBytes(6),
     (b) => FRIEND_ALPHABET[b % FRIEND_ALPHABET.length],
   ).join("");
+const POT_BOT_ID = "system-pot-bot";
 const integer = (v: any, min = 1, max = 1e12) =>
   Number.isSafeInteger(v) && v >= min && v <= max
     ? v
@@ -63,6 +67,29 @@ async function areFriends(c: Client, a: string, b: string) {
     [a, b],
   );
   return q.rows.length > 0;
+}
+async function ensurePotBot(c: Client) {
+  const existing = await c.query("SELECT id FROM accounts WHERE id=$1", [
+    POT_BOT_ID,
+  ]);
+  if (existing.rows.length) {
+    await c.query("UPDATE accounts SET bot=true WHERE id=$1", [POT_BOT_ID]);
+    return POT_BOT_ID;
+  }
+  let username = "Pot Bot";
+  if (
+    (
+      await c.query("SELECT id FROM accounts WHERE lower(username)=lower($1)", [
+        username,
+      ])
+    ).rows.length
+  )
+    username = `Pot Bot ${code()}`;
+  await c.query(
+    "INSERT INTO accounts(id,username,friend_code,bot,balance) VALUES($1,$2,$3,true,0) ON CONFLICT(id) DO NOTHING",
+    [POT_BOT_ID, username, code()],
+  );
+  return POT_BOT_ID;
 }
 async function transact<T>(fn: (c: Client) => Promise<T>, readOnly = false) {
   const c = await pool().connect();
@@ -96,6 +123,13 @@ export async function settle(c: Client) {
         round.id,
       ])
     ).rows;
+    const total = entries.reduce((sum: number, entry: any) => {
+      const amount = Number(entry.amount);
+      if (!Number.isSafeInteger(amount) || amount < 1)
+        fail("The pot contains an invalid contribution.");
+      return sum + amount;
+    }, 0);
+    if (!Number.isSafeInteger(total)) fail("The pot total is too large to settle.");
     const winner = weightedWinner(entries, (max: number) =>
       randomBelow(max, randomBytes),
     );
@@ -103,13 +137,13 @@ export async function settle(c: Client) {
       await change(
         c,
         winner,
-        Number(round.total),
+        total,
         `Global pot #${round.id} won`,
       );
-    await c.query("UPDATE rounds SET settled=true,winner_id=$2 WHERE id=$1", [
-      round.id,
-      winner,
-    ]);
+    await c.query(
+      "UPDATE rounds SET settled=true,winner_id=$2,total=$3 WHERE id=$1",
+      [round.id, winner, total],
+    );
   }
   for (const table of (
     await c.query(
@@ -125,7 +159,7 @@ export async function settle(c: Client) {
     await change(
       c,
       winner || table.host_id,
-      Number(table.stake) * (winner ? 2 : 1),
+      friendTablePayout(Number(table.stake), Boolean(winner)),
       winner
         ? `Friend table ${table.code} won`
         : `Friend table ${table.code} expired: refund`,
@@ -180,11 +214,44 @@ async function pot(c: Client) {
     "INSERT INTO rounds(id,ends_at) VALUES($1,$2) ON CONFLICT DO NOTHING",
     [rid, new Date((rid + 1) * 600000)],
   );
+  const contributors = (
+    await c.query(
+      "SELECT w.user_id,SUM(w.amount)::bigint AS amount FROM wagers w JOIN accounts a ON a.id=w.user_id WHERE w.round_id=$1 AND a.bot=false GROUP BY w.user_id",
+      [rid],
+    )
+  ).rows;
+  const botStake = matchedPotBotStake(contributors);
+  const botAccount = await c.query("SELECT id FROM accounts WHERE id=$1", [
+    POT_BOT_ID,
+  ]);
+  if (botStake) {
+    const botId = await ensurePotBot(c);
+    await c.query("DELETE FROM wagers WHERE round_id=$1 AND user_id=$2", [
+      rid,
+      botId,
+    ]);
+    await c.query(
+      "INSERT INTO wagers(round_id,user_id,amount) VALUES($1,$2,$3)",
+      [rid, botId, botStake],
+    );
+  } else if (botAccount.rows.length) {
+    await c.query("DELETE FROM wagers WHERE round_id=$1 AND user_id=$2", [
+      rid,
+      POT_BOT_ID,
+    ]);
+  }
+  const total = (
+    await c.query(
+      "SELECT COALESCE(SUM(amount),0)::bigint AS total FROM wagers WHERE round_id=$1",
+      [rid],
+    )
+  ).rows[0].total;
+  await c.query("UPDATE rounds SET total=$2 WHERE id=$1", [rid, total]);
   return {
     round: (await c.query("SELECT * FROM rounds WHERE id=$1", [rid])).rows[0],
     entrants: (
       await c.query(
-        "SELECT a.username,w.user_id,SUM(w.amount)::bigint AS amount FROM wagers w JOIN accounts a ON a.id=w.user_id WHERE w.round_id=$1 GROUP BY w.user_id,a.username ORDER BY amount DESC",
+        "SELECT a.username,a.bot,w.user_id,SUM(w.amount)::bigint AS amount FROM wagers w JOIN accounts a ON a.id=w.user_id WHERE w.round_id=$1 GROUP BY w.user_id,a.username,a.bot ORDER BY amount DESC",
         [rid],
       )
     ).rows,
@@ -281,6 +348,22 @@ export async function handle(
               )
             ).rows,
           };
+        if (route === "account/username" && req.method === "POST") {
+          const username =
+            typeof body.username === "string" ? body.username.trim() : "";
+          if (!validUsername(username))
+            fail("Choose a username with 3–24 letters, numbers, spaces, _ or -.");
+          const taken = await c.query(
+            "SELECT id FROM accounts WHERE lower(username)=lower($1) AND id<>$2",
+            [username, id],
+          );
+          if (taken.rows.length) fail("That username is already taken.", 409);
+          await c.query("UPDATE accounts SET username=$2 WHERE id=$1", [
+            id,
+            username,
+          ]);
+          return { account: await account() };
+        }
         if (route === "ledger" && req.method === "GET")
           return (
             await c.query(

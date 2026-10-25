@@ -51,8 +51,11 @@ export async function getProviders() {
   return r.json();
 }
 
-export async function loginWithGoogle() {
-  const { url } = await post("signin/google", {
+export async function loginWithGoogle(prompt) {
+  const path = prompt
+    ? `signin/google?${new URLSearchParams({ prompt })}`
+    : "signin/google";
+  const { url } = await post(path, {
     callbackUrl: location.origin + "/",
   });
   if (!url) throw Error("Google sign-in could not start. Please try again.");

@@ -5618,14 +5618,15 @@
     },
     {
       "id": "world-38b1a8656815ee75",
-      "name": "Charles III",
+      "name": "King Charles III",
       "country": "United Kingdom",
-      "role": "Head of state",
+      "role": "King · Head of state",
       "page": "https://en.wikipedia.org/wiki/Charles_III",
+      "officialSource": "https://www.royal.uk/the-king",
       "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/King_Charles_III_%28July_2023%29.jpg/400px-King_Charles_III_%28July_2023%29.jpg",
       "set": "world",
-      "rarity": "Common",
-      "value": 105,
+      "rarity": "Epic",
+      "value": 7500,
       "emoji": "🌍",
       "pattern": "grid",
       "colors": [
@@ -5638,8 +5639,9 @@
       "id": "world-b8356339d506f77d",
       "name": "Andy Burnham",
       "country": "United Kingdom",
-      "role": "Head of government",
+      "role": "Prime Minister",
       "page": "https://en.wikipedia.org/wiki/Andy_Burnham",
+      "officialSource": "https://www.gov.uk/government/ministers/prime-minister",
       "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/Prime_Minister_Andy_Burnham_portrait_%28cropped%29.jpg/400px-Prime_Minister_Andy_Burnham_portrait_%28cropped%29.jpg",
       "set": "world",
       "rarity": "Uncommon",
@@ -5656,12 +5658,13 @@
       "id": "world-c6af8a1c1faf4aae",
       "name": "Donald Trump",
       "country": "United States",
-      "role": "Head of state and government",
+      "role": "President",
       "page": "https://en.wikipedia.org/wiki/Donald_Trump",
+      "officialSource": "https://www.whitehouse.gov/administration/donald-j-trump/",
       "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/Official_Presidential_Portrait_of_President_Donald_J._Trump_%282025%29.jpg/400px-Official_Presidential_Portrait_of_President_Donald_J._Trump_%282025%29.jpg",
       "set": "world",
       "rarity": "Epic",
-      "value": 7000,
+      "value": 23000,
       "emoji": "🌍",
       "pattern": "grid",
       "colors": [
@@ -5975,6 +5978,24 @@
         "#c8a96a"
       ],
       "flavor": "The treasury has issued a fictional £25 penalty. Political satire."
+    },
+    {
+      "id": "world-israel-flag",
+      "name": "Flag of Israel",
+      "country": "Israel",
+      "role": "National flag",
+      "page": "https://en.wikipedia.org/wiki/Flag_of_Israel",
+      "image": "/img/flag-israel.svg",
+      "set": "world",
+      "rarity": "Epic",
+      "value": 5000,
+      "emoji": "🇮🇱",
+      "pattern": "stars",
+      "colors": [
+        "#174b86",
+        "#f0f4fb"
+      ],
+      "flavor": "A bright flag for a standout pull."
     }
   ],
   "kim": {

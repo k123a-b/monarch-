@@ -170,7 +170,77 @@ export const alpha = {
   colors: ["#56401a", "#ffe093"],
   flavor: "One crown. One serial. An unreasonable amount of gold.",
 };
-export const catalog = [...cards, ...chases, alpha, ...leaderData.cards].map(
+const nationFlagValues = [
+  ["United States", 50000],
+  ["China", 45000],
+  ["Russia", 40000],
+  ["India", 35000],
+  ["United Kingdom", 32000],
+  ["France", 30000],
+  ["Germany", 28000],
+  ["Japan", 26000],
+  ["South Korea", 24000],
+  ["Turkey", 22000],
+  ["Brazil", 20000],
+  ["Saudi Arabia", 18000],
+  ["Italy", 17000],
+  ["Pakistan", 16000],
+  ["Indonesia", 15000],
+  ["Canada", 14000],
+  ["Australia", 13000],
+  ["Spain", 12000],
+  ["Mexico", 11000],
+  ["Poland", 10000],
+  ["Ukraine", 9500],
+  ["Netherlands", 9000],
+  ["Iran", 8500],
+  ["Egypt", 8000],
+  ["United Arab Emirates", 7500],
+  ["Switzerland", 7000],
+  ["Sweden", 6500],
+  ["Norway", 6000],
+  ["Singapore", 5500],
+  ["South Africa", 4900],
+  ["Argentina", 4500],
+  ["Nigeria", 4000],
+  ["Thailand", 3500],
+  ["Vietnam", 3000],
+  ["Malaysia", 2500],
+  ["Philippines", 2000],
+  ["Bangladesh", 1500],
+  ["Qatar", 1000],
+  ["Greece", 900],
+];
+const nationFlagCards = nationFlagValues.map(([country, value], index) => {
+  const rarity =
+    value >= 25000
+      ? "Crown"
+      : value >= 10000
+        ? "Epic"
+        : value >= 5000
+          ? "Uncommon"
+          : "Common";
+  return {
+    id: `world-flag-${country.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name: `Flag of ${country}`,
+    country,
+    role: "National flag",
+    set: "world",
+    rarity,
+    value,
+    emoji: flags[country],
+    pattern: patterns[index % patterns.length],
+    colors: rarity === "Crown" ? ["#5b4320", "#e1bc68"] : ["#1a345c", "#8bb9ef"],
+    flavor: "A national flag card. Its fictional value reflects a broad game-power tier.",
+  };
+});
+export const catalog = [
+  ...cards,
+  ...chases,
+  alpha,
+  ...leaderData.cards,
+  ...nationFlagCards,
+].map(
   (c) => ({
     ...c,
     flag: flags[c.country],

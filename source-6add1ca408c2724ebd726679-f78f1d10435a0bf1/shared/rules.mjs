@@ -1,6 +1,28 @@
 export const FRIEND_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const validFriendCode = (value) =>
   typeof value === "string" && /^[A-HJ-NP-Z2-9]{6}$/.test(value);
+export const validUsername = (value) =>
+  typeof value === "string" &&
+  value.length >= 3 &&
+  value.length <= 24 &&
+  /^[a-zA-Z0-9_ -]+$/.test(value);
+export function friendTablePayout(stake, hasOpponent) {
+  if (!Number.isSafeInteger(stake) || stake < 1)
+    throw Error("Stake must be a positive whole-pence amount.");
+  const payout = stake * (hasOpponent ? 2 : 1);
+  if (!Number.isSafeInteger(payout))
+    throw Error("Payout exceeds the supported balance limit.");
+  return payout;
+}
+export function matchedPotBotStake(contributors) {
+  if (!Array.isArray(contributors))
+    throw Error("Pot contributors must be a list.");
+  if (contributors.length !== 1) return 0;
+  const amount = Number(contributors[0]?.amount);
+  if (!Number.isSafeInteger(amount) || amount < 1)
+    throw Error("Pot contribution must be a positive whole-pence amount.");
+  return amount;
+}
 export function activityReward(account, visible, now = Date.now()) {
   const day = new Date(now).toISOString().slice(0, 10);
   const last = account.last_heartbeat

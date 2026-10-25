@@ -11,8 +11,11 @@ import {
 } from "../shared/catalog.mjs";
 import {
   activityReward,
+  friendTablePayout,
+  matchedPotBotStake,
   validFriendCode,
   validTradeCards,
+  validUsername,
   randomBelow,
 } from "../shared/rules.mjs";
 const rng =
@@ -91,27 +94,58 @@ test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   assert.equal(world.chaseOdds, 45000);
   assert.equal(world.price, 1000);
 });
-test("weighted draw respects exact stake boundaries", () => {
+test("weighted pot draw includes every contributor, bot or player, at exact stake boundaries", () => {
   const entries = [
-    { user_id: "a", amount: 1 },
-    { user_id: "b", amount: 3 },
+    { user_id: "bot", amount: 1 },
+    { user_id: "player-a", amount: 3 },
   ];
   assert.equal(
     weightedWinner(entries, () => 0),
-    "a",
+    "bot",
   );
   assert.equal(
     weightedWinner(entries, () => 1),
-    "b",
+    "player-a",
   );
   assert.equal(
     weightedWinner(entries, () => 3),
-    "b",
+    "player-a",
   );
   assert.equal(
     weightedWinner([], () => 0),
     null,
   );
+});
+test("Pot Bot matches only a sole human contributor's total stake", () => {
+  assert.equal(matchedPotBotStake([]), 0);
+  assert.equal(matchedPotBotStake([{ user_id: "player", amount: "725" }]), 725);
+  assert.equal(
+    matchedPotBotStake([
+      { user_id: "player-a", amount: "725" },
+      { user_id: "player-b", amount: "100" },
+    ]),
+    0,
+  );
+  assert.throws(() => matchedPotBotStake([{ amount: "not-money" }]));
+});
+test("a sole player and matching bot have equal odds in the weighted draw", () => {
+  const entries = [
+    { user_id: "player", amount: 725 },
+    { user_id: "bot", amount: 725 },
+  ];
+  assert.equal(weightedWinner(entries, () => 0), "player");
+  assert.equal(weightedWinner(entries, () => 725), "bot");
+});
+test("friend table winner receives twice the stake while an unjoined table is refunded", () => {
+  assert.equal(friendTablePayout(250, true), 500);
+  assert.equal(friendTablePayout(250, false), 250);
+  assert.throws(() => friendTablePayout(0, true));
+  assert.throws(() => friendTablePayout(Number.MAX_SAFE_INTEGER, true));
+});
+test("usernames are case-friendly public names with strict length and character bounds", () => {
+  for (const name of ["Monarch 7", "Lady_Gold", "A-B"]) assert.ok(validUsername(name));
+  for (const name of ["", "ab", "a".repeat(25), "bad/name", "👑King"])
+    assert.ok(!validUsername(name));
 });
 test("large-pot random selection supports safe integers beyond crypto.randomInt limits", () => {
   assert.equal(
@@ -213,9 +247,30 @@ test("every country in the world collection has a flag and stable template IDs",
   for (const c of leaders)
     assert.match(c.flag, /^\p{Regional_Indicator}{2}$/u, c.country);
 });
-test("Trump returns £70 and the explicit satirical penalty is isolated to its template", () => {
+test("World Leaders includes 40 unique standalone national flag cards", () => {
+  const flags = catalog.filter((card) => card.role === "National flag");
+  assert.equal(flags.length, 40);
+  assert.equal(new Set(flags.map((card) => card.country)).size, 40);
+  assert.equal(new Set(flags.map((card) => card.value)).size, 40);
+  assert.ok(flags.every((card) => /^\p{Regional_Indicator}{2}$/u.test(card.flag)));
+  assert.equal(cardMap["world-israel-flag"].value, 5000);
+  assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
+  assert.ok(cardMap["world-flag-united-states"].value > cardMap["world-flag-greece"].value);
+  assert.ok(cardMap["world-flag-united-states"].rarity === "Crown");
+  assert.ok(cardMap["world-flag-greece"].rarity === "Common");
+});
+test("requested featured cards keep their fictional GBP values and flags", () => {
+  const king = cardMap["world-38b1a8656815ee75"];
+  assert.equal(king.name, "King Charles III");
+  assert.equal(king.country, "United Kingdom");
+  assert.equal(king.value, 7500);
+  assert.equal(king.rarity, "Epic");
+  assert.equal(king.flag, "🇬🇧");
   assert.equal(cardMap["world-c6af8a1c1faf4aae"].name, "Donald Trump");
-  assert.equal(cardMap["world-c6af8a1c1faf4aae"].value, 7000);
+  assert.equal(cardMap["world-c6af8a1c1faf4aae"].value, 23000);
+  assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
+  assert.equal(cardMap["world-israel-flag"].value, 5000);
+  assert.equal(cardMap["world-israel-flag"].flag, "🇮🇱");
   assert.deepEqual(
     catalog.filter((c) => c.value < 0).map((c) => c.id),
     ["world-former-keir-starmer"],
@@ -294,9 +349,21 @@ test("a tenth Brainrot pack upgrades only its lowest card and keeps three ordina
 
 test("the world milestone upgrades the negative penalty when it is the lowest card", () => {
   const pack = packs.find((p) => p.id === "world");
-  const random = (max) => (max === 100000000 ? 0 : max - 1);
+  const negativeIndex = catalog
+    .filter((card) => card.set === "world" && card.rarity === "Common")
+    .findIndex((card) => card.value < 0);
+  let firstCard = true;
+  const random = (max) => {
+    if (max === 100000000) return 0;
+    if (firstCard) {
+      firstCard = false;
+      return negativeIndex;
+    }
+    return max - 1;
+  };
   const ordinary = rollPack(pack, random);
   assert.ok(ordinary.some((c) => c.value < 0));
+  firstCard = true;
   const milestone = rollPack(pack, random, { guaranteedEpic: true });
   assert.ok(milestone.every((c) => c.value >= 0));
   assert.equal(milestone.filter((c) => c.rarity === "Epic").length, 1);

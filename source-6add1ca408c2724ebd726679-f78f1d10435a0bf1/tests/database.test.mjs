@@ -380,6 +380,57 @@ test(
         assert.ok(round.settled);
         assert.ok([a.id, b.id].includes(round.winner_id));
       });
+      await t.test(
+        "global pot instantly matches a solo player and removes the bot when a second player joins",
+        async (t) => {
+          const current = (await request(a, "pot")).data;
+          const rid = Number(current.round.id);
+          const existingWagers = Number(
+            (
+              await query(
+                "SELECT COUNT(*) AS n FROM wagers WHERE round_id=$1",
+                [rid],
+              )
+            ).rows[0].n,
+          );
+          if (
+            existingWagers ||
+            new Date(current.round.ends_at).getTime() - Date.now() < 30000
+          )
+            return t.skip("The live test round is occupied or nearly over.");
+
+          const solo = await request(a, "wager", {
+            amount: 100,
+            round: rid,
+          });
+          assert.equal(solo.status, 200);
+          assert.equal(Number(solo.data.round.total), 200);
+          assert.deepEqual(
+            Object.fromEntries(
+              solo.data.entrants.map((entry) => [
+                entry.user_id,
+                Number(entry.amount),
+              ]),
+            ),
+            { [a.id]: 100, "system-pot-bot": 100 },
+          );
+
+          const joined = await request(b, "wager", {
+            amount: 50,
+            round: rid,
+          });
+          assert.equal(joined.status, 200);
+          assert.equal(Number(joined.data.round.total), 150);
+          assert.ok(joined.data.entrants.every((entry) => !entry.bot));
+          assert.deepEqual(
+            joined.data.entrants.map((entry) => [entry.user_id, Number(entry.amount)]),
+            [
+              [a.id, 100],
+              [b.id, 50],
+            ],
+          );
+        },
+      );
     } finally {
       const users = [a.id, b.id, milestoneUser.id];
       await query("DELETE FROM inventory WHERE owner_id=ANY($1::text[])", [
