@@ -20,6 +20,18 @@ export function connectionString(): string {
   }
 }
 
+// Safe description of the connection in use for error logs: user, host, port,
+// which variable supplied it and how long the password is. Never the password.
+export function databaseTarget(): string {
+  const from = process.env.DATABASE_URL ? "DATABASE_URL" : "POSTGRES_URL";
+  try {
+    const u = new URL(connectionString());
+    return `[${from} user=${decodeURIComponent(u.username)} host=${u.hostname} port=${u.port} db=${u.pathname.slice(1)} passwordLength=${decodeURIComponent(u.password).length} hasBrackets=${/[\[\]]/.test(decodeURIComponent(u.password))}]`;
+  } catch {
+    return `[${from} could not be parsed as a URL]`;
+  }
+}
+
 const holder = globalThis as unknown as { __cardMonarchsPool?: pg.Pool };
 
 export function pool(): pg.Pool {
