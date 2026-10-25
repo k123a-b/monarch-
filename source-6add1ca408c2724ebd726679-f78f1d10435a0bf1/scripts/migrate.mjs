@@ -5,11 +5,12 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 
-const url = process.env.DATABASE_URL;
-if (!url) {
+const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+if (!raw) {
   console.error("Set DATABASE_URL to your Supabase connection string.");
   process.exit(1);
 }
+const url = raw.split("?")[0];
 const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");
 const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
 const client = new pg.Client({
