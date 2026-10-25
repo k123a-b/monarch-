@@ -1,16 +1,6 @@
 import { imageSource, presentedCard } from "../shared/presentation.mjs";
 import "./style.css";
-import {
-  getUser,
-  login,
-  signup,
-  logout,
-  oauthLogin,
-  handleAuthCallback,
-  getSettings,
-  requestPasswordRecovery,
-  updateUser,
-} from "@netlify/identity";
+import { getUser, getProviders, loginWithGoogle, logout } from "./auth.js";
 import {
   catalog,
   cardMap,
@@ -89,7 +79,9 @@ const image = (src, w = 500) => {
   const source = imageSource(src);
   return source.startsWith("/") && source.endsWith(".svg")
     ? source
-    : `/.netlify/images?url=${encodeURIComponent(source)}&w=${w}&fm=webp`;
+    : import.meta.env.DEV
+      ? source
+      : `/_vercel/image?url=${encodeURIComponent(source)}&w=${w}&q=75`;
 };
 const art = (pack) =>
   image(
@@ -105,7 +97,7 @@ document.addEventListener(
     if (!(img instanceof HTMLImageElement)) return;
     if (
       !img.dataset.originalTried &&
-      img.getAttribute("src")?.startsWith("/.netlify/images?")
+      img.getAttribute("src")?.startsWith("/_vercel/image?")
     ) {
       img.dataset.originalTried = "true";
       const original = new URL(img.src).searchParams.get("url");
@@ -500,16 +492,16 @@ window.addEventListener("hashchange", () => {
 });
 function authModal(mode = "signup") {
   showModal(
-    `<div class="auth-heading">${icon("crown")}<span class="eyebrow">YOUR KINGDOM AWAITS</span><h2>${mode === "signup" ? "Join the court." : "Welcome back, monarch."}</h2><p>${mode === "signup" ? "Your first £5.00 of virtual cash is on us." : "Your collection missed you. Probably."}</p></div><div class="auth-tabs"><button data-action="auth-signup" class="${mode === "signup" ? "active" : ""}">Create account</button><button data-action="auth-login" class="${mode === "login" ? "active" : ""}">Sign in</button></div><form id="auth-form" data-mode="${mode}">${mode === "signup" ? '<label>Username<input name="username" autocomplete="nickname" minlength="3" maxlength="24" required placeholder="Your royal name"></label>' : ""}<label>Email<input name="email" type="email" autocomplete="email" placeholder="you@yourkingdom.com" required></label><label>Password<input name="password" type="password" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" minlength="8" required placeholder="At least 8 characters"></label><p class="form-error" role="alert"></p><button class="button full" type="submit">${mode === "signup" ? "Create account & claim £5" : "Enter your kingdom"} ${icon("arrow")}</button></form>${mode === "login" ? '<button class="text-button forgot" data-action="forgot">Forgot password?</button>' : ""}<div class="or-divider">or</div><button class="button google full" data-action="google"><span class="google-g">G</span> Continue with Google</button><p id="oauth-note" class="fine-print"></p><p class="fine-print">Just a game. All money is fictional virtual GBP. No purchases, deposits, or withdrawals.</p>`,
+    `<div class="auth-heading">${icon("crown")}<span class="eyebrow">YOUR KINGDOM AWAITS</span><h2>${mode === "signup" ? "Join the court." : "Welcome back, monarch."}</h2><p>${mode === "signup" ? "Your first £5.00 of virtual cash is on us." : "Your collection missed you. Probably."}</p></div><button class="button google full" data-action="google"><span class="google-g">G</span> Continue with Google</button><p id="oauth-note" class="fine-print" role="status"></p><p class="fine-print">Just a game. All money is fictional virtual GBP. No purchases, deposits, or withdrawals.</p>`,
     "auth-modal",
   );
-  getSettings()
+  getProviders()
     .then((settings) => {
       if (!modal.open) return;
       const btn = $("[data-action=google]", modal);
-      if (btn && !settings.providers?.google) {
+      if (btn && !settings.google) {
         $("#oauth-note").textContent =
-          "Google sign-in is awaiting provider configuration. You can create an account with email now.";
+          "Google sign-in is not configured on this site yet.";
         btn.disabled = true;
       }
     })
@@ -775,17 +767,14 @@ document.addEventListener("click", async (e) => {
     if (action === "auth-login") return authModal("login");
     if (action === "auth-signup") return authModal("signup");
     if (action === "google") {
-      await oauthLogin("google");
-      return;
-    }
-    if (action === "forgot") {
-      const email = $("[name=email]", modal)?.value;
-      if (!email) {
-        toast("Enter your email address first.");
-        return;
+      const btn = $("[data-action=google]", modal);
+      if (btn) btn.disabled = true;
+      try {
+        await loginWithGoogle();
+      } catch (e) {
+        if (btn) btn.disabled = false;
+        throw e;
       }
-      await requestPasswordRecovery(email);
-      toast("Check your email for a password reset link.");
       return;
     }
     if (action === "logout") {
@@ -996,26 +985,6 @@ document.addEventListener("submit", async (e) => {
     return n;
   };
   try {
-    if (form.id === "auth-form") {
-      const email = String(data.get("email")),
-        password = String(data.get("password"));
-      if (form.dataset.mode === "signup") {
-        const user = await signup(email, password, {
-          full_name: String(data.get("username")),
-        });
-        if (!user.emailVerified) {
-          $(".form-error", form).classList.add("positive");
-          $(".form-error", form).textContent =
-            "Check your email to confirm your account, then sign in to collect your £5 bonus.";
-          return;
-        }
-      } else await login(email, password);
-      state.user = await getUser();
-      await sync();
-      closeModal();
-      render();
-      toast("Welcome to the court.");
-    }
     if (form.id === "wager-form") {
       if (!requireUser()) return;
       await api("wager", {
@@ -1054,14 +1023,6 @@ document.addEventListener("submit", async (e) => {
       state.friends = d;
       await tradeModal(form.dataset.id);
       toast("Offer saved. Both confirmations reset.");
-    }
-    if (form.id === "reset-password") {
-      await updateUser({ password: String(data.get("password")) });
-      closeModal();
-      toast("Password updated.");
-      state.user = await getUser();
-      await sync();
-      render();
     }
   } catch (err) {
     const inline = $(".form-error", form);
@@ -1171,19 +1132,20 @@ async function boot() {
   if ([...tabs, "profile", "codex"].includes(initial)) state.view = initial;
   render();
   try {
-    const callback = await handleAuthCallback();
     state.user = await getUser();
     if (state.user) {
       await sync();
       render();
     }
-    if (callback?.type === "recovery") {
-      showModal(
-        '<h2>A fresh royal password.</h2><form id="reset-password"><label>New password<input name="password" type="password" minlength="8" required autocomplete="new-password"></label><button class="button full">Save password</button></form>',
+    const failed = new URLSearchParams(location.search).get("error");
+    if (failed) {
+      history.replaceState(null, "", location.pathname + location.hash);
+      toast(
+        failed === "AccessDenied"
+          ? "Google sign-in was cancelled."
+          : "Google sign-in failed. Please try again.",
       );
     }
-    if (callback?.type === "confirmation")
-      toast("Email confirmed. Welcome to the court.");
   } catch (e) {
     toast(e.message);
   }

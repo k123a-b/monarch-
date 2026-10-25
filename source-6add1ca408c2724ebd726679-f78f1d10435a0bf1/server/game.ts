@@ -1,5 +1,3 @@
-import { getUser } from "@netlify/identity";
-import { getDatabase } from "@netlify/database";
 import { randomInt, randomBytes } from "node:crypto";
 import {
   packs,
@@ -7,9 +5,10 @@ import {
   rollPack,
   weightedWinner,
   packProgress,
-} from "../../shared/catalog.mjs";
-import { database } from "../../db/index.js";
-import { accounts, inventory } from "../../db/schema.js";
+} from "../shared/catalog.mjs";
+import { database, pool } from "../db/index.js";
+import { accounts, inventory } from "../db/schema.js";
+import { sessionUser, type SessionUser } from "./session.js";
 import { eq, desc, inArray } from "drizzle-orm";
 
 import {
@@ -18,7 +17,7 @@ import {
   validFriendCode,
   FRIEND_ALPHABET,
   randomBelow,
-} from "../../shared/rules.mjs";
+} from "../shared/rules.mjs";
 
 type Client = any;
 class GameError extends Error {
@@ -66,7 +65,7 @@ async function areFriends(c: Client, a: string, b: string) {
   return q.rows.length > 0;
 }
 async function transact<T>(fn: (c: Client) => Promise<T>, readOnly = false) {
-  const c = await getDatabase().pool.connect();
+  const c = await pool().connect();
   try {
     await c.query(
       readOnly ? "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY" : "BEGIN",
@@ -143,17 +142,14 @@ export async function settleRounds() {
     await pot(c);
   });
 }
-async function ensureAccount(c: Client, user: any) {
+async function ensureAccount(c: Client, user: SessionUser) {
   const existing = (
     await c.query("SELECT * FROM accounts WHERE id=$1", [user.id])
   ).rows[0];
   if (existing) return existing;
   let name =
     String(
-      user.name ||
-        user.userMetadata?.full_name ||
-        user.user_metadata?.full_name ||
-        "Monarch",
+      user.name || "Monarch",
     )
       .replace(/[^a-zA-Z0-9_ -]/g, "")
       .trim()
@@ -200,7 +196,10 @@ async function pot(c: Client) {
     serverTime: Date.now(),
   };
 }
-export async function handle(req: Request, readUser: typeof getUser = getUser) {
+export async function handle(
+  req: Request,
+  readUser: (req: Request) => Promise<SessionUser | null> = sessionUser,
+) {
   const url = new URL(req.url),
     route = url.pathname.replace(/^\/api\/?/, "");
   try {
@@ -241,7 +240,7 @@ export async function handle(req: Request, readUser: typeof getUser = getUser) {
       };
       if (!Object.hasOwn(metrics, board)) fail("Unknown leaderboard.");
       const metric = metrics[board as keyof typeof metrics];
-      const viewer = await readUser();
+      const viewer = await readUser(req);
       return Response.json(
         await transact(async (c) => {
           return (
@@ -253,7 +252,7 @@ export async function handle(req: Request, readUser: typeof getUser = getUser) {
         }, true),
       );
     }
-    const user = await readUser();
+    const user = await readUser(req);
     if (!user) fail("Sign in to enter the court.", 401);
     let body: any = {};
     if (req.method === "POST") {
@@ -645,9 +644,3 @@ export async function handle(req: Request, readUser: typeof getUser = getUser) {
     );
   }
 }
-export default async (req: Request) => {
-  const response = await handle(req);
-  response.headers.set("Cache-Control", "no-store");
-  return response;
-};
-export const config = { path: "/api/*" };

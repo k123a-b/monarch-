@@ -8,9 +8,9 @@ test(
   "transactional economy integration",
   { skip: process.env.CARD_MONARCHS_DATABASE_TESTS !== "1" },
   async (t) => {
-    const { handle } = await import("../netlify/functions/api.mts");
-    const { getDatabase } = await import("@netlify/database");
-    const pool = getDatabase().pool;
+    const { handle } = await import("../server/game.ts");
+    const { pool: getPool } = await import("../db/index.ts");
+    const pool = getPool();
     const suffix = randomUUID().slice(0, 8);
     const a = { id: randomUUID(), name: "Test Monarch " + suffix },
       b = { id: randomUUID(), name: "Test Courtier " + suffix };

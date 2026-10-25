@@ -41,7 +41,7 @@ test(
 
 // These request-validation checks deliberately stop before any database access.
 test("malformed and non-object mutation payloads return 400 before accessing accounts", async () => {
-  const { handle } = await import("../netlify/functions/api.mts");
+  const { handle } = await import("../server/game.ts");
   for (const body of ["{", "null", "[]", "42", '"pack"']) {
     const r = await handle(
       new Request("https://game.example/api/open", {
@@ -59,7 +59,7 @@ test("malformed and non-object mutation payloads return 400 before accessing acc
   }
 });
 test("unknown and inherited leaderboard names return 400 before running SQL", async () => {
-  const { handle } = await import("../netlify/functions/api.mts");
+  const { handle } = await import("../server/game.ts");
   for (const board of ["unknown", "constructor", "__proto__", "toString"]) {
     const r = await handle(
       new Request("https://game.example/api/leaderboards?board=" + board),
