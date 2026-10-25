@@ -927,15 +927,115 @@ main {
   transform: rotate(-6deg);
 }
 .foil-pack.starter {
-  --pack-color: #d8b96e;
+  --pack-color: #edcf83;
+  border-color: #f0d795;
+  background:
+    radial-gradient(ellipse at 50% 38%, #f3d98a46, transparent 58%),
+    linear-gradient(145deg, #3a2d1f, #1d202a 58%, #2e2419);
+  box-shadow:
+    0 14px 28px #080b14a6,
+    0 0 28px #d8b96e30,
+    inset 0 0 0 1px #fff5d233;
+}
+.foil-pack.starter img {
+  opacity: 0.76;
+  object-position: 50% 34%;
+  filter: saturate(0.82) contrast(1.08);
 }
 .foil-pack.starter:before {
-  background: linear-gradient(
-    #17191d75,
-    #17191d11 30%,
-    #17191d3d 55%,
-    #17191df2 88%
+  background:
+    linear-gradient(
+      180deg,
+      #12141b55,
+      transparent 20%,
+      #10131a22 42%,
+      #11141cf2 94%
+    ),
+    linear-gradient(
+      110deg,
+      #f5d98c22,
+      transparent 35%,
+      #fff0bd17 52%,
+      transparent 68%
+    );
+}
+.foil-pack.starter:after {
+  inset: 7px;
+  border: 1px solid #f0d7959c;
+  box-shadow: inset 0 0 18px #edcf831c;
+}
+.foil-pack.starter .pack-brand {
+  position: relative;
+  z-index: 2;
+  color: #fff1ca;
+  font-size: 6px;
+  letter-spacing: 1.1px;
+  text-shadow: 0 1px 5px #000;
+}
+.foil-pack.starter .pack-brand .icon {
+  color: #f1d58d;
+}
+.starter-pack-seal {
+  position: absolute;
+  z-index: 2;
+  top: 37%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 9px;
+  border: 1px solid #ffedb8;
+  border-radius: 50%;
+  color: #302516;
+  background: radial-gradient(circle at 35% 28%, #fff6da, #e6c46f 58%, #a47d3f);
+  box-shadow:
+    0 3px 12px #0009,
+    0 0 18px #f1d58d88,
+    inset 0 0 0 3px #fff6d880;
+  font: 900 7px/1.2 var(--heading);
+  letter-spacing: 0.65px;
+  text-align: center;
+  transform: translateX(-50%) rotate(-9deg);
+}
+.foil-pack.starter .pack-label {
+  z-index: 2;
+  bottom: 19px;
+}
+.foil-pack.starter .pack-label > span {
+  color: #f4dfad;
+  font-size: 5px;
+  letter-spacing: 1.2px;
+}
+.foil-pack.starter .pack-label strong {
+  margin: 6px 0 7px;
+  color: #fff4d5;
+  font-size: 22px;
+  letter-spacing: 0.1px;
+  text-shadow:
+    0 2px 10px #000,
+    0 0 14px #e6c46f55;
+}
+.foil-pack.starter .pack-label small {
+  color: #efdfbe;
+  font-size: 5px;
+  letter-spacing: 1.8px;
+}
+.foil-pack.starter .pack-crimp {
+  border-top-color: #f5dfaa;
+  background: repeating-linear-gradient(
+    90deg,
+    #f5dfaa99 0,
+    #5b482d 1px,
+    #d4b66d88 2px
   );
+}
+.starter-pack-preview .foil-pack.starter .starter-pack-seal {
+  top: 36%;
+  width: 37px;
+  height: 37px;
+  padding: 5px;
+  font-size: 4.5px;
 }
 .foil-pack.world {
   --pack-color: #a8a6ce;
