@@ -203,8 +203,16 @@ function title(eyebrow, heading, text) {
   return `<div class="page-heading"><span class="eyebrow">${eyebrow}</span><h1>${heading}</h1><p>${text}</p></div>`;
 }
 function packArt(p, extra = "") {
-  return `<div class="foil-pack ${p.id} ${extra}" style="--pack-color:${p.color}"><img src="${art(p)}" alt="${esc(p.name)} artwork" loading="${extra ? "eager" : "lazy"}"><div class="pack-sheen"></div><div class="pack-brand">${icon("crown")} CARD MONARCHS</div><div class="pack-label"><span>${p.id === "brainrot" ? "THE ORIGINAL COLLECTION" : p.id === "apex" ? "THE ULTIMATE COLLECTION" : "THE ROYAL COLLECTION"}</span><strong>${p.short.replace(" ", "<br>")}</strong><small>${p.count} CARDS INSIDE</small></div><div class="pack-crimp"></div></div>`;
+  return `<div class="foil-pack ${p.id} ${extra}" style="--pack-color:${p.color}"><img src="${art(p)}" alt="${esc(p.name)} artwork" loading="${extra ? "eager" : "lazy"}"><div class="pack-sheen"></div><div class="pack-brand">${icon("crown")} CARD MONARCHS</div><div class="pack-label"><span>${p.id === "starter" ? "A GIFT FOR EVERY PLAYER" : p.id === "brainrot" ? "THE ORIGINAL COLLECTION" : p.id === "apex" ? "THE ULTIMATE COLLECTION" : "THE ROYAL COLLECTION"}</span><strong>${p.short.replace(" ", "<br>")}</strong><small>${p.count} ${p.count === 1 ? "CARD" : "CARDS"} INSIDE</small></div><div class="pack-crimp"></div></div>`;
 }
+const starterPackArt = {
+  id: "starter",
+  name: "Starter Pack",
+  short: "STARTER",
+  color: "#d8b96e",
+  art: "brainrot",
+  count: 1,
+};
 function guaranteeProgress() {
   const { progress, remaining, nextGuaranteed } = packProgress(
     Number(state.account?.packs || 0),
@@ -406,6 +414,13 @@ function rewardsView() {
       "Keep playing. The treasury picks up the tab.",
     ) +
     `<div class="rewards-layout"><section class="panel reward-card">${icon("rewards", "reward-icon")}<span class="eyebrow">YOUR DAILY PLAY REWARD</span><h2>${earned >= playReward.dailyCap ? "Allowance complete" : money(nextReward)} <span>${earned >= playReward.dailyCap ? "for today" : "next · every 10 active minutes"}</span></h2><p>Your reward grows by ${money(playReward.increasePence)} each time you reach another 10 minutes, up to ${money(playReward.dailyCap)} per day.</p><div class="reward-track">${rewardSteps.map((amount, i) => `<span class="${steps > i ? "claimed" : ""}">${steps > i ? icon("check") : icon("coin")}<small>${money(amount)}</small></span>`).join("")}</div><div class="pot-progress"><span style="width:${Math.min(100, (seconds / playReward.intervalSeconds) * 100)}%"></span></div><div class="pot-summary"><span>${Math.floor(seconds / 60)} / 10 active minutes</span><span>${money(earned)} / ${money(playReward.dailyCap)} today</span></div><p class="muted">${earned >= playReward.dailyCap ? `Today’s ${money(playReward.dailyCap)} allowance is complete. Come back after midnight UTC.` : `Next reward: ${money(nextReward)}. Rewards land automatically; keep this tab visible and interact to count active time.`}</p>${!state.user ? '<button class="button" data-action="auth">Start earning ' + icon("arrow") + "</button>" : ""}</section><section class="panel starter-reward"><span class="eyebrow">A GIFT FOR EVERY PLAYER</span><h2>Your free starter pack</h2><p>Every account, new or existing, gets one claim for a single random card from the Brainrot, Royalty, or World Leaders collections. It’s ${starterOdds[0] / 1000000}% likely to be Common, with a chance at something rarer.</p><p class="fine-print">One card per account · once opened, it cannot be claimed again · no charge.</p>${!state.user ? `<button class="button" data-action="auth">Sign in to claim ${icon("arrow")}</button>` : a?.starter_claimed ? '<button class="button ghost" disabled>Starter pack opened</button>' : '<button class="button" data-action="claim-starter">Open your free starter pack ' + icon("arrow") + "</button>"}</section><section class="panel"><span class="eyebrow">YOUR FIRST ROYAL DECREE</span><h2>A £5.00 welcome.</h2><p>Every new account gets £5.00 of virtual cash. That’s five Brainrot Packs, or your first Royalty Booster.</p><div class="welcome-amount">£5<span>.00</span></div><button class="button ghost" data-action="${state.user ? "go-packs" : "auth"}">${state.user ? "Browse packs" : "Claim your welcome bonus"} ${icon("arrow")}</button><div class="fine-print">${icon("info")} Virtual currency only. Resets and daily limits use UTC. Background tabs earn nothing.</div></section></div>`;
+  $(".starter-reward h2").insertAdjacentHTML(
+    "afterend",
+    `<div class="starter-pack-preview">${packArt(starterPackArt)}</div>`,
+  );
+  const starterButton = $('[data-action="claim-starter"]');
+  if (starterButton)
+    starterButton.innerHTML = `Open Starter Pack ${icon("arrow")}`;
 }
 async function friendsView() {
   const v = renderVersion,
@@ -1029,21 +1044,38 @@ document.addEventListener("click", async (e) => {
     if (action === "confirm-buy") return openPack(id);
     if (action === "claim-starter") {
       if (!requireUser() || state.busy) return;
+      showModal(
+        `<span class="eyebrow">A GIFT FOR EVERY PLAYER</span><h2>Your Starter Pack is ready.</h2><p>One surprise card, free. Give the pack a click to open it.</p><button class="starter-pack-open" data-action="open-starter" aria-label="Open your Starter Pack">${packArt(starterPackArt, "starter-opening-art")}</button><p class="muted">One card inside · no charge</p>`,
+        "starter-opening-modal",
+      );
+      return;
+    }
+    if (action === "open-starter") {
+      if (state.busy) return;
       state.busy = true;
-      target.disabled = true;
       try {
+        showModal(
+          `<span class="eyebrow">YOUR FREE STARTER PACK</span><h2>The court holds its breath…</h2><div class="opening-pack">${packArt(starterPackArt)}</div><p class="muted">Opening your Starter Pack.</p>`,
+          "opening-modal",
+        );
         const result = await api("rewards/starter", {});
         state.account = result.account;
         state.inventory.unshift(result.card);
         updateWallet();
         rewardsView();
         showModal(
-          `<span class="eyebrow">YOUR FREE STARTER PACK</span><h2>Your first card is in.</h2><div class="reveal-cards"><div class="revealed">${gameCard(result.card, { owned: true })}</div></div><button class="button" data-action="close">To your rewards ${icon("arrow")}</button>`,
+          `<span class="eyebrow">YOUR FREE STARTER PACK</span><h2>Tap to reveal your card.</h2><div class="starter-flip-scene"><button class="starter-flip-card" data-action="reveal-starter-card" aria-label="Flip and reveal your starter card"><span class="starter-flip-inner"><span class="starter-flip-front">${icon("crown")}<strong>STARTER</strong><small>TAP TO REVEAL</small></span><span class="starter-flip-back">${gameCard(result.card, { owned: true })}</span></span></button></div><button class="button starter-reveal-done" data-action="close" hidden>To your rewards ${icon("arrow")}</button>`,
           "reveal-modal",
         );
       } finally {
         state.busy = false;
       }
+      return;
+    }
+    if (action === "reveal-starter-card") {
+      target.classList.add("flipped");
+      target.disabled = true;
+      $(".starter-reveal-done", modal).hidden = false;
       return;
     }
     if (action === "select-card") {

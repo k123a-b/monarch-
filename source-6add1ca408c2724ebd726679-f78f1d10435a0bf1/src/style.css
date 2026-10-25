@@ -926,6 +926,17 @@ main {
 .foil-pack.apex {
   transform: rotate(-6deg);
 }
+.foil-pack.starter {
+  --pack-color: #d8b96e;
+}
+.foil-pack.starter:before {
+  background: linear-gradient(
+    #17191d75,
+    #17191d11 30%,
+    #17191d3d 55%,
+    #17191df2 88%
+  );
+}
 .foil-pack.world {
   --pack-color: #a8a6ce;
 }
@@ -2095,6 +2106,142 @@ form input {
 }
 .welcome-amount > span {
   font-size: 38px;
+}
+.starter-pack-preview {
+  height: 180px;
+  margin: 8px 0 12px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #343642;
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at center, #d8b96e21, transparent 68%),
+    linear-gradient(140deg, #222532, #171b26);
+  overflow: hidden;
+}
+.starter-pack-preview .foil-pack {
+  width: 95px;
+  height: 138px;
+}
+.starter-pack-preview .pack-label strong {
+  font-size: 13px;
+}
+.starter-pack-preview .pack-label span,
+.starter-pack-preview .pack-label small {
+  font-size: 5px;
+}
+.starter-pack-open {
+  border: 0;
+  padding: 20px 30px;
+  background:
+    radial-gradient(ellipse at center, #d8b96e24, transparent 70%), transparent;
+  cursor: pointer;
+}
+.starter-pack-open .foil-pack {
+  width: 160px;
+  height: 230px;
+  animation: starter-pack-bob 1.2s ease-in-out infinite alternate;
+}
+.starter-pack-open:hover .foil-pack {
+  transform: rotate(0) scale(1.06);
+}
+.starter-opening-modal {
+  text-align: center;
+}
+.starter-opening-modal .muted {
+  margin-top: 12px;
+}
+.starter-flip-scene {
+  width: min(260px, 80vw);
+  height: 370px;
+  margin: 24px auto;
+  perspective: 1000px;
+}
+.starter-flip-card,
+.starter-flip-inner,
+.starter-flip-front,
+.starter-flip-back {
+  width: 100%;
+  height: 100%;
+}
+.starter-flip-card {
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  perspective: 1000px;
+}
+.starter-flip-inner {
+  display: block;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 850ms cubic-bezier(0.2, 0.75, 0.15, 1);
+}
+.starter-flip-card.flipped .starter-flip-inner {
+  transform: rotateY(180deg);
+}
+.starter-flip-front,
+.starter-flip-back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #cfad62;
+  border-radius: 12px;
+  backface-visibility: hidden;
+  box-shadow: 0 16px 40px #0008;
+}
+.starter-flip-front {
+  gap: 18px;
+  color: #f0d696;
+  background:
+    radial-gradient(circle at 50% 35%, #d8b96e44, transparent 48%),
+    linear-gradient(145deg, #26283a, #12151f);
+}
+.starter-flip-front:before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border: 1px solid #d8b96e70;
+  border-radius: 8px;
+}
+.starter-flip-front .icon {
+  width: 56px;
+  height: 56px;
+}
+.starter-flip-front strong {
+  font: 800 23px var(--heading);
+  letter-spacing: 2px;
+}
+.starter-flip-front small {
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+.starter-flip-back {
+  transform: rotateY(180deg);
+}
+.starter-flip-back .game-card {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+}
+.starter-reveal-done {
+  margin: 0 auto 20px;
+}
+@keyframes starter-pack-bob {
+  from {
+    transform: rotate(-5deg) translateY(0);
+  }
+  to {
+    transform: rotate(4deg) translateY(-8px);
+  }
+}
+.opening-pack .foil-pack.starter {
+  animation: wobble 0.5s infinite alternate;
 }
 .rewards-layout > .panel > h2 {
   font-size: 30px;
