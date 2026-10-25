@@ -3,15 +3,40 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/((?!api/|_vercel/).*)", "destination": "/index.html" }],
+  "rewrites": [
+    {
+      "source": "/api/:path+",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api/|_vercel/).*)",
+      "destination": "/index.html"
+    }
+  ],
   "images": {
-    "sizes": [400, 500, 650],
-    "qualities": [75],
-    "formats": ["image/webp"],
+    "sizes": [
+      400,
+      500,
+      650
+    ],
+    "qualities": [
+      75
+    ],
+    "formats": [
+      "image/webp"
+    ],
     "minimumCacheTTL": 86400,
     "remotePatterns": [
-      { "protocol": "https", "hostname": "upload.wikimedia.org", "pathname": "/**" },
-      { "protocol": "https", "hostname": "thumb.wikimedia.org", "pathname": "/**" }
+      {
+        "protocol": "https",
+        "hostname": "upload.wikimedia.org",
+        "pathname": "/**"
+      },
+      {
+        "protocol": "https",
+        "hostname": "thumb.wikimedia.org",
+        "pathname": "/**"
+      }
     ]
   }
 }
