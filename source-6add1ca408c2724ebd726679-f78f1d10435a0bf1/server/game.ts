@@ -6,7 +6,7 @@ import {
   weightedWinner,
   packProgress,
 } from "../shared/catalog.mjs";
-import { database, pool } from "../db/index.js";
+import { database, pool, databaseTarget } from "../db/index.js";
 import { accounts, inventory } from "../db/schema.js";
 import { sessionUser, type SessionUser } from "./session.js";
 import { eq, desc, inArray } from "drizzle-orm";
@@ -629,7 +629,17 @@ export async function handle(
     // record the cause in the server logs (code and message only, never request
     // data or environment values).
     if (status === 500 || busy)
-      console.error("api error", req.method, route, e?.code, e?.message);
+      console.error(
+        "api error",
+        req.method,
+        route,
+        e?.code,
+        e?.message,
+        // Which database the site is trying to reach (never the password).
+        e?.code === "28P01" || e?.code === "XX000" || e?.code === "ENOTFOUND"
+          ? databaseTarget()
+          : "",
+      );
     return Response.json(
       {
         error:
