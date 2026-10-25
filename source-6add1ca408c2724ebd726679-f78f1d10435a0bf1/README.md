@@ -6,7 +6,7 @@ The vanilla JavaScript SPA includes five pack tiers, an animated card reveal wit
 
 ## Technology
 
-Vite bundles the HTML, CSS, and framework-free JavaScript frontend. A Vercel Function (`api/[...path].ts`) provides the JSON API and Google sign-in. Supabase provides managed PostgreSQL, accessed with Drizzle and the `pg` driver; transactional game operations use explicit transactions and locking on a pooled connection, and recent pulls use Drizzle ORM. Auth.js (`@auth/core`) handles Google OAuth and issues a signed, HTTP-only session cookie. Vercel Image Optimization serves generated pack/meme artwork and externally sourced leader portraits.
+Vite bundles the HTML, CSS, and framework-free JavaScript frontend. A Vercel Function (`api/index.ts`) provides the JSON API and Google sign-in. Supabase provides managed PostgreSQL, accessed with Drizzle and the `pg` driver; transactional game operations use explicit transactions and locking on a pooled connection, and recent pulls use Drizzle ORM. Auth.js (`@auth/core`) handles Google OAuth and issues a signed, HTTP-only session cookie. Vercel Image Optimization serves generated pack/meme artwork and externally sourced leader portraits.
 
 ## Local development
 
