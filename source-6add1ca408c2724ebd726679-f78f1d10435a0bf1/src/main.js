@@ -203,7 +203,7 @@ function title(eyebrow, heading, text) {
   return `<div class="page-heading"><span class="eyebrow">${eyebrow}</span><h1>${heading}</h1><p>${text}</p></div>`;
 }
 function packArt(p, extra = "") {
-  return `<div class="foil-pack ${p.id} ${extra}" style="--pack-color:${p.color}"><img src="${art(p)}" alt="${esc(p.name)} artwork" loading="${extra ? "eager" : "lazy"}"><div class="pack-sheen"></div><div class="pack-brand">${icon("crown")} CARD MONARCHS</div><div class="pack-label"><span>${p.id === "starter" ? "A GIFT FOR EVERY PLAYER" : p.id === "brainrot" ? "THE ORIGINAL COLLECTION" : p.id === "apex" ? "THE ULTIMATE COLLECTION" : "THE ROYAL COLLECTION"}</span><strong>${p.short.replace(" ", "<br>")}</strong><small>${p.count} ${p.count === 1 ? "CARD" : "CARDS"} INSIDE</small></div><div class="pack-crimp"></div></div>`;
+  return `<div class="foil-pack ${p.id} ${extra}" style="--pack-color:${p.color}"><img src="${art(p)}" alt="${esc(p.name)} artwork" loading="${extra ? "eager" : "lazy"}"><div class="pack-sheen"></div><div class="pack-brand">${icon("crown")} CARD MONARCHS</div>${p.id === "starter" ? '<div class="starter-pack-seal">FREE · ONE CARD</div>' : ""}<div class="pack-label"><span>${p.id === "starter" ? "A GIFT FOR EVERY PLAYER" : p.id === "brainrot" ? "THE ORIGINAL COLLECTION" : p.id === "apex" ? "THE ULTIMATE COLLECTION" : "THE ROYAL COLLECTION"}</span><strong>${p.short.replace(" ", "<br>")}</strong><small>${p.count} ${p.count === 1 ? "CARD" : "CARDS"} INSIDE</small></div><div class="pack-crimp"></div></div>`;
 }
 const starterPackArt = {
   id: "starter",
