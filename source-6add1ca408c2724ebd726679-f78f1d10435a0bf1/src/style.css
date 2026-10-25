@@ -2296,9 +2296,6 @@ form input {
   background-size: 200%;
   animation: loading 1.5s infinite;
 }
-.supreme-shake {
-  animation: earthquake 0.1s 15;
-}
 .legendary-flash:after {
   content: "";
   position: fixed;
@@ -3462,9 +3459,6 @@ body:has(dialog[open]) {
     transition: none !important;
     scroll-behavior: auto !important;
   }
-  .supreme-shake {
-    transform: none !important;
-  }
 }
 .roster-link {
   display: flex !important;
@@ -3538,6 +3532,110 @@ body:has(dialog[open]) {
 }
 .game-card .card-emoji[hidden] {
   display: none;
+}
+.game-card {
+  border-radius: 13px;
+  box-shadow:
+    0 12px 28px #03060c80,
+    inset 0 0 0 1px #fff1;
+}
+.game-card:before {
+  inset: 7px;
+  border-color: #f2e5c044;
+  border-radius: 8px;
+}
+.game-card .card-top {
+  padding: 14px 17px;
+  font-size: 8px;
+  letter-spacing: 1.7px;
+}
+.game-card .card-portrait {
+  height: 180px;
+  margin: 0 8px;
+  border-radius: 8px;
+  background: radial-gradient(ellipse at 50% 28%, #ffffff20, transparent 70%);
+}
+.game-card .card-portrait img {
+  object-position: 50% 20%;
+  mask-image: linear-gradient(#111 83%, transparent);
+}
+.game-card .card-caption {
+  padding: 10px 18px 18px;
+  min-height: 164px;
+}
+.game-card .card-caption > small {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+}
+.game-card .card-caption h3 {
+  font-size: 19px;
+  line-height: 1.2;
+}
+.game-card .leader-role {
+  color: #ded0aa;
+  font-size: 7px;
+  letter-spacing: 0.8px;
+  margin: -3px 0 3px;
+}
+.game-card .card-value {
+  border-top-color: #f2d89255;
+}
+.game-card.rarity-epic {
+  border-color: #87aef0;
+  box-shadow:
+    0 10px 30px #345a9b44,
+    inset 0 0 34px #739ee91c;
+}
+.game-card.rarity-crown,
+.game-card.rarity-alpha,
+.game-card.rarity-chase {
+  box-shadow:
+    0 12px 34px #b7883655,
+    inset 0 0 38px #edcf791a;
+}
+.settings-button .icon {
+  width: 15px;
+  height: 15px;
+}
+.settings-modal #username-input {
+  width: 100%;
+  margin: 8px 0 0;
+}
+.settings-modal label {
+  display: block;
+  color: #ded5c0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.settings-modal .form-error {
+  min-height: 18px;
+  margin: 5px 0;
+  color: #f0a49c;
+  font-size: 11px;
+}
+.settings-divider {
+  border-top: 1px solid var(--line);
+  margin: 22px 0 14px;
+}
+.settings-modal .text-button.full {
+  justify-content: center;
+  margin-top: 10px;
+}
+@media (max-width: 600px) {
+  .header-actions {
+    gap: 8px;
+  }
+  .settings-button {
+    padding: 9px !important;
+    font-size: 0 !important;
+  }
+  .settings-button .icon {
+    width: 18px;
+    height: 18px;
+  }
+  .game-card .card-portrait {
+    height: 155px;
+  }
 }
 @media (max-width: 600px) {
   .codex-intro {
@@ -3641,13 +3739,70 @@ body:has(dialog[open]) {
 }
 
 .country-flag {
-  font-size: 1.35rem;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.45em;
+  height: 1.1em;
+  font-size: 1.55rem;
   vertical-align: middle;
-  margin-right: 0.25rem;
+  margin-right: 0.3rem;
+  filter: drop-shadow(0 2px 3px #05070b80);
+}
+.country-flag-badge {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100% - 20px);
+  padding: 5px 9px;
+  border: 1px solid #f0d89880;
+  border-radius: 999px;
+  background: #111827e8;
+  color: #fff8e8;
+  box-shadow: 0 3px 12px #05070b88;
+  font-size: 25px;
+  line-height: 1;
+}
+.country-flag-badge small {
+  overflow: hidden;
+  color: #fff8e8;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.national-flag-portrait {
+  background:
+    radial-gradient(ellipse at center, #ffffff1c, transparent 67%),
+    linear-gradient(140deg, #101827, #24344c);
+}
+.national-flag-art {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  font-size: clamp(5rem, 9vw, 7rem);
+  filter: drop-shadow(0 8px 14px #05070b99);
+}
+.roster-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.roster-filters .button.active {
+  border-color: #63583e;
+  color: #dfc58f;
+  background: #b7964d14;
 }
 .revealed {
   position: relative;
   min-width: 0;
+  perspective: 900px;
 }
 .revealed > .button {
   margin-top: 0.7rem;
@@ -3655,173 +3810,160 @@ body:has(dialog[open]) {
   white-space: normal;
 }
 .presidential-reveal > .game-card {
-  animation: presidential-portrait 2s both;
+  animation: presidential-portrait 1.8s cubic-bezier(.18,.75,.25,1) both;
 }
-.missile-salute {
+.presidential-reveal > .game-card:before,
+.trumpet-reveal > .game-card:before,
+.supreme-reveal > .game-card:before {
+  border-color: #ffe5a8a8;
+  box-shadow: inset 0 0 30px #f3d27c32, 0 0 28px #f3d27c40;
+}
+.presidential-sparkle,
+.trumpet-fanfare,
+.supreme-stars {
   position: absolute;
-  inset: 0;
+  inset: -12%;
   pointer-events: none;
-  z-index: 5;
-  overflow: hidden;
-}
-.missile-salute i {
-  position: absolute;
-  left: 50%;
-  top: 45%;
-  width: 10px;
-  height: 38px;
-  border-radius: 70% 70% 15% 15%;
-  background: linear-gradient(90deg, #84929d, #eef0e2, #798991);
-  transform-origin: 0 0;
-  animation: missile-orbit 1.65s cubic-bezier(0.4, 0, 0.5, 1) both;
-  --angle: 0deg;
-}
-.missile-salute i:nth-child(2) {
-  --angle: 120deg;
-}
-.missile-salute i:nth-child(3) {
-  --angle: 240deg;
-}
-.missile-salute i::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 2px;
-  width: 6px;
-  height: 25px;
-  background: linear-gradient(#e8bc69, transparent);
-}
-.missile-salute b {
-  position: absolute;
-  inset: 15%;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff4cc, #d6a95388 30%, transparent 68%);
-  animation: missile-impact 2s both;
-}
-@keyframes missile-orbit {
-  0% {
-    transform: rotate(var(--angle)) translateY(-110px) rotate(90deg);
-    opacity: 0;
-  }
-  12% {
-    opacity: 1;
-  }
-  70% {
-    transform: rotate(calc(var(--angle) + 600deg)) translateY(-100px)
-      rotate(90deg);
-    opacity: 1;
-  }
-  95% {
-    opacity: 1;
-  }
-  100% {
-    transform: rotate(calc(var(--angle) + 750deg)) translateY(0) scale(0.2);
-    opacity: 0;
-  }
-}
-@keyframes missile-impact {
-  0%,
-  75% {
-    transform: scale(0.1);
-    opacity: 0;
-  }
-  84% {
-    transform: scale(1.7);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-}
-@keyframes presidential-portrait {
-  0%,
-  78% {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .missile-salute {
-    display: none;
-  }
-  .presidential-reveal > .game-card {
-    animation: none;
-  }
-}
-
-.supreme-salute {
-  position: absolute;
-  inset: -20%;
   z-index: 6;
   overflow: hidden;
-  pointer-events: none;
 }
-.supreme-salute span {
+.presidential-sparkle span,
+.supreme-stars span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  color: #ffe7a0;
+  font-size: 2rem;
+  text-shadow: 0 0 14px #f4d27c, 0 0 30px #fff4d1;
+  animation: star-orbit 1.8s ease-out both;
+  --angle: 0deg;
+}
+.presidential-sparkle span:nth-child(2),
+.supreme-stars span:nth-child(2) {
+  --angle: 90deg;
+}
+.presidential-sparkle span:nth-child(3),
+.supreme-stars span:nth-child(3) {
+  --angle: 180deg;
+}
+.supreme-stars span:nth-child(4) {
+  --angle: 270deg;
+}
+.trumpet-reveal > .game-card {
+  animation: trumpet-arrive 1.9s cubic-bezier(.16,.8,.25,1) both;
+}
+.trumpet-fanfare {
+  display: grid;
+  place-items: center;
+}
+.trumpet-fanfare > span {
+  font-size: clamp(2.8rem, 10vw, 5rem);
+  filter: drop-shadow(0 0 18px #f8d782);
+  animation: trumpet-bloom 1.8s ease-out both;
+}
+.trumpet-fanfare > i {
   position: absolute;
   left: 50%;
   top: 42%;
-  color: #e0bd72;
-  font:
-    700 clamp(3rem, 9vw, 6rem) Georgia,
-    serif;
-  text-shadow: 0 3px 20px #9b3b31;
-  --angle: -45deg;
-  animation: supreme-flight 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  color: #ffe3a0;
+  font-size: 2rem;
+  font-style: normal;
+  text-shadow: 0 0 15px #ffe3a0;
+  animation: music-rise 1.8s ease-out both;
+  --note-x: -70px;
 }
-.supreme-salute span:nth-child(2) {
-  --angle: 45deg;
+.trumpet-fanfare > i:nth-of-type(2) {
+  --note-x: 30px;
+  animation-delay: .08s;
 }
-.supreme-salute span:nth-child(3) {
-  --angle: 135deg;
+.trumpet-fanfare > i:nth-of-type(3) {
+  --note-x: 80px;
+  animation-delay: .16s;
 }
-.supreme-salute span:nth-child(4) {
-  --angle: 225deg;
-}
-.supreme-reveal > .game-card {
-  animation: supreme-unlock 1.8s both;
-}
-@keyframes supreme-flight {
+@keyframes presidential-portrait {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-220px)
-      scale(0.3);
+    transform: translateY(20px) scale(.88) rotateY(-12deg);
   }
-  15% {
+  55% {
     opacity: 1;
-  }
-  70% {
-    opacity: 1;
-    transform: translate(-50%, -50%) rotate(calc(var(--angle) + 270deg))
-      translateY(-70px) scale(1);
+    transform: translateY(-5px) scale(1.04) rotateY(4deg);
   }
   100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) rotate(calc(var(--angle) + 360deg))
-      translateY(0) scale(0.15);
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateY(0);
   }
 }
-@keyframes supreme-unlock {
-  0%,
-  65% {
+.supreme-reveal > .game-card {
+  animation: supreme-arrive 1.8s cubic-bezier(.17,.8,.25,1) both;
+}
+@keyframes star-orbit {
+  from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: rotate(var(--angle)) translateY(-18px) scale(.3);
   }
-  100% {
+  30% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: rotate(calc(var(--angle) + 150deg)) translateY(-100px) scale(1.3);
+  }
+}
+@keyframes trumpet-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(.86);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-5px) scale(1.03);
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes trumpet-bloom {
+  0% {
+    opacity: 0;
+    transform: translateY(36px) rotate(-18deg) scale(.5);
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-75px) rotate(12deg) scale(1.1);
+  }
+}
+@keyframes music-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px) scale(.5);
+  }
+  25% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--note-x)), -105px) scale(1.2) rotate(15deg);
+  }
+}
+@keyframes supreme-arrive {
+  0% {
+    opacity: 0;
+    transform: scale(.88);
+    filter: brightness(.7);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.03);
+    filter: brightness(1.25);
+  }
+  to {
     opacity: 1;
     transform: scale(1);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .supreme-salute {
-    display: none;
-  }
-  .supreme-reveal > .game-card {
-    animation: none;
+    filter: brightness(1);
   }
 }
 
