@@ -873,6 +873,8 @@
       "country": "Burundi",
       "role": "Head of government",
       "page": "https://en.wikipedia.org/wiki/Nestor_Ntahontuye",
+      "image": "/img/leader-placeholder.svg",
+      "portraitPlaceholder": true,
       "set": "world",
       "rarity": "Common",
       "value": 105,
@@ -4580,6 +4582,8 @@
       "country": "San Marino",
       "role": "Head of state",
       "page": "https://en.wikipedia.org/wiki/Gerardo_Giovagnoli",
+      "image": "/img/leader-placeholder.svg",
+      "portraitPlaceholder": true,
       "set": "world",
       "rarity": "Common",
       "value": 105,
@@ -4597,6 +4601,8 @@
       "country": "San Marino",
       "role": "Head of state",
       "page": "https://en.wikipedia.org/wiki/William_Casali",
+      "image": "/img/leader-placeholder.svg",
+      "portraitPlaceholder": true,
       "set": "world",
       "rarity": "Common",
       "value": 80,
@@ -5639,20 +5645,21 @@
       "id": "world-b8356339d506f77d",
       "name": "Andy Burnham",
       "country": "United Kingdom",
-      "role": "Prime Minister",
+      "role": "MP · Greater Manchester",
       "page": "https://en.wikipedia.org/wiki/Andy_Burnham",
-      "officialSource": "https://www.gov.uk/government/ministers/prime-minister",
-      "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/Prime_Minister_Andy_Burnham_portrait_%28cropped%29.jpg/400px-Prime_Minister_Andy_Burnham_portrait_%28cropped%29.jpg",
+      "officialSource": "https://members.parliament.uk/member/1427",
+      "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6b/Official_portrait_of_Andy_Burnham_MP_2026_%28cropped_3x4%29.jpg/500px-Official_portrait_of_Andy_Burnham_MP_2026_%28cropped_3x4%29.jpg",
       "set": "world",
-      "rarity": "Uncommon",
-      "value": 430,
+      "rarity": "Epic",
+      "value": 5000,
       "emoji": "🌍",
       "pattern": "grid",
       "colors": [
         "#33495e",
         "#c8a96a"
       ],
-      "flavor": "Diplomatic immunity does not cover a bad pack pull."
+      "flavor": "Diplomatic immunity does not cover a bad pack pull.",
+      "imageSource": "https://commons.wikimedia.org/wiki/File:Official_portrait_of_Andy_Burnham_MP_2026_(cropped_3x4).jpg"
     },
     {
       "id": "world-c6af8a1c1faf4aae",
@@ -5973,10 +5980,7 @@
       "value": -2500,
       "emoji": "🌍",
       "pattern": "grid",
-      "colors": [
-        "#523038",
-        "#c8a96a"
-      ],
+      "colors": ["#523038", "#c8a96a"],
       "flavor": "The treasury has issued a fictional £25 penalty. Political satire."
     },
     {
@@ -5991,10 +5995,7 @@
       "value": 5000,
       "emoji": "🇮🇱",
       "pattern": "stars",
-      "colors": [
-        "#174b86",
-        "#f0f4fb"
-      ],
+      "colors": ["#174b86", "#f0f4fb"],
       "flavor": "A bright flag for a standout pull."
     }
   ],

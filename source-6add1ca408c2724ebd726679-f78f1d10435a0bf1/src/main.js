@@ -10,7 +10,9 @@ import {
   leaderSource,
   packProgress,
   packValueRange,
+  starterOdds,
 } from "../shared/catalog.mjs";
+import { playReward } from "../shared/rules.mjs";
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) =>
   String(s ?? "").replace(
@@ -80,7 +82,8 @@ let viewRequest = 0;
 let syncRequest = 0;
 const image = (src, w = 500) => {
   const source = imageSource(src);
-  return source.startsWith("/") && source.endsWith(".svg")
+  return source.startsWith("/img/flags/") ||
+    (source.startsWith("/") && source.endsWith(".svg"))
     ? source
     : import.meta.env.DEV
       ? source
@@ -163,15 +166,21 @@ function showModal(content, cls = "") {
   if (!modal.open) modal.showModal();
 }
 function closeModal() {
-  if (state.busy) return;
+  if (state.busy || modal.classList.contains("username-required-modal")) return;
   modal.close();
   modalFocus?.focus();
 }
 modal.addEventListener("cancel", (e) => {
-  if (state.busy) e.preventDefault();
+  if (state.busy || modal.classList.contains("username-required-modal"))
+    e.preventDefault();
 });
 modal.addEventListener("click", (e) => {
-  if (e.target === modal && !state.busy) closeModal();
+  if (
+    e.target === modal &&
+    !state.busy &&
+    !modal.classList.contains("username-required-modal")
+  )
+    closeModal();
 });
 function requireUser() {
   if (state.user) return true;
@@ -213,7 +222,7 @@ function shop() {
           : p.set === "world",
   );
   $("#main").innerHTML =
-    `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="tiny-crown">${icon("crown")}</span> WELCOME TO YOUR KINGDOM</div><h1>Chaos is<br><span>collectible.</span></h1><p>Ridiculous cards. Royal-level pulls.<br>Open packs, trade with your court, and play for the pot.</p><div class="hero-buttons"><a href="#shop" class="button" data-action="scroll-shop">Explore packs ${icon("arrow")}</a><button class="button ghost" data-action="how">How it works ${icon("info")}</button></div><div class="hero-note"><span class="green-dot"></span> Real fun. Fictional money. <span>Always.</span></div></div><div class="hero-stage" aria-label="Featured collectible cards"><div class="orbital"></div><span class="stage-star s1">✦</span><span class="stage-star s2">✧</span><div class="hero-card back-left"><div class="ornate-corner"></div><img src="${image("/img/royal.png")}" alt="Royal crown"><span>THE ROYAL COURT</span><strong>Crown of Eternity</strong><b>CROWN • ${money(6000)}</b></div><div class="hero-card back-right"><img src="${image("/img/apex.png")}" alt="Mystery Gold crown"><span>THE ONE. THE ONLY.</span><strong>Mystery Gold</strong><b>ALPHA • SERIAL № 001</b></div><div class="hero-card front"><div class="hero-card-top">${icon("crown")} THE BRAINROT COLLECTION <span>001</span></div><img src="${image("/img/brainrot.png", 650)}" alt="Tralalero Tralala, a crowned shark wearing blue sneakers"><div class="hero-card-bottom"><span>COMMON</span><strong>Tralalero<br>Tralala</strong><small>All hail the king of absolutely nothing.</small><div><span>SELL VALUE</span><b>£0.28</b></div></div></div><div class="floating-label">${icon("spark")} Your next legendary pull?</div></div></section><section class="trust-strip"><div>${icon("rewards")}<span><strong>£5 on the house</strong><small>Your welcome bonus awaits.</small></span></div><div>${icon("collection")}<span><strong>Collect. Trade. Reign.</strong><small>Build a collection fit for a monarch.</small></span></div><div>${icon("coin")}<span><strong>Play more, earn more</strong><small>£0.50 every 10 active minutes.</small></span></div><span class="play-label">100% VIRTUAL<br><strong>0% REAL MONEY</strong></span></section><section id="shop" class="shop-section"><div class="section-heading"><div><span class="eyebrow">THE ROYAL PACK SHOP</span><h2>Pick your poison.<span> Or your crown.</span></h2></div><button class="text-button odds-link" data-action="all-odds">${icon("info")} Transparent odds. Always.</button></div>${guaranteeProgress()}<div class="shop-filters" role="group" aria-label="Pack collection"><div>${[
+    `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="tiny-crown">${icon("crown")}</span> WELCOME TO YOUR KINGDOM</div><h1>Chaos is<br><span>collectible.</span></h1><p>Ridiculous cards. Royal-level pulls.<br>Open packs, trade with your court, and play for the pot.</p><div class="hero-buttons"><a href="#shop" class="button" data-action="scroll-shop">Explore packs ${icon("arrow")}</a><button class="button ghost" data-action="how">How it works ${icon("info")}</button></div><div class="hero-note"><span class="green-dot"></span> Real fun. Fictional money. <span>Always.</span></div></div><div class="hero-stage" aria-label="Featured collectible cards"><div class="orbital"></div><span class="stage-star s1">✦</span><span class="stage-star s2">✧</span><div class="hero-card back-left"><div class="ornate-corner"></div><img src="${image("/img/royal.png")}" alt="Royal crown"><span>THE ROYAL COURT</span><strong>Crown of Eternity</strong><b>CROWN • ${money(6000)}</b></div><div class="hero-card back-right"><img src="${image("/img/apex.png")}" alt="Mystery Gold crown"><span>THE ONE. THE ONLY.</span><strong>Mystery Gold</strong><b>ALPHA • SERIAL № 001</b></div><div class="hero-card front"><div class="hero-card-top">${icon("crown")} THE BRAINROT COLLECTION <span>001</span></div><img src="${image("/img/brainrot.png", 650)}" alt="Tralalero Tralala, a crowned shark wearing blue sneakers"><div class="hero-card-bottom"><span>COMMON</span><strong>Tralalero<br>Tralala</strong><small>All hail the king of absolutely nothing.</small><div><span>SELL VALUE</span><b>£0.28</b></div></div></div><div class="floating-label">${icon("spark")} Your next legendary pull?</div></div></section><section class="trust-strip"><div>${icon("rewards")}<span><strong>£5 on the house</strong><small>Your welcome bonus awaits.</small></span></div><div>${icon("collection")}<span><strong>Collect. Trade. Reign.</strong><small>Build a collection fit for a monarch.</small></span></div><div>${icon("coin")}<span><strong>Growing play rewards</strong><small>Earn more the longer you play.</small></span></div><span class="play-label">100% VIRTUAL<br><strong>0% REAL MONEY</strong></span></section><section id="shop" class="shop-section"><div class="section-heading"><div><span class="eyebrow">THE ROYAL PACK SHOP</span><h2>Pick your poison.<span> Or your crown.</span></h2></div><button class="text-button odds-link" data-action="all-odds">${icon("info")} Transparent odds. Always.</button></div>${guaranteeProgress()}<div class="shop-filters" role="group" aria-label="Pack collection"><div>${[
       ["all", "All packs"],
       ["brainrot", "Brainrot collection"],
       ["royal", "The royal court"],
@@ -233,7 +242,7 @@ function gameCard(
 ) {
   const template = cardMap[row.template_id || row.id] || row;
   const t = presentedCard(
-    template,
+    owned && row.rarity ? { ...template, rarity: row.rarity } : template,
     owned ||
       Boolean(row.template_id) ||
       state.inventory.some((c) => c.template_id === template.id),
@@ -244,7 +253,16 @@ function gameCard(
     ? [
         t.page && {
           url: t.page,
-          label: t.set === "world" ? "Portrait / biography" : "Card source",
+          label:
+            t.role === "National flag"
+              ? "Flag image source"
+              : t.set === "world"
+                ? "Portrait / biography"
+                : "Card source",
+        },
+        t.imageSource && {
+          url: t.imageSource,
+          label: "Portrait image source",
         },
         t.officialSource && { url: t.officialSource, label: "Official office" },
       ]
@@ -258,10 +276,18 @@ function gameCard(
   const countryFlag = t.flag
     ? `<span class="country-flag-badge" role="img" aria-label="${esc(t.country)} flag">${t.flag}<small>${esc(t.country)}</small></span>`
     : "";
+  const portraitAlt =
+    t.role === "National flag"
+      ? `Flag of ${esc(t.country)}`
+      : t.id === "locked-world-chase"
+        ? "Locked mystery leader"
+        : t.portraitPlaceholder
+          ? `Portrait unavailable for ${esc(t.name)}`
+          : `Portrait of ${esc(t.name)}`;
   const portrait =
     t.role === "National flag"
-      ? `<div class="card-portrait national-flag-portrait">${countryFlag}<span class="national-flag-art" role="img" aria-label="Flag of ${esc(t.country)}">${t.flag}</span></div>`
-      : `<div class="card-portrait">${countryFlag}<img src="${image(t.image || (t.set === "world" ? "/img/leader-placeholder.svg" : "/img/apex.png"), 400)}" loading="lazy" alt="${t.id === "locked-world-chase" ? "Locked mystery leader" : "Portrait of " + esc(t.name)}"></div>`;
+      ? `<div class="card-portrait national-flag-portrait">${countryFlag}<img src="${image(t.image, 320)}" loading="lazy" alt="${portraitAlt}"></div>`
+      : `<div class="card-portrait">${countryFlag}<img src="${image(t.image || (t.set === "world" ? "/img/leader-placeholder.svg" : "/img/apex.png"), 400)}" loading="lazy" alt="${portraitAlt}"></div>`;
   return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}</article>`;
 }
 function collection() {
@@ -352,17 +378,34 @@ function rewardsView() {
     a?.reward_day === new Date().toISOString().slice(0, 10)
       ? a.daily_reward
       : 0;
+  const steps =
+    a?.reward_day === new Date().toISOString().slice(0, 10)
+      ? a.reward_steps || 0
+      : 0;
   const seconds =
     a?.reward_day === new Date().toISOString().slice(0, 10)
       ? a.active_seconds
       : 0;
+  const nextReward = Math.min(
+    playReward.firstPence + steps * playReward.increasePence,
+    playReward.dailyCap - earned,
+  );
+  const rewardSteps = [];
+  for (let step = 0, total = 0; total < playReward.dailyCap; step++) {
+    const reward = Math.min(
+      playReward.firstPence + step * playReward.increasePence,
+      playReward.dailyCap - total,
+    );
+    rewardSteps.push(reward);
+    total += reward;
+  }
   $("#main").innerHTML =
     title(
       "A LITTLE ROYAL ALLOWANCE",
       "Good things come to players.",
       "Keep playing. The treasury picks up the tab.",
     ) +
-    `<div class="rewards-layout"><section class="panel reward-card">${icon("rewards", "reward-icon")}<span class="eyebrow">YOUR DAILY PLAY REWARD</span><h2>£0.50 <span>/ 10 minutes</span></h2><p>For every ten minutes of active play, a little more for your next pack.</p><div class="reward-track">${Array.from({ length: 6 }, (_, i) => `<span class="${earned > i * 50 ? "claimed" : ""}">${earned > i * 50 ? icon("check") : icon("coin")}<small>£0.50</small></span>`).join("")}</div><div class="pot-progress"><span style="width:${Math.min(100, (seconds / 600) * 100)}%"></span></div><div class="pot-summary"><span>${Math.floor(seconds / 60)} / 10 active minutes</span><span>${money(earned)} / £3.00 today</span></div><p class="muted">${earned >= 300 ? "Today’s £3.00 allowance is complete. Come back after midnight UTC." : "Rewards land in your balance automatically. Keep this tab visible and interact to count active time."}</p>${!state.user ? '<button class="button" data-action="auth">Start earning ' + icon("arrow") + "</button>" : ""}</section><section class="panel"><span class="eyebrow">YOUR FIRST ROYAL DECREE</span><h2>A £5.00 welcome.</h2><p>Every new account gets £5.00 of virtual cash. That’s five Brainrot Packs, or your first Royalty Booster.</p><div class="welcome-amount">£5<span>.00</span></div><button class="button ghost" data-action="${state.user ? "go-packs" : "auth"}">${state.user ? "Browse packs" : "Claim your welcome bonus"} ${icon("arrow")}</button><div class="fine-print">${icon("info")} Virtual currency only. Resets and daily limits use UTC. Background tabs earn nothing.</div></section></div>`;
+    `<div class="rewards-layout"><section class="panel reward-card">${icon("rewards", "reward-icon")}<span class="eyebrow">YOUR DAILY PLAY REWARD</span><h2>${earned >= playReward.dailyCap ? "Allowance complete" : money(nextReward)} <span>${earned >= playReward.dailyCap ? "for today" : "next · every 10 active minutes"}</span></h2><p>Your reward grows by ${money(playReward.increasePence)} each time you reach another 10 minutes, up to ${money(playReward.dailyCap)} per day.</p><div class="reward-track">${rewardSteps.map((amount, i) => `<span class="${steps > i ? "claimed" : ""}">${steps > i ? icon("check") : icon("coin")}<small>${money(amount)}</small></span>`).join("")}</div><div class="pot-progress"><span style="width:${Math.min(100, (seconds / playReward.intervalSeconds) * 100)}%"></span></div><div class="pot-summary"><span>${Math.floor(seconds / 60)} / 10 active minutes</span><span>${money(earned)} / ${money(playReward.dailyCap)} today</span></div><p class="muted">${earned >= playReward.dailyCap ? `Today’s ${money(playReward.dailyCap)} allowance is complete. Come back after midnight UTC.` : `Next reward: ${money(nextReward)}. Rewards land automatically; keep this tab visible and interact to count active time.`}</p>${!state.user ? '<button class="button" data-action="auth">Start earning ' + icon("arrow") + "</button>" : ""}</section><section class="panel starter-reward"><span class="eyebrow">A GIFT FOR EVERY PLAYER</span><h2>Your free starter pack</h2><p>Every account, new or existing, gets one claim for a single random card from the Brainrot, Royalty, or World Leaders collections. It’s ${starterOdds[0] / 1000000}% likely to be Common, with a chance at something rarer.</p><p class="fine-print">One card per account · once opened, it cannot be claimed again · no charge.</p>${!state.user ? `<button class="button" data-action="auth">Sign in to claim ${icon("arrow")}</button>` : a?.starter_claimed ? '<button class="button ghost" disabled>Starter pack opened</button>' : '<button class="button" data-action="claim-starter">Open your free starter pack ' + icon("arrow") + "</button>"}</section><section class="panel"><span class="eyebrow">YOUR FIRST ROYAL DECREE</span><h2>A £5.00 welcome.</h2><p>Every new account gets £5.00 of virtual cash. That’s five Brainrot Packs, or your first Royalty Booster.</p><div class="welcome-amount">£5<span>.00</span></div><button class="button ghost" data-action="${state.user ? "go-packs" : "auth"}">${state.user ? "Browse packs" : "Claim your welcome bonus"} ${icon("arrow")}</button><div class="fine-print">${icon("info")} Virtual currency only. Resets and daily limits use UTC. Background tabs earn nothing.</div></section></div>`;
 }
 async function friendsView() {
   const v = renderVersion,
@@ -533,6 +576,13 @@ function authModal(mode = "signup") {
     })
     .catch(() => {});
 }
+function firstUsernameModal() {
+  showModal(
+    `<span class="eyebrow">WELCOME TO THE COURT</span><h2>Choose your public username</h2><p>This is the name other players will see in the app. Choose a unique name you’re happy to use.</p><form id="username-form"><label for="username-input">Your username</label><input id="username-input" name="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_ -]+" autocomplete="nickname" placeholder="3–24 letters, numbers, spaces, _ or -" required autofocus><p class="form-error" role="alert"></p><button class="button full">Save username & continue ${icon("arrow")}</button></form>`,
+    "settings-modal username-required-modal",
+  );
+  $("#username-input")?.focus();
+}
 function settingsModal() {
   if (!state.account) {
     toast("Your account is still loading. Please try again.");
@@ -618,9 +668,30 @@ async function openPack(id) {
     const total = cards.reduce((s, c) => s + Number(c.value), 0);
     function revealMarkup() {
       showModal(
-        `<span class="eyebrow">${esc(p.name.toUpperCase())} · ${revealed} / ${cards.length} REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= p.price ? "positive" : "negative"}">${total >= p.price ? "+" : ""}${money(total - p.price)} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div><button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "To my collection" : "Reveal all cards"} ${icon("arrow")}</button>`,
+        `<span class="eyebrow">${esc(p.name.toUpperCase())} · ${revealed} / ${cards.length} REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= p.price ? "positive" : "negative"}">${total >= p.price ? "+" : ""}${money(total - p.price)} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : ""}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "To my collection" : "Reveal all cards"} ${icon("arrow")}</button>`,
         "reveal-modal",
       );
+    }
+    function addCenteredRevealStage(index, stageClass, cardClass, decoration) {
+      const target = $(".reveal-cards", modal).children[index];
+      const card = $(".game-card", target);
+      const rect = card.getBoundingClientRect();
+      const stage = document.createElement("div");
+      stage.className = stageClass;
+      stage.setAttribute("aria-hidden", "true");
+      stage.style.setProperty(
+        "--start-x",
+        `${rect.left + rect.width / 2 - window.innerWidth / 2}px`,
+      );
+      stage.style.setProperty(
+        "--start-y",
+        `${rect.top + rect.height / 2 - window.innerHeight / 2}px`,
+      );
+      const clone = card.cloneNode(true);
+      clone.classList.add(cardClass);
+      stage.append(clone);
+      if (decoration) stage.insertAdjacentHTML("beforeend", decoration);
+      modal.append(stage);
     }
     revealMarkup();
     let animationTimer;
@@ -668,12 +739,36 @@ async function openPack(id) {
             newCards.includes(c) &&
             cardMap[c.template_id]?.name === "King Charles III",
         );
+        const andyIndex = cards.findIndex(
+          (c) =>
+            newCards.includes(c) &&
+            cardMap[c.template_id]?.name === "Andy Burnham",
+        );
+        const israelIndex = cards.findIndex(
+          (c) => newCards.includes(c) && c.template_id === "world-israel-flag",
+        );
         if (trumpIndex >= 0 && !reduced) {
-          const target = $(".reveal-cards", modal).children[trumpIndex];
-          target.classList.add("presidential-reveal");
-          target.insertAdjacentHTML(
-            "beforeend",
-            '<div class="presidential-sparkle" aria-hidden="true"><span>✦</span><span>✦</span><span>✦</span></div>',
+          addCenteredRevealStage(
+            trumpIndex,
+            "american-stage",
+            "american-card",
+            '<div class="american-fireworks"><span>★</span><span>★</span><span>★</span><b>🇺🇸</b><i>★</i><i>★</i><i>★</i></div>',
+          );
+        }
+        if (andyIndex >= 0 && !reduced) {
+          addCenteredRevealStage(
+            andyIndex,
+            "andy-stage",
+            "andy-card",
+            '<div class="andy-northern-lights"><span>✦</span><span>✧</span><i>✦</i></div>',
+          );
+        }
+        if (israelIndex >= 0 && !reduced) {
+          addCenteredRevealStage(
+            israelIndex,
+            "israel-stage",
+            "israel-card",
+            '<div class="israel-star-glow"><span>✡</span><i>✦</i><i>✦</i></div>',
           );
         }
         if (charlesIndex >= 0 && !reduced) {
@@ -711,15 +806,19 @@ async function openPack(id) {
         const hasCharles = charlesIndex >= 0;
         const duration = reduced
           ? 0
-          : trumpIndex >= 0 || hasCharles
-            ? 2000
-            : hasKim
-              ? 1800
-              : newCards.some((c) =>
-                    ["Epic", "Crown", "Chase", "Alpha"].includes(c.rarity),
-                  )
-                ? 1800
-                : 550;
+          : andyIndex >= 0
+            ? 3200
+            : israelIndex >= 0
+              ? 2800
+              : trumpIndex >= 0 || hasCharles
+                ? 2500
+                : hasKim
+                  ? 1800
+                  : newCards.some((c) =>
+                        ["Epic", "Crown", "Chase", "Alpha"].includes(c.rarity),
+                      )
+                    ? 1800
+                    : 550;
         const controls = [...modal.querySelectorAll("button")].map((button) => [
           button,
           button.disabled,
@@ -733,7 +832,7 @@ async function openPack(id) {
           modal.classList.remove("legendary-flash");
           modal
             .querySelectorAll(
-              ".celebration,.supreme-stars,.presidential-sparkle,.trumpet-fanfare",
+              ".celebration,.supreme-stars,.presidential-sparkle,.trumpet-fanfare,.american-stage,.andy-stage,.israel-stage",
             )
             .forEach((node) => node.remove());
         };
@@ -756,6 +855,10 @@ async function openPack(id) {
         modal.removeEventListener("click", handler);
         closeModal();
         navigate("collection");
+      }
+      if (b.dataset.action === "sell-pack") {
+        modal.removeEventListener("click", handler);
+        sellModal(cards.map((card) => card.id));
       }
     };
     modal.addEventListener("click", handler);
@@ -890,7 +993,7 @@ document.addEventListener("click", async (e) => {
           [
             "05",
             "Earn your allowance",
-            "Earn £0.50 per 10 active minutes, up to £3.00 daily. Background tabs do not count.",
+            "Earn more every 10 active minutes, up to £5.00 daily. Background tabs do not count.",
           ],
         ]
           .map(
@@ -924,6 +1027,25 @@ document.addEventListener("click", async (e) => {
     if (action === "all-odds") return oddsModal();
     if (action === "buy") return buyPack(id);
     if (action === "confirm-buy") return openPack(id);
+    if (action === "claim-starter") {
+      if (!requireUser() || state.busy) return;
+      state.busy = true;
+      target.disabled = true;
+      try {
+        const result = await api("rewards/starter", {});
+        state.account = result.account;
+        state.inventory.unshift(result.card);
+        updateWallet();
+        rewardsView();
+        showModal(
+          `<span class="eyebrow">YOUR FREE STARTER PACK</span><h2>Your first card is in.</h2><div class="reveal-cards"><div class="revealed">${gameCard(result.card, { owned: true })}</div></div><button class="button" data-action="close">To your rewards ${icon("arrow")}</button>`,
+          "reveal-modal",
+        );
+      } finally {
+        state.busy = false;
+      }
+      return;
+    }
     if (action === "select-card") {
       if (e.target.closest("button")) return;
       if (state.selected.has(Number(id))) state.selected.delete(Number(id));
@@ -1089,9 +1211,14 @@ document.addEventListener("submit", async (e) => {
         username: String(data.get("username") || "").trim(),
       });
       state.account = result.account;
+      modal.classList.remove("username-required-modal");
       closeModal();
       render();
-      toast("Username updated.");
+      toast(
+        result.account.username_set
+          ? "Your public username is saved."
+          : "Username updated.",
+      );
     }
     if (form.id === "trade-offer") {
       await api("trades/offer", {
@@ -1216,6 +1343,7 @@ async function boot() {
     if (state.user) {
       await sync();
       render();
+      if (state.account?.username_set === false) firstUsernameModal();
     }
     const failed = new URLSearchParams(location.search).get("error");
     if (failed) {

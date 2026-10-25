@@ -6,6 +6,12 @@ export const validUsername = (value) =>
   value.length >= 3 &&
   value.length <= 24 &&
   /^[a-zA-Z0-9_ -]+$/.test(value);
+export const playReward = Object.freeze({
+  intervalSeconds: 600,
+  firstPence: 50,
+  increasePence: 25,
+  dailyCap: 500,
+});
 export function friendTablePayout(stake, hasOpponent) {
   if (!Number.isSafeInteger(stake) || stake < 1)
     throw Error("Stake must be a positive whole-pence amount.");
@@ -43,15 +49,20 @@ export function activityReward(account, visible, now = Date.now()) {
   let active =
     (account.reward_day === day ? account.active_seconds : 0) + elapsed;
   let paid = account.reward_day === day ? account.daily_reward : 0;
-  const reward = Math.max(
-    0,
-    Math.min(Math.floor(active / 600) * 50, 300 - paid),
-  );
+  let steps = account.reward_day === day ? account.reward_steps || 0 : 0;
+  const reward =
+    active >= playReward.intervalSeconds && paid < playReward.dailyCap
+      ? Math.min(
+          playReward.firstPence + steps * playReward.increasePence,
+          playReward.dailyCap - paid,
+        )
+      : 0;
   if (reward) {
     paid += reward;
-    active -= (reward / 50) * 600;
+    active -= playReward.intervalSeconds;
+    steps++;
   }
-  return { day, reward, active: Math.min(active, 600), paid };
+  return { day, reward, active: Math.min(active, 600), paid, steps };
 }
 export function validTradeCards(trade, offered) {
   return (

@@ -3601,6 +3601,9 @@ body:has(dialog[open]) {
   width: 100%;
   margin: 8px 0 0;
 }
+.username-required-modal .modal-close {
+  display: none;
+}
 .settings-modal label {
   display: block;
   color: #ded5c0;
@@ -3781,12 +3784,11 @@ body:has(dialog[open]) {
     radial-gradient(ellipse at center, #ffffff1c, transparent 67%),
     linear-gradient(140deg, #101827, #24344c);
 }
-.national-flag-art {
-  display: grid;
+.national-flag-portrait > img {
   width: 100%;
   height: 100%;
-  place-items: center;
-  font-size: clamp(5rem, 9vw, 7rem);
+  object-fit: contain;
+  padding: 18px;
   filter: drop-shadow(0 8px 14px #05070b99);
 }
 .roster-filters {
@@ -3809,14 +3811,360 @@ body:has(dialog[open]) {
   width: 100%;
   white-space: normal;
 }
-.presidential-reveal > .game-card {
-  animation: presidential-portrait 1.8s cubic-bezier(.18,.75,.25,1) both;
-}
-.presidential-reveal > .game-card:before,
 .trumpet-reveal > .game-card:before,
 .supreme-reveal > .game-card:before {
   border-color: #ffe5a8a8;
-  box-shadow: inset 0 0 30px #f3d27c32, 0 0 28px #f3d27c40;
+  box-shadow:
+    inset 0 0 30px #f3d27c32,
+    0 0 28px #f3d27c40;
+}
+.american-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, #11182755 0 22%, transparent 67%),
+    linear-gradient(135deg, #183b7040, transparent 45%, #a11d2e35);
+  animation: american-stage-flash 2.4s ease-out both;
+}
+.american-card {
+  width: min(340px, 76vw);
+  animation: american-card-arrive 2.4s cubic-bezier(0.18, 0.75, 0.25, 1) both;
+  box-shadow:
+    0 0 36px #e9c56f77,
+    0 0 95px #315eaa66;
+}
+.american-card:before {
+  border-color: #fff6d7 !important;
+  box-shadow:
+    inset 0 0 30px #376fca55,
+    0 0 32px #f6d57d88;
+}
+.andy-stage,
+.israel-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+.andy-stage {
+  background:
+    radial-gradient(ellipse at center, #5ca9bc29 0 26%, transparent 68%),
+    linear-gradient(110deg, #183c50b0, #14233025 55%, #d8b55618);
+  animation: andy-stage-glide 3.2s ease-out both;
+}
+.andy-card {
+  width: min(340px, 76vw);
+  animation: andy-card-flight 3.2s cubic-bezier(0.22, 0.66, 0.24, 1) both;
+  box-shadow:
+    0 0 36px #73bdd477,
+    0 0 90px #3f718b55;
+}
+.andy-card:before {
+  border-color: #d2f5ef !important;
+  box-shadow:
+    inset 0 0 28px #61bccb38,
+    0 0 30px #b2ecdf70;
+}
+.andy-northern-lights,
+.israel-star-glow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.andy-northern-lights span,
+.andy-northern-lights i {
+  position: absolute;
+  color: #e9fffa;
+  font-size: clamp(1.4rem, 4vw, 2.6rem);
+  font-style: normal;
+  text-shadow: 0 0 18px #8cebd8;
+  animation: andy-star-drift 2.6s ease-out both;
+}
+.andy-northern-lights span:first-child {
+  top: 19%;
+  left: 18%;
+}
+.andy-northern-lights span:nth-child(2) {
+  top: 28%;
+  right: 19%;
+  animation-delay: 0.15s;
+}
+.andy-northern-lights i {
+  bottom: 17%;
+  right: 24%;
+  animation-delay: 0.3s;
+}
+.israel-stage {
+  background:
+    radial-gradient(ellipse at center, #d9f5ff3d 0 25%, transparent 66%),
+    linear-gradient(130deg, #08376f98, #101c3940 55%, #eaf5ff24);
+  animation: israel-stage-glow 2.8s ease-out both;
+}
+.israel-card {
+  width: min(340px, 76vw);
+  animation: israel-card-arrive 2.8s cubic-bezier(0.2, 0.72, 0.25, 1) both;
+  box-shadow:
+    0 0 35px #a7ddff8a,
+    0 0 90px #397fc566;
+}
+.israel-card:before {
+  border-color: #d8f0ff !important;
+  box-shadow:
+    inset 0 0 32px #67aeea38,
+    0 0 32px #aadfff75;
+}
+.israel-star-glow span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: #64a8ff;
+  font-size: clamp(8rem, 22vw, 15rem);
+  line-height: 1;
+  text-shadow:
+    0 0 30px #b5e5ff,
+    0 0 85px #318bff;
+  animation: israel-star-bloom 2.5s ease-out both;
+}
+.israel-star-glow i {
+  position: absolute;
+  color: #effbff;
+  font-size: 2rem;
+  font-style: normal;
+  text-shadow: 0 0 18px #c8f0ff;
+  animation: andy-star-drift 2.3s ease-out both;
+}
+.israel-star-glow i:first-of-type {
+  top: 21%;
+  left: 21%;
+}
+.israel-star-glow i:last-of-type {
+  right: 20%;
+  bottom: 18%;
+  animation-delay: 0.2s;
+}
+@keyframes andy-stage-glide {
+  0%,
+  10% {
+    opacity: 0;
+  }
+  35%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes andy-card-flight {
+  0% {
+    opacity: 0;
+    transform: translate(
+        calc(var(--start-x) - 70vw),
+        calc(var(--start-y) + 12vh)
+      )
+      scale(0.48) rotate(-7deg);
+  }
+  38% {
+    opacity: 1;
+    transform: translate(calc(var(--start-x) - 28vw), -5vh) scale(0.78)
+      rotate(-3deg);
+  }
+  76% {
+    transform: translate(0, 0) scale(1.04) rotate(1deg);
+  }
+  88% {
+    transform: translate(0, 0) scale(0.98) rotate(-0.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+@keyframes andy-star-drift {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.5) rotate(-20deg);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50px) scale(1.35) rotate(35deg);
+  }
+}
+@keyframes israel-stage-glow {
+  0%,
+  14% {
+    opacity: 0;
+  }
+  36%,
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes israel-card-arrive {
+  0% {
+    opacity: 0;
+    transform: translate(var(--start-x), calc(var(--start-y) + 6vh)) scale(0.58)
+      rotateY(-16deg);
+  }
+  38% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1.06) rotateY(5deg);
+  }
+  76%,
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotateY(0);
+  }
+}
+@keyframes israel-star-bloom {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(-20deg);
+  }
+  32% {
+    opacity: 0.65;
+  }
+  70% {
+    opacity: 0.32;
+    transform: translate(-50%, -50%) scale(1) rotate(10deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.25) rotate(18deg);
+  }
+}
+.american-fireworks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: #fff3cb;
+  text-shadow:
+    0 0 15px #fff,
+    0 0 30px #e6bb5f;
+}
+.american-fireworks span,
+.american-fireworks i {
+  position: absolute;
+  font-size: clamp(1.5rem, 5vw, 3rem);
+  font-style: normal;
+  animation: american-starburst 1.5s ease-out both;
+}
+.american-fireworks span:nth-child(1) {
+  top: 18%;
+  left: 24%;
+}
+.american-fireworks span:nth-child(2) {
+  top: 26%;
+  right: 21%;
+  animation-delay: 0.12s;
+}
+.american-fireworks span:nth-child(3) {
+  bottom: 18%;
+  left: 23%;
+  animation-delay: 0.2s;
+}
+.american-fireworks i:nth-of-type(1) {
+  bottom: 22%;
+  right: 19%;
+  animation-delay: 0.1s;
+}
+.american-fireworks i:nth-of-type(2) {
+  top: 9%;
+  left: 48%;
+  animation-delay: 0.16s;
+}
+.american-fireworks i:nth-of-type(3) {
+  bottom: 8%;
+  right: 45%;
+  animation-delay: 0.24s;
+}
+.american-fireworks b {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  font-size: 2.5rem;
+  font-weight: 400;
+  animation: american-flag-wave 1s ease-in-out infinite alternate;
+}
+@keyframes american-stage-flash {
+  0% {
+    opacity: 0;
+  }
+  12%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes american-card-arrive {
+  0% {
+    opacity: 0;
+    transform: translate(var(--start-x), var(--start-y)) scale(0.45)
+      rotate(-9deg);
+  }
+  34% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1.08) rotate(2deg);
+  }
+  41% {
+    transform: translate(-9px, 2px) scale(1.08) rotate(-2deg);
+  }
+  48% {
+    transform: translate(9px, -2px) scale(1.08) rotate(2deg);
+  }
+  55% {
+    transform: translate(-6px, 1px) scale(1.05) rotate(-1deg);
+  }
+  62% {
+    transform: translate(5px, -1px) scale(1.03) rotate(1deg);
+  }
+  75% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+@keyframes american-starburst {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-35deg);
+  }
+  35%,
+  65% {
+    opacity: 1;
+    transform: scale(1.2) rotate(20deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5) rotate(50deg);
+  }
+}
+@keyframes american-flag-wave {
+  from {
+    transform: translateX(-4px) rotate(-5deg) scale(0.95);
+  }
+  to {
+    transform: translateX(4px) rotate(5deg) scale(1.05);
+  }
 }
 .presidential-sparkle,
 .trumpet-fanfare,
@@ -3834,7 +4182,9 @@ body:has(dialog[open]) {
   top: 50%;
   color: #ffe7a0;
   font-size: 2rem;
-  text-shadow: 0 0 14px #f4d27c, 0 0 30px #fff4d1;
+  text-shadow:
+    0 0 14px #f4d27c,
+    0 0 30px #fff4d1;
   animation: star-orbit 1.8s ease-out both;
   --angle: 0deg;
 }
@@ -3850,7 +4200,7 @@ body:has(dialog[open]) {
   --angle: 270deg;
 }
 .trumpet-reveal > .game-card {
-  animation: trumpet-arrive 1.9s cubic-bezier(.16,.8,.25,1) both;
+  animation: trumpet-arrive 1.9s cubic-bezier(0.16, 0.8, 0.25, 1) both;
 }
 .trumpet-fanfare {
   display: grid;
@@ -3874,16 +4224,16 @@ body:has(dialog[open]) {
 }
 .trumpet-fanfare > i:nth-of-type(2) {
   --note-x: 30px;
-  animation-delay: .08s;
+  animation-delay: 0.08s;
 }
 .trumpet-fanfare > i:nth-of-type(3) {
   --note-x: 80px;
-  animation-delay: .16s;
+  animation-delay: 0.16s;
 }
 @keyframes presidential-portrait {
   0% {
     opacity: 0;
-    transform: translateY(20px) scale(.88) rotateY(-12deg);
+    transform: translateY(20px) scale(0.88) rotateY(-12deg);
   }
   55% {
     opacity: 1;
@@ -3895,12 +4245,12 @@ body:has(dialog[open]) {
   }
 }
 .supreme-reveal > .game-card {
-  animation: supreme-arrive 1.8s cubic-bezier(.17,.8,.25,1) both;
+  animation: supreme-arrive 1.8s cubic-bezier(0.17, 0.8, 0.25, 1) both;
 }
 @keyframes star-orbit {
   from {
     opacity: 0;
-    transform: rotate(var(--angle)) translateY(-18px) scale(.3);
+    transform: rotate(var(--angle)) translateY(-18px) scale(0.3);
   }
   30% {
     opacity: 1;
@@ -3913,7 +4263,7 @@ body:has(dialog[open]) {
 @keyframes trumpet-arrive {
   0% {
     opacity: 0;
-    transform: translateY(24px) scale(.86);
+    transform: translateY(24px) scale(0.86);
   }
   65% {
     opacity: 1;
@@ -3926,7 +4276,7 @@ body:has(dialog[open]) {
 @keyframes trumpet-bloom {
   0% {
     opacity: 0;
-    transform: translateY(36px) rotate(-18deg) scale(.5);
+    transform: translateY(36px) rotate(-18deg) scale(0.5);
   }
   35% {
     opacity: 1;
@@ -3939,21 +4289,22 @@ body:has(dialog[open]) {
 @keyframes music-rise {
   from {
     opacity: 0;
-    transform: translate(-50%, 20px) scale(.5);
+    transform: translate(-50%, 20px) scale(0.5);
   }
   25% {
     opacity: 1;
   }
   to {
     opacity: 0;
-    transform: translate(calc(-50% + var(--note-x)), -105px) scale(1.2) rotate(15deg);
+    transform: translate(calc(-50% + var(--note-x)), -105px) scale(1.2)
+      rotate(15deg);
   }
 }
 @keyframes supreme-arrive {
   0% {
     opacity: 0;
-    transform: scale(.88);
-    filter: brightness(.7);
+    transform: scale(0.88);
+    filter: brightness(0.7);
   }
   55% {
     opacity: 1;

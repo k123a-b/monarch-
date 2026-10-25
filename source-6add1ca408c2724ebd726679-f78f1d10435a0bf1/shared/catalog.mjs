@@ -1,11 +1,18 @@
 import flags from "./flags.json" with { type: "json" };
 import leaderData from "./leaders.json" with { type: "json" };
 import portraits from "./portraits.json" with { type: "json" };
+import { rateLeader } from "./leader-ratings.mjs";
 export const money = (p) =>
   new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
     p / 100,
   );
 const cards = [];
+const flagCode = (country) =>
+  [...(flags[country] || "")]
+    .map((character) =>
+      String.fromCharCode(character.codePointAt(0) - 0x1f1e6 + 97),
+    )
+    .join("");
 const patterns = [
   "waves",
   "grid",
@@ -228,38 +235,54 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
     set: "world",
     rarity,
     value,
+    page: `https://flagcdn.com/w320/${flagCode(country)}.png`,
     emoji: flags[country],
     pattern: patterns[index % patterns.length],
-    colors: rarity === "Crown" ? ["#5b4320", "#e1bc68"] : ["#1a345c", "#8bb9ef"],
-    flavor: "A national flag card. Its fictional value reflects a broad game-power tier.",
+    colors:
+      rarity === "Crown" ? ["#5b4320", "#e1bc68"] : ["#1a345c", "#8bb9ef"],
+    flavor:
+      "A national flag card. Its fictional value reflects a broad game-power tier.",
   };
 });
 export const catalog = [
   ...cards,
   ...chases,
   alpha,
-  ...leaderData.cards,
+  ...leaderData.cards.map(rateLeader),
   ...nationFlagCards,
-].map(
-  (c) => ({
-    ...c,
-    flag: flags[c.country],
-    image:
-      portraits[c.id] ||
-      c.image ||
-      (c.set === "royal"
-        ? "/img/" +
-          (c.rarity === "Crown"
-            ? "apex"
-            : c.rarity === "Epic"
-              ? "vault"
-              : "royal") +
-          ".png"
-        : c.rarity === "Alpha"
-          ? "/img/apex.png"
-          : undefined),
-  }),
-);
+].map((c) => ({
+  ...c,
+  flag: flags[c.country],
+  page:
+    c.role === "National flag"
+      ? `https://flagcdn.com/w320/${flagCode(c.country)}.png`
+      : c.page,
+  image:
+    c.role === "National flag"
+      ? `/img/flags/${flagCode(c.country)}.png`
+      : portraits[c.id] ||
+        c.image ||
+        (c.set === "royal"
+          ? "/img/" +
+            (c.rarity === "Crown"
+              ? "apex"
+              : c.rarity === "Epic"
+                ? "vault"
+                : "royal") +
+            ".png"
+          : c.rarity === "Alpha"
+            ? "/img/apex.png"
+            : c.set === "world"
+              ? "/img/leader-placeholder.svg"
+              : undefined),
+  portraitPlaceholder: Boolean(
+    c.portraitPlaceholder ||
+    (c.set === "world" &&
+      c.role !== "National flag" &&
+      !portraits[c.id] &&
+      !c.image),
+  ),
+}));
 export const cardMap = Object.fromEntries(catalog.map((c) => [c.id, c]));
 export const leaderSource = {
   source: leaderData.source,
@@ -336,7 +359,7 @@ export const packs = [
     price: 1000,
     count: 4,
     set: "world",
-    odds: [85000000, 12000000, 2800000, 199900, 100],
+    odds: [74920000, 19200000, 5560000, 319840, 160],
     chase: "kim",
     chaseOdds: 45000,
     art: "world",
@@ -345,6 +368,7 @@ export const packs = [
   },
 ];
 export const rarities = ["Common", "Uncommon", "Epic", "Crown", "Alpha"];
+export const starterOdds = [85000000, 12000000, 2500000, 500000, 0];
 // Immutable template pools are safe to reuse; player state always stays in the database.
 const normalPools = new Map();
 for (const card of catalog) {
@@ -402,6 +426,27 @@ export function rollPack(pack, randomInt, { guaranteedEpic = false } = {}) {
     if (eligible.length) result[eligible[0].i] = { ...chase };
   }
   return result;
+}
+export function rollStarterPack(randomInt) {
+  const roll = randomInt(100000000);
+  let cumulative = 0;
+  const rarity = rarities.find(
+    (_, index) => (cumulative += starterOdds[index]) > roll,
+  );
+  if (!rarity) throw Error("Invalid starter pack odds");
+  const sets = [
+    ...new Set(
+      catalog
+        .filter((card) => card.rarity === rarity && card.value >= 0)
+        .map((card) => card.set),
+    ),
+  ];
+  if (!sets.length) throw Error("Empty starter pack rarity pool");
+  const set = sets[randomInt(sets.length)];
+  const pool = catalog.filter(
+    (card) => card.rarity === rarity && card.set === set && card.value >= 0,
+  );
+  return { ...pool[randomInt(pool.length)] };
 }
 export function weightedWinner(entries, randomInt) {
   const total = entries.reduce((s, e) => s + Number(e.amount), 0);
