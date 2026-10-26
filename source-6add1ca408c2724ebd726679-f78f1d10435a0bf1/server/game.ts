@@ -537,10 +537,24 @@ export async function handle(
           const discoveredFortnite = cards
             .filter((card: any) => card.set === "fortnite")
             .map((card: any) => card.id);
-          await c.query(
-            "UPDATE accounts SET packs=packs+1,pulled=pulled+$2,fortnite_collection=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.fortnite_collection || $3::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1",
-            [id, cards.length, discoveredFortnite],
-          );
+          const discoveryColumn = discoveredFortnite.length
+            ? await c.query(
+                "SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='accounts' AND column_name='fortnite_collection'",
+              )
+            : { rows: [] };
+          if (discoveryColumn.rows.length) {
+            await c.query(
+              "UPDATE accounts SET packs=packs+1,pulled=pulled+$2,fortnite_collection=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.fortnite_collection || $3::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1",
+              [id, cards.length, discoveredFortnite],
+            );
+          } else {
+            // Pack opening remains available during rollout if the discovery migration
+            // has not yet been applied; the inventory still reveals current pulls.
+            await c.query(
+              "UPDATE accounts SET packs=packs+1,pulled=pulled+$2 WHERE id=$1",
+              [id, cards.length],
+            );
+          }
           return {
             cards: result,
             account: await account(),
