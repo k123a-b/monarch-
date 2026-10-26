@@ -13,14 +13,14 @@ const countryTiers = [
 const notableFigures = {
   "Donald Trump": { rarity: "Epic", value: 23000 },
   "King Charles III": { rarity: "Epic", value: 7500 },
-  "Charles III": { rarity: "Epic", value: 6500 },
-  "Xi Jinping": { rarity: "Crown", value: 14000 },
-  "Vladimir Putin": { rarity: "Crown", value: 12500 },
-  "Narendra Modi": { rarity: "Crown", value: 10000 },
-  "Volodymyr Zelenskyy": { rarity: "Crown", value: 11000 },
-  "Emmanuel Macron": { rarity: "Epic", value: 8500 },
-  "Benjamin Netanyahu": { rarity: "Epic", value: 7500 },
-  "Andy Burnham": { rarity: "Epic", value: 5000 },
+  "Charles III": { rarity: "Epic", value: 2600 },
+  "Xi Jinping": { rarity: "Crown", value: 5600 },
+  "Vladimir Putin": { rarity: "Crown", value: 5000 },
+  "Narendra Modi": { rarity: "Crown", value: 4000 },
+  "Volodymyr Zelenskyy": { rarity: "Crown", value: 4400 },
+  "Emmanuel Macron": { rarity: "Epic", value: 3400 },
+  "Benjamin Netanyahu": { rarity: "Epic", value: 3000 },
+  "Andy Burnham": { rarity: "Epic", value: 2000 },
 };
 
 function countryCode(country) {
@@ -41,5 +41,5 @@ export function rateLeader(card) {
   const gdp = countryData.countries[countryCode(card.country)] || 0;
   const [threshold, rarity, value] =
     countryTiers.find(([minimum]) => gdp >= minimum) || countryTiers.at(-1);
-  return { ...card, rarity, value };
+  return { ...card, rarity, value: Math.round(value * 0.4) };
 }

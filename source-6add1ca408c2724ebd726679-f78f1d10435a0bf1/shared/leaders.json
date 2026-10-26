@@ -5977,11 +5977,11 @@
       "image": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Prime_Minister_Sir_Keir_Starmer_Official_Portrait_%28cropped%29.jpg",
       "set": "world",
       "rarity": "Common",
-      "value": -2500,
+      "value": -250,
       "emoji": "🌍",
       "pattern": "grid",
       "colors": ["#523038", "#c8a96a"],
-      "flavor": "The treasury has issued a fictional £25 penalty. Political satire."
+      "flavor": "The treasury has issued a fictional £2.50 penalty. Political satire."
     },
     {
       "id": "world-israel-flag",

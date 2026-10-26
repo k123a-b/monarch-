@@ -146,7 +146,7 @@ const chases = [
   ["signet", "Gilded Signet", 20000, "🖋", "royal"],
   ["sovereign", "Vault Sovereign", 50000, "🏛", "royal"],
   ["apex-crown", "Apex Crown", 150000, "⚡", "royal"],
-  ["kim", "Kim Jong Un", 21000000, "🌏", "world"],
+  ["kim", "Kim Jong Un", 25000, "🌏", "world"],
 ].map(([id, name, value, emoji, set]) => ({
   id,
   name,
@@ -234,7 +234,7 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
     role: "National flag",
     set: "world",
     rarity,
-    value,
+    value: Math.round(value * 0.4),
     page: `https://flagcdn.com/w320/${flagCode(country)}.png`,
     emoji: flags[country],
     pattern: patterns[index % patterns.length],
@@ -286,11 +286,17 @@ export const catalog = [
 export const cardMap = Object.fromEntries(catalog.map((c) => [c.id, c]));
 const rarityPowerups = Object.freeze({
   Common: [
-    { name: "No effect", epicBonus: 0 },
-    { name: "Faint spark", epicBonus: 25000 },
-    { name: "Slight stumble", epicBonus: -25000 },
-    { name: "Small stumble", epicBonus: -50000 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
     { name: "Tiny lift", epicBonus: 50000 },
+    { name: "Slight stumble", epicBonus: -25000 },
     { name: "Thrifty crown", epicBonus: 0, packDiscount: 10 },
   ],
   Uncommon: [

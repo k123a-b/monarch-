@@ -126,13 +126,37 @@ test("Apex replaces exactly one low card with Crown when all rolls are Epic", ()
 test("card powerups are defined and Kim guarantees every second pack card Uncommon+", () => {
   const bonuses = [];
   let discountCard;
+  let commonCards = 0;
+  let commonCardsWithoutPowerup = 0;
   for (const card of catalog) {
+    assert.ok(
+      Number.isSafeInteger(card.value),
+      `${card.id} has a whole-pence value`,
+    );
     const powerup = cardPowerup(card);
     assert.equal(typeof powerup.name, "string");
     assert.ok(Number.isInteger(powerup.epicBonus));
+    if (card.rarity === "Common") {
+      commonCards++;
+      if (
+        powerup.epicBonus === 0 &&
+        !powerup.packDiscount &&
+        !powerup.everyOtherCard
+      )
+        commonCardsWithoutPowerup++;
+    } else {
+      assert.ok(
+        powerup.epicBonus !== 0 || powerup.everyOtherCard,
+        `${card.id} has an active power-up`,
+      );
+    }
     bonuses.push(powerup.epicBonus);
     if (powerup.packDiscount) discountCard = card;
   }
+  assert.ok(
+    commonCardsWithoutPowerup / commonCards >= 0.7,
+    "most Common cards should not have a power-up",
+  );
   assert.ok(bonuses.some((bonus) => bonus > 0));
   assert.ok(bonuses.some((bonus) => bonus < 0));
   assert.ok(discountCard);
@@ -167,6 +191,25 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
   assert.ok(["Uncommon", "Epic", "Crown", "Alpha"].includes(cards[1].rarity));
   assert.ok(["Uncommon", "Epic", "Crown", "Alpha"].includes(cards[3].rarity));
 });
+test("a pack's card values can total below or above its virtual price", () => {
+  const pack = packs.find((entry) => entry.id === "brainrot");
+  const loss = rollPack(pack, rng(0)).reduce(
+    (total, card) => total + card.value,
+    0,
+  );
+  const gain = rollPack(pack, rng(99999999, true)).reduce(
+    (total, card) => total + card.value,
+    0,
+  );
+  assert.ok(
+    loss < pack.price,
+    "a pack can return less than its purchase price",
+  );
+  assert.ok(
+    gain > pack.price,
+    "a pack can return more than its purchase price",
+  );
+});
 test("daily rewards wheel has three no-prize sectors and an exact 0.1% £45 silver prize", () => {
   assert.equal(
     dailySpinSegments.reduce((sum, segment) => sum + segment.weight, 0),
@@ -192,7 +235,7 @@ test("original catalogue contains exactly 93 templates excluding world expansion
 test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   const kim = cardMap.kim;
   assert.equal(kim.rarity, "Chase");
-  assert.equal(kim.value, 21000000);
+  assert.equal(kim.value, 25000);
   const world = packs.find((p) => p.id === "world");
   assert.equal(world.chaseOdds, 45000);
   assert.equal(world.price, 1000);
@@ -463,6 +506,8 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   });
   assert.equal(americanLeader.rarity, "Crown");
   assert.equal(greekLeader.rarity, "Uncommon");
+  assert.equal(americanLeader.value, 2600);
+  assert.equal(greekLeader.value, 400);
   assert.ok(americanLeader.value > greekLeader.value);
   assert.deepEqual(
     [
@@ -522,7 +567,7 @@ test("requested featured cards keep their fictional GBP values and flags", () =>
     catalog.filter((c) => c.value < 0).map((c) => c.id),
     ["world-former-keir-starmer"],
   );
-  assert.equal(cardMap["world-former-keir-starmer"].value, -2500);
+  assert.equal(cardMap["world-former-keir-starmer"].value, -250);
 });
 test("world packs can return less or more than their purchase price", () => {
   const p = packs.find((p) => p.id === "world");

@@ -35,7 +35,7 @@ test("all bundled catalogue images and both fallback assets exist", () => {
 test("locked chase presentation contains no identity, country, portrait or provenance spoilers", () => {
   const locked = presentedCard(cardMap.kim);
   assert.equal(locked.name, "Mystery world leader");
-  assert.equal(locked.value, 21000000);
+  assert.equal(locked.value, 25000);
   assert.equal(locked.image, "/img/mystery-leader.svg");
   assert.doesNotMatch(JSON.stringify(locked), /kim|korea|wikimedia|wikipedia/i);
   assert.equal(locked.page, undefined);
