@@ -131,6 +131,16 @@ test("Fortnite Drop Pack shifts 12 points out of Common and prices the roster fo
     ],
     [1500, 3500, 3000, 10000, 17500, 25000, 400000],
   );
+  const fortniteCards = catalog.filter((card) => card.set === "fortnite");
+  assert.equal(fortniteCards.length, 30);
+  assert.equal(new Set(fortniteCards.map((card) => card.name)).size, 30);
+  assert.equal(new Set(fortniteCards.map((card) => card.id)).size, 30);
+  assert.ok(
+    fortniteCards.every((card) =>
+      /^https:\/\/fortnite-api\.com\/images\/cosmetics\/br\/[^/]+\/icon\.png$/.test(card.image),
+    ),
+    "all 30 distinct Fortnite cards point to a cosmetic portrait",
+  );
 });
 
 test("Apex replaces exactly one low card with Crown when all rolls are Epic", () => {
