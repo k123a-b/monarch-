@@ -447,6 +447,17 @@ export async function handle(
           ]);
           return { account: await account() };
         }
+        if (route === "upgrades/pack-opening" && req.method === "POST") {
+          const currentAccount = await account();
+          const slots = Number(currentAccount.pack_slots || 1);
+          if (slots >= 3) fail("All pack-opening upgrades are unlocked.", 409);
+          const nextSlots = slots + 1;
+          if (body.pack_slots !== nextSlots) fail("Unlock pack-opening slots one step at a time.", 409);
+          const cost = nextSlots === 2 ? 45000 : 55000;
+          await change(c, id, -cost, "Unlocked opening up to " + nextSlots + " packs at once");
+          await c.query("UPDATE accounts SET pack_slots=$2 WHERE id=$1", [id, nextSlots]);
+          return { account: await account() };
+        }
         if (route === "rewards/spin" && req.method === "POST") {
           const today = new Date().toISOString().slice(0, 10);
           const current = await account();
@@ -474,93 +485,55 @@ export async function handle(
         if (route === "open" && req.method === "POST") {
           const pack = packs.find((p) => p.id === body.pack);
           if (!pack) return fail("Unknown pack.");
+          const quantity = body.quantity === undefined ? 1 : integer(body.quantity, 1, 3);
           const currentAccount = await account();
+          const slots = Math.max(1, Math.min(3, Number(currentAccount.pack_slots || 1)));
+          if (quantity > slots) fail("Unlock the " + quantity + "-pack upgrade first.", 409);
           const equippedIds: number[] = currentAccount.loadout || [];
           const equipped = equippedIds.length
-            ? (
-                await c.query(
-                  "SELECT id,template_id FROM inventory WHERE owner_id=$1 AND id=ANY($2::int[]) AND vaulted=false AND trade_id IS NULL",
-                  [id, equippedIds],
-                )
-              ).rows
+            ? (await c.query("SELECT id,template_id FROM inventory WHERE owner_id=$1 AND id=ANY($2::int[]) AND vaulted=false AND trade_id IS NULL", [id, equippedIds])).rows
             : [];
           if (equipped.length !== equippedIds.length)
-            fail(
-              "Your loadout has an unavailable card. Update it before opening a pack.",
-              409,
-            );
-          const effects = loadoutPowerup(
-            equipped.map((row: any) => cardMap[row.template_id]),
-          );
-          const discount =
-            (Number(currentAccount.packs) + 1) % 3 === 0
-              ? effects.packDiscount
-              : 0;
-          await change(
-            c,
-            id,
-            -(pack.price - discount),
-            `${pack.name} opened${discount ? " (loadout discount)" : ""}`,
-          );
-          const epicGuaranteed = packProgress(
-            Number(currentAccount.packs),
-          ).nextGuaranteed;
-          const cards = rollPack(pack, randomInt, {
-            guaranteedEpic: epicGuaranteed,
-            powerups: equipped.map((row: any) => cardMap[row.template_id]),
-          });
+            fail("Your loadout has an unavailable card. Update it before opening a pack.", 409);
+          const powerCards = equipped.map((row: any) => cardMap[row.template_id]);
+          const effects = loadoutPowerup(powerCards);
+          const opened = Number(currentAccount.packs || 0);
+          const discountMilestones = Math.floor((opened + quantity) / 3) - Math.floor(opened / 3);
+          const discount = Math.min(pack.price, effects.packDiscount * discountMilestones);
+          const pricePaid = pack.price * quantity - discount;
+          await change(c, id, -pricePaid, quantity + " " + pack.name + (quantity === 1 ? "" : " packs") + " opened" + (discount ? " (loadout discount)" : ""));
+          const cards: any[] = [];
+          const guaranteedPacks: number[] = [];
+          for (let offset = 0; offset < quantity; offset++) {
+            const guaranteedEpic = packProgress(opened + offset).nextGuaranteed;
+            if (guaranteedEpic) guaranteedPacks.push(offset + 1);
+            cards.push(...rollPack(pack, randomInt, { guaranteedEpic, powerups: powerCards }));
+          }
           const minted = [];
           for (const card of cards) {
-            const serial =
-              card.rarity === "Alpha"
-                ? (
-                    await c.query(
-                      "INSERT INTO alpha_pulls DEFAULT VALUES RETURNING id",
-                    )
-                  ).rows[0].id
-                : null;
-            minted.push({
-              template_id: card.id,
-              value: card.value,
-              rarity: card.rarity,
-              serial,
-            });
+            const serial = card.rarity === "Alpha"
+              ? (await c.query("INSERT INTO alpha_pulls DEFAULT VALUES RETURNING id")).rows[0].id
+              : null;
+            minted.push({ template_id: card.id, value: card.value, rarity: card.rarity, serial });
           }
-          // Insert the whole pack together to shorten the shared write-lock duration.
           const stored = await c.query(
             "INSERT INTO inventory(owner_id,template_id,value,rarity,serial) SELECT $1,card.template_id,card.value,card.rarity,card.serial FROM jsonb_to_recordset($2::jsonb) AS card(template_id text,value bigint,rarity text,serial integer) RETURNING *",
             [id, JSON.stringify(minted)],
           );
-          const result = stored.rows
-            .sort((a: any, b: any) => a.id - b.id)
-            .map((row: any) => ({ ...cardMap[row.template_id], ...row }));
-          const discoveredFortnite = cards
-            .filter((card: any) => card.set === "fortnite")
-            .map((card: any) => card.id);
+          const result = stored.rows.sort((a: any, b: any) => a.id - b.id).map((row: any) => ({ ...cardMap[row.template_id], ...row }));
+          const discoveredFortnite = cards.filter((card: any) => card.set === "fortnite").map((card: any) => card.id);
           const discoveryColumn = discoveredFortnite.length
-            ? await c.query(
-                "SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='accounts' AND column_name='fortnite_collection'",
-              )
+            ? await c.query("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='accounts' AND column_name='fortnite_collection'")
             : { rows: [] };
           if (discoveryColumn.rows.length) {
             await c.query(
-              "UPDATE accounts SET packs=packs+1,pulled=pulled+$2,fortnite_collection=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.fortnite_collection || $3::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1",
-              [id, cards.length, discoveredFortnite],
+              "UPDATE accounts SET packs=packs+$2,pulled=pulled+$3,fortnite_collection=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.fortnite_collection || $4::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1",
+              [id, quantity, cards.length, discoveredFortnite],
             );
           } else {
-            // Pack opening remains available during rollout if the discovery migration
-            // has not yet been applied; the inventory still reveals current pulls.
-            await c.query(
-              "UPDATE accounts SET packs=packs+1,pulled=pulled+$2 WHERE id=$1",
-              [id, cards.length],
-            );
+            await c.query("UPDATE accounts SET packs=packs+$2,pulled=pulled+$3 WHERE id=$1", [id, quantity, cards.length]);
           }
-          return {
-            cards: result,
-            account: await account(),
-            epicGuaranteed,
-            discount,
-          };
+          return { cards: result, account: await account(), packCount: quantity, epicGuaranteed: guaranteedPacks.length > 0, guaranteedPacks, discount, pricePaid };
         }
         if (route === "rewards/starter" && req.method === "POST") {
           const card = rollStarterPack(randomInt);
@@ -922,3 +895,4 @@ export async function handle(
     );
   }
 }
+

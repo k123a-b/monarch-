@@ -31,6 +31,7 @@ test(
       id: randomUUID(),
       name: "Test Milestone " + suffix,
     };
+    const batchUser = { id: randomUUID(), name: "Test Batch " + suffix };
     const roundId = -Date.now();
     async function request(user, path, body) {
       const req = new Request("http://localhost:8889/api/" + path, {
@@ -118,6 +119,28 @@ test(
             (await request(a, "me")).data.account.username,
             aa.username,
           );
+        },
+      );
+      await t.test(
+        "pack upgrades charge £450 then £550 and batch-open three packs together",
+        async () => {
+          await request(batchUser, "me");
+          await query("UPDATE accounts SET balance=200000 WHERE id=$1", [batchUser.id]);
+          const secondSlot = await request(batchUser, "upgrades/pack-opening", { pack_slots: 2 });
+          assert.equal(secondSlot.status, 200);
+          assert.equal(secondSlot.data.account.pack_slots, 2);
+          assert.equal(Number(secondSlot.data.account.balance), 155000);
+          assert.equal((await request(batchUser, "open", { pack: "brainrot", quantity: 3 })).status, 409);
+          const thirdSlot = await request(batchUser, "upgrades/pack-opening", { pack_slots: 3 });
+          assert.equal(thirdSlot.status, 200);
+          assert.equal(Number(thirdSlot.data.account.balance), 100000);
+          const batch = await request(batchUser, "open", { pack: "brainrot", quantity: 3 });
+          assert.equal(batch.status, 200);
+          assert.equal(batch.data.packCount, 3);
+          assert.equal(batch.data.cards.length, 12);
+          assert.equal(batch.data.pricePaid, 300);
+          assert.equal(Number(batch.data.account.packs), 3);
+          assert.equal(Number(batch.data.account.balance), 99700);
         },
       );
       await t.test(
@@ -662,7 +685,7 @@ test(
         },
       );
     } finally {
-      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id];
+      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id, batchUser.id];
       await query("DELETE FROM inventory WHERE owner_id=ANY($1::text[])", [
         users,
       ]);
@@ -685,3 +708,4 @@ test(
     }
   },
 );
+
