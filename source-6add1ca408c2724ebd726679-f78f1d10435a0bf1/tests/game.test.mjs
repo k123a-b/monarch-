@@ -115,6 +115,34 @@ for (const p of packs) {
       });
   });
 }
+test("Fortnite Drop Pack shifts 12 points out of Common and prices the roster for £125 packs", () => {
+  const pack = packs.find((entry) => entry.id === "fortnite");
+  assert.deepEqual(pack.odds, [74000000, 20000000, 5998990, 1000, 10]);
+  assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), 100000000);
+  assert.deepEqual(
+    [
+      cardMap["fortnite-recruit"].value,
+      cardMap["fortnite-jonesy"].value,
+      cardMap["fortnite-commando"].value,
+      cardMap["fortnite-fishstick"].value,
+      cardMap["fortnite-agent-peely"].value,
+      cardMap["fortnite-midas"].value,
+      cardMap["fortnite-renegade-raider"].value,
+    ],
+    [1500, 3500, 3000, 10000, 17500, 25000, 400000],
+  );
+  const fortniteCards = catalog.filter((card) => card.set === "fortnite");
+  assert.equal(fortniteCards.length, 30);
+  assert.equal(new Set(fortniteCards.map((card) => card.name)).size, 30);
+  assert.equal(new Set(fortniteCards.map((card) => card.id)).size, 30);
+  assert.ok(
+    fortniteCards.every((card) =>
+      /^https:\/\/fortnite-api\.com\/images\/cosmetics\/br\/[^/]+\/icon\.png$/.test(card.image),
+    ),
+    "all 30 distinct Fortnite cards point to a cosmetic portrait",
+  );
+});
+
 test("Apex replaces exactly one low card with Crown when all rolls are Epic", () => {
   const pull = rollPack(
     packs.find((p) => p.id === "apex"),

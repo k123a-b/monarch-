@@ -358,6 +358,28 @@ function gameCard(
         : "boost-neutral";
   return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${loadoutAction ? `data-action="loadout-preview" data-id="${row.id}" tabindex="0" role="button" aria-label="View odds effect for ${esc(t.name)}"` : selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><small class="card-powerup ${boostTone}">${icon("spark")} ${esc(powerupText)}</small><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id || equipped ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id || equipped ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}${loadoutAction ? `<div class="card-actions loadout-card-actions"><button class="button ${equipped ? "ghost" : "small"}" data-action="loadout-toggle" data-id="${row.id}" ${row.vaulted || row.trade_id || loadoutFull ? "disabled" : ""}>${equipped ? "Unequip" : loadoutFull ? "Loadout full" : "Equip power"}</button></div>` : ""}</article>`;
 }
+function fortniteCollectionAlbum() {
+  const cards = catalog.filter((card) => card.set === "fortnite");
+  const discovered = new Set([
+    ...(Array.isArray(state.account?.fortnite_collection)
+      ? state.account.fortnite_collection
+      : []),
+    ...state.inventory
+      .filter((card) => card.template_id?.startsWith("fortnite-"))
+      .map((card) => card.template_id),
+  ]);
+  const revealedCount = cards.filter((card) => discovered.has(card.id)).length;
+  return `<section class="fortnite-album"><div class="fortnite-album-heading"><div><span class="eyebrow">FORTNITE FIELD GUIDE</span><h2>Character collection</h2><p>Discover all 30 characters. Pull a character once to reveal it permanently.</p></div><strong>${revealedCount} / ${cards.length} revealed</strong></div><div class="fortnite-album-grid">${cards
+    .map((card, index) => {
+      const revealed = discovered.has(card.id);
+      const mysteryName = `Mystery character ${String(index + 1).padStart(2, "0")}`;
+      return `<article class="fortnite-album-card ${revealed ? "revealed" : "mystery"}" aria-label="${revealed ? esc(card.name + ", " + card.rarity) : esc(mysteryName)}">
+        <div class="fortnite-album-art"><img src="${image(card.image, 360)}" alt="${revealed ? esc(card.name + " Fortnite outfit") : "Mystery Fortnite character"}" loading="lazy">${revealed ? "" : '<span aria-hidden="true">?</span>'}</div>
+        <div class="fortnite-album-info"><small>${revealed ? esc(card.rarity.toUpperCase()) : "UNDISCOVERED"}</small><h3>${revealed ? esc(card.name) : "Mystery character"}</h3><p>${revealed ? money(card.value) + " sell value" : "Open a Fortnite Drop Pack to reveal this character."}</p></div>
+      </article>`;
+    })
+    .join("")}</div></section>`;
+}
 function collection() {
   const mine = state.inventory;
   let filtered = mine.filter((c) => {
@@ -392,7 +414,7 @@ function collection() {
       )
       .join(
         "",
-      )}</select><select id="sort-filter" aria-label="Sort cards"><option value="recent">Most recent</option><option value="value" ${state.sort === "value" ? "selected" : ""}>Highest value</option></select><button class="button ghost small" data-action="sell-selected" ${state.selected.size ? "" : "disabled"}>Sell selected (${state.selected.size})</button></div>${filtered.length ? `<p class="muted">${filtered.length} cards · Click cards to select for a bulk sale. Duplicates: ${mine.length - new Set(mine.map((c) => c.template_id)).size}</p>      <div class="collection-grid">${filtered.map((row) => gameCard(row, { selectable: !row.vaulted && !row.trade_id && !(state.account?.loadout || []).includes(Number(row.id)), actions: true, owned: true })).join("")}</div>` : empty("collection", state.user ? "Your court is looking a little empty." : "Your collection starts with a crown.", "Open a pack to discover your first cards.", state.user ? "Explore packs" : "Join the court", state.user ? "go-packs" : "auth")}`;
+      )}</select><select id="sort-filter" aria-label="Sort cards"><option value="recent">Most recent</option><option value="value" ${state.sort === "value" ? "selected" : ""}>Highest value</option></select><button class="button ghost small" data-action="sell-selected" ${state.selected.size ? "" : "disabled"}>Sell selected (${state.selected.size})</button></div>${state.set === "fortnite" ? fortniteCollectionAlbum() : ""}${filtered.length ? `<p class="muted">${filtered.length} cards · Click cards to select for a bulk sale. Duplicates: ${mine.length - new Set(mine.map((c) => c.template_id)).size}</p>      <div class="collection-grid">${filtered.map((row) => gameCard(row, { selectable: !row.vaulted && !row.trade_id && !(state.account?.loadout || []).includes(Number(row.id)), actions: true, owned: true })).join("")}</div>` : empty("collection", state.user ? "Your court is looking a little empty." : "Your collection starts with a crown.", "Open a pack to discover your first cards.", state.user ? "Explore packs" : "Join the court", state.user ? "go-packs" : "auth")}`;
 }
 function loadoutEffectModal(cardId) {
   const row = state.inventory.find((card) => Number(card.id) === Number(cardId));
