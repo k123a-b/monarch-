@@ -424,16 +424,16 @@ export function loadoutPowerup(cards) {
     throw Error("A loadout can contain at most four cards.");
   const powerups = cards.map(cardPowerup);
   const epicBonus = Math.max(
-    -1000000,
+    -750000,
     Math.min(
-      1000000,
+      750000,
       powerups.reduce((total, powerup) => total + powerup.epicBonus, 0),
     ),
   );
   const uncommonBonus = Math.max(
-    -600000,
+    -400000,
     Math.min(
-      600000,
+      400000,
       powerups.reduce((total, powerup) => total + (powerup.uncommonBonus || 0), 0),
     ),
   );
@@ -553,6 +553,12 @@ export const packs = [
     tag: "THE WORLD IS YOUR COLLECTION",
   },
 ];
+export const indexSets = Object.freeze([
+  { id: "meme-hall", name: "Meme Hall", subtitle: "The first eight internet oddities.", cardIds: ["brainrot-common-0", "brainrot-common-1", "brainrot-common-2", "brainrot-common-3", "brainrot-common-4", "brainrot-common-5", "brainrot-uncommon-0", "brainrot-uncommon-1"] },
+  { id: "royal-archive", name: "Royal Archive", subtitle: "Eight unlikely members of the court.", cardIds: ["royal-common-0", "royal-common-1", "royal-common-2", "royal-common-3", "royal-common-4", "royal-common-5", "royal-common-6", "royal-uncommon-0"] },
+  { id: "fortnite-classics", name: "Fortnite Classics", subtitle: "A starter squad of familiar outfits.", cardIds: ["fortnite-recruit", "fortnite-jonesy", "fortnite-commando", "fortnite-fishstick", "fortnite-agent-peely", "fortnite-midas", "fortnite-peely", "fortnite-skull-trooper"] },
+  { id: "world-stage", name: "World Stage", subtitle: "Eight flags from around the globe.", cardIds: ["world-flag-united-states", "world-flag-united-kingdom", "world-flag-france", "world-flag-china", "world-flag-japan", "world-flag-brazil", "world-flag-canada", "world-flag-ukraine"] },
+]);
 export const rarities = ["Common", "Uncommon", "Epic", "Crown", "Alpha"];
 export const starterOdds = [85000000, 12000000, 2500000, 500000, 0];
 // Immutable template pools are safe to reuse; player state always stays in the database.
@@ -567,7 +573,7 @@ for (const card of catalog) {
 export function rollPack(
   pack,
   randomInt,
-  { guaranteedEpic = false, powerups = [] } = {},
+  { guaranteedEpic = false, powerups = [], permanentEpicBonus = 0, permanentCrownBonus = 0 } = {},
 ) {
   const effect = loadoutPowerup(powerups);
   const odds = [...pack.odds];
@@ -580,21 +586,23 @@ export function rollPack(
     odds[1] -= shifted;
     odds[0] += shifted;
   }
-  if (effect.epicBonus > 0) {
-    let remaining = effect.epicBonus;
+  const epicBonus = Math.max(-750000, Math.min(1750000, effect.epicBonus + permanentEpicBonus));
+  const crownBonus = Math.max(0, Math.min(800000, effect.crownBonus + permanentCrownBonus));
+  if (epicBonus > 0) {
+    let remaining = epicBonus;
     for (const index of [0, 1]) {
       const shifted = Math.min(odds[index], remaining);
       odds[index] -= shifted;
       odds[2] += shifted;
       remaining -= shifted;
     }
-  } else if (effect.epicBonus < 0) {
-    const shifted = Math.min(odds[2], -effect.epicBonus);
+  } else if (epicBonus < 0) {
+    const shifted = Math.min(odds[2], -epicBonus);
     odds[2] -= shifted;
     odds[0] += shifted;
   }
-  if (effect.crownBonus > 0) {
-    let remaining = effect.crownBonus;
+  if (crownBonus > 0) {
+    let remaining = crownBonus;
     for (const index of [0, 1]) {
       const shifted = Math.min(odds[index], remaining);
       odds[index] -= shifted;
