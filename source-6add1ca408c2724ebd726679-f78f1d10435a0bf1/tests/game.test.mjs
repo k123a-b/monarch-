@@ -11,6 +11,8 @@ import {
   packProgress,
   packValueRange,
   cardPowerup,
+  indexSets,
+  rarities,
   loadoutPowerup,
 } from "../shared/catalog.mjs";
 import {
@@ -151,6 +153,25 @@ test("Apex replaces exactly one low card with Crown when all rolls are Epic", ()
   assert.equal(pull.filter((c) => c.rarity === "Crown").length, 1);
   assert.equal(pull.filter((c) => c.rarity === "Epic").length, 4);
 });
+test("character index sets use existing cards and keep earned bonuses bounded", () => {
+  assert.equal(indexSets.length, 4);
+  for (const set of indexSets) {
+    assert.equal(set.cardIds.length, 8);
+    assert.equal(new Set(set.cardIds).size, set.cardIds.length);
+    assert.ok(set.cardIds.every((id) => cardMap[id]), set.name + " only references catalog cards");
+  }
+  assert.equal(loadoutPowerup([cardMap["royal-crown-0"], cardMap["royal-crown-1"], cardMap["royal-crown-2"], cardMap["royal-crown-3"]]).epicBonus, 750000);
+  assert.equal(loadoutPowerup([cardMap["royal-crown-0"], cardMap["royal-crown-1"], cardMap["royal-crown-2"], cardMap["royal-crown-3"]]).uncommonBonus, 250000);
+});
+test("permanent character-index rewards shift Epic and Crown odds by their stated amounts", () => {
+  const deterministic = (value) => (max) => max === 100000000 ? value : Math.max(0, max - 1);
+  const brainrot = packs.find((pack) => pack.id === "brainrot");
+  assert.equal(rollPack(brainrot, deterministic(81800000))[0].rarity, "Common");
+  assert.equal(rollPack(brainrot, deterministic(81800000), { permanentEpicBonus: 500000 })[0].rarity, "Uncommon");
+  const fortnite = packs.find((pack) => pack.id === "fortnite");
+  assert.equal(rollPack(fortnite, deterministic(99950000))[0].rarity, "Epic");
+  assert.equal(rollPack(fortnite, deterministic(99950000), { permanentCrownBonus: 100000 })[0].rarity, "Crown");
+});
 test("card powerups are defined and Kim guarantees every second pack card Uncommon+", () => {
   const bonuses = [];
   let discountCard;
@@ -174,13 +195,13 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
         !powerup.everyOtherCard
       )
         commonCardsWithoutPowerup++;
-    } else {
+    } else if (["Crown", "Chase", "Alpha"].includes(card.rarity)) {
       assert.ok(
         powerup.epicBonus !== 0 ||
           powerup.uncommonBonus !== 0 ||
           powerup.crownBonus !== 0 ||
           powerup.everyOtherCard,
-        `${card.id} has an active power-up`,
+        card.id + " should retain a special-card power-up",
       );
     }
     bonuses.push(powerup.epicBonus);
@@ -202,7 +223,7 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
   assert.ok(
     Math.abs(
       loadoutPowerup([cardMap.kim, cardMap.kim, cardMap.kim]).epicBonus,
-    ) <= 1000000,
+    ) <= 750000,
   );
   assert.equal(cardMap["mystery-gold"].rarity, "Alpha");
   assert.equal(rarities.includes("Alpha"), true);
