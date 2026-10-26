@@ -235,7 +235,7 @@ test("original catalogue contains exactly 93 templates excluding world expansion
 test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   const kim = cardMap.kim;
   assert.equal(kim.rarity, "Chase");
-  assert.equal(kim.value, 25000);
+  assert.equal(kim.value, 1500000);
   const world = packs.find((p) => p.id === "world");
   assert.equal(world.chaseOdds, 45000);
   assert.equal(world.price, 1000);
