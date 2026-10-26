@@ -454,7 +454,7 @@ export const packs = [
     price: 500,
     count: 4,
     set: "royal",
-    odds: [86000000, 12000000, 1900000, 99900, 100],
+    odds: [74000000, 24000000, 1900000, 99900, 100],
     chase: "signet",
     chaseOdds: 500,
     art: "royal",
