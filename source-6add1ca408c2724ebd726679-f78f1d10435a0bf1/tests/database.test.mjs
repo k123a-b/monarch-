@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { cardMap, cardPowerup } from "../shared/catalog.mjs";
+import { cardMap, cardPowerup, indexSets } from "../shared/catalog.mjs";
 
 // Uses a dedicated configured database, never a mocked SQL implementation.
 test(
@@ -32,6 +32,7 @@ test(
       name: "Test Milestone " + suffix,
     };
     const batchUser = { id: randomUUID(), name: "Test Batch " + suffix };
+    const indexUser = { id: randomUUID(), name: "Test Index " + suffix };
     const roundId = -Date.now();
     async function request(user, path, body) {
       const req = new Request("http://localhost:8889/api/" + path, {
@@ -141,6 +142,28 @@ test(
           assert.equal(batch.data.pricePaid, 300);
           assert.equal(Number(batch.data.account.packs), 3);
           assert.equal(Number(batch.data.account.balance), 99700);
+        },
+      );
+      await t.test(
+        "index set rewards persist, apply to pack odds, and respect the account caps",
+        async () => {
+          await request(indexUser, "me");
+          const allSetCards = indexSets.flatMap((set) => set.cardIds);
+          await query("UPDATE accounts SET character_index=$2::text[] WHERE id=$1", [indexUser.id, allSetCards]);
+          const epicOne = await request(indexUser, "index/claim", { set_id: indexSets[0].id, reward: "epic" });
+          assert.equal(epicOne.status, 200);
+          assert.equal(epicOne.data.account.permanent_epic_bonus, 500000);
+          const epicTwo = await request(indexUser, "index/claim", { set_id: indexSets[1].id, reward: "epic" });
+          assert.equal(epicTwo.status, 200);
+          assert.equal(epicTwo.data.account.permanent_epic_bonus, 1000000);
+          assert.equal((await request(indexUser, "index/claim", { set_id: indexSets[2].id, reward: "epic" })).status, 409);
+          const crown = await request(indexUser, "index/claim", { set_id: indexSets[2].id, reward: "crown" });
+          assert.equal(crown.status, 200);
+          assert.equal(crown.data.account.permanent_crown_bonus, 100000);
+          assert.equal((await request(indexUser, "index/claim", { set_id: indexSets[3].id, reward: "crown" })).status, 409);
+          const badge = await request(indexUser, "index/claim", { set_id: indexSets[3].id, reward: "badge" });
+          assert.equal(badge.status, 200);
+          assert.equal(badge.data.account.set_rewards[indexSets[3].id], "badge");
         },
       );
       await t.test(
@@ -685,7 +708,7 @@ test(
         },
       );
     } finally {
-      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id, batchUser.id];
+      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id, batchUser.id, indexUser.id];
       await query("DELETE FROM inventory WHERE owner_id=ANY($1::text[])", [
         users,
       ]);
