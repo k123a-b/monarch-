@@ -475,6 +475,18 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
   );
   assert.ok(cardMap["world-flag-united-states"].rarity === "Crown");
   assert.ok(cardMap["world-flag-greece"].rarity === "Common");
+  const flagValues = ["Common", "Uncommon", "Epic", "Crown"].map((rarity) =>
+    flags
+      .filter((card) => card.rarity === rarity && card.country !== "Israel")
+      .map((card) => card.value),
+  );
+  assert.ok(
+    flagValues.every((values) => values.length > 0),
+    "every flag rarity has cards",
+  );
+  assert.ok(Math.max(...flagValues[0]) < Math.min(...flagValues[1]));
+  assert.ok(Math.max(...flagValues[1]) < Math.min(...flagValues[2]));
+  assert.ok(Math.max(...flagValues[2]) < Math.min(...flagValues[3]));
 });
 test("World Leaders shifts 1.08 percentage points from Common to Epic", () => {
   const world = packs.find((pack) => pack.id === "world");
