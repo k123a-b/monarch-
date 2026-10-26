@@ -38,6 +38,9 @@ Before deploying the fourth loadout slot, apply `db/migrations/20261026110000_fo
 
 Before deploying the World Leaders value rebalance, apply `db/migrations/20261027120000_rebalance_world_leader_values.sql`, `db/migrations/20261027130000_balance_world_leader_values.sql`, and `db/migrations/20261027140000_target_world_pack_loss_rate.sql` with `npm run migrate` against the same Supabase database used by the deployment. They revalue already-owned World Leaders cards without changing player balances. A later 25% card-value migration applies to those cards too.
 
+
+Before deploying the Fortnite character discovery album, apply `db/migrations/20261027170000_fortnite_collection_discovery.sql` with `npm run migrate`. It backfills existing Fortnite cards and saves future discoveries permanently on the account, including after a card is sold.
+
 ## Economy and fairness
 
 The four original packs use the base per-card odds, expressed as integers out of 100,000,000. Alpha/Mystery Gold is isolated from regular pools and numbered using a database sequence. Apex guarantees at least a Crown by replacing its lowest card if necessary. Chase rolls are per pack; they replace only an eligible lower-value, non-Alpha card. Normal template duplicates are avoided until a rarity pool is exhausted. Pack value may be above or below the purchase price; card values enter the balance only when cards are sold.
