@@ -12,15 +12,15 @@ const countryTiers = [
 ];
 const worldLeaderValueScale = 1.13;
 const notableFigures = {
-  "Donald Trump": { rarity: "Epic", value: 23000 },
+  "Donald Trump": { rarity: "Crown", value: 333333 },
   "King Charles III": { rarity: "Epic", value: 7500 },
   "Xi Jinping": { rarity: "Crown", value: 5600 },
   "Vladimir Putin": { rarity: "Crown", value: 5000 },
   "Narendra Modi": { rarity: "Crown", value: 4000 },
   "Volodymyr Zelenskyy": { rarity: "Crown", value: 4400 },
   "Emmanuel Macron": { rarity: "Epic", value: 3400 },
-  "Benjamin Netanyahu": { rarity: "Epic", value: 3000 },
-  "Andy Burnham": { rarity: "Epic", value: 2000 },
+  "Benjamin Netanyahu": { rarity: "Crown", value: 133333 },
+  "Andy Burnham": { rarity: "Epic", value: 10667, flavor: "Just a normal bloke" },
 };
 
 function countryCode(country) {
@@ -42,7 +42,12 @@ export function rateLeader(card) {
     notable &&
     (card.name !== "King Charles III" || card.country === "United Kingdom")
   ) {
-    const featured = ["Donald Trump", "King Charles III"].includes(card.name);
+    const featured = [
+      "Donald Trump",
+      "King Charles III",
+      "Benjamin Netanyahu",
+      "Andy Burnham",
+    ].includes(card.name);
     return {
       ...card,
       ...notable,
