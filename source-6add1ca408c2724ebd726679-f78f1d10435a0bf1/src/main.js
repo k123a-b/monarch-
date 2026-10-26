@@ -478,9 +478,20 @@ function rewardsView() {
   if (starterButton)
     starterButton.innerHTML = `Open Starter Pack ${icon("arrow")}`;
   const spunToday = a?.spin_day === new Date().toISOString().slice(0, 10);
+  const spinPrizeRows = [
+    {
+      id: "no-prize",
+      label: "No prize",
+      reward: 0,
+      weight: dailySpinSegments
+        .filter((segment) => !segment.reward)
+        .reduce((sum, segment) => sum + segment.weight, 0),
+    },
+    ...dailySpinSegments.filter((segment) => segment.reward),
+  ];
   $(".rewards-layout").insertAdjacentHTML(
     "beforeend",
-    `<section class="panel daily-spin"><span class="eyebrow">ONCE PER UTC DAY</span><h2>Daily spin</h2><p>Three no-prize slices, small virtual-cash wins, and a 0.1% shot at £45.</p>${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p><div class="spin-prizes">${dailySpinSegments.map((segment) => `<span>${esc(segment.label)} <small>${(segment.weight / 1000000).toFixed(2)}%</small></span>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin</button>' : spunToday ? `<p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p><button class="button ghost full" disabled>Come back tomorrow</button>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></section>`,
+    `<section class="panel daily-spin"><div class="spin-heading"><div><span class="eyebrow">A LITTLE DAILY LUCK</span><h2>Your daily spin</h2><p>One free spin each day. Give the wheel a turn and see what the treasury has in store.</p></div><span class="spin-daily-badge">${icon("spark")} ONCE A DAY</span></div><div class="spin-content"><div class="spin-wheel-column">${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p></div><div class="spin-prize-panel"><div class="spin-jackpot"><span>THE SILVER JACKPOT</span><strong>£45</strong><small>1 in 1,000 spins · virtual cash</small></div><div class="spin-prizes">${spinPrizeRows.map((segment) => `<div class="spin-prize-row ${segment.id === "no-prize" ? "no-prize" : ""} ${segment.id === "silver" ? "silver-prize" : ""}"><i aria-hidden="true"></i><span>${esc(segment.label)}</span><b>${segment.reward ? money(segment.reward) : "Try again"}</b><small>${(segment.weight / 1000000).toFixed(segment.weight % 1000000 ? 1 : 0)}%</small></div>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin ' + icon("arrow") + "</button>" : spunToday ? `<button class="button ghost full" disabled>Come back tomorrow</button><p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></div></div></section>`,
   );
 }
 function dailySpinWheel() {
@@ -512,10 +523,10 @@ function dailySpinWheel() {
             : ["#3b4050", "#4b5060", "#303544"][missIndex];
       const textColor = segment.id === "silver" ? "#18202a" : "#fff5dc";
       angle = end;
-      return `<path d="M 110 110 L ${x1.toFixed(2)} ${y1.toFixed(2)} A 104 104 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" fill="${color}" stroke="#181b24" stroke-width="2"/>${segment.id === "silver" ? "" : `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" fill="${textColor}" transform="rotate(${((start + end) / 2 + 90).toFixed(2)} ${tx.toFixed(2)} ${ty.toFixed(2)})">${esc(segment.label.toUpperCase())}</text>`}`;
+      return `<path d="M 110 110 L ${x1.toFixed(2)} ${y1.toFixed(2)} A 104 104 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" fill="${color}" stroke="#181b24" stroke-width="2"/>${sweep >= 20 ? `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" fill="${textColor}" transform="rotate(${((start + end) / 2 + 90).toFixed(2)} ${tx.toFixed(2)} ${ty.toFixed(2)})">${esc(segment.label.toUpperCase())}</text>` : ""}`;
     })
     .join("");
-  return `<div class="spin-wheel-wrap"><span class="spin-pointer" aria-hidden="true"></span><svg class="spin-wheel" data-wheel viewBox="0 0 220 220" role="img" aria-label="Daily prize wheel with three no-prize slices, virtual cash prizes, and a 0.1 percent chance to win £45"><circle cx="110" cy="110" r="108" fill="#13161e" stroke="#e2ca8e" stroke-width="3"/>${sectors}<circle cx="110" cy="110" r="20" fill="#171a22" stroke="#e2ca8e" stroke-width="3"/><text class="spin-wheel-center" x="110" y="114">SPIN</text></svg></div>`;
+  return `<div class="spin-wheel-wrap"><span class="spin-pointer" aria-hidden="true"></span><svg class="spin-wheel" data-wheel viewBox="0 0 220 220" role="img" aria-label="Daily prize wheel with three no-prize slices, virtual cash prizes, and a 0.1 percent chance to win £45"><circle cx="110" cy="110" r="108" fill="#13161e" stroke="#e2ca8e" stroke-width="3"/>${sectors}<circle cx="110" cy="110" r="25" fill="#171a22" stroke="#e2ca8e" stroke-width="3"/><text class="spin-wheel-center" x="110" y="114">SPIN</text></svg></div>`;
 }
 async function friendsView() {
   const v = renderVersion,
@@ -546,7 +557,7 @@ async function friendsView() {
         "Build your royal court.",
         "Good friends. Questionable trades. Perfectly friendly wagers.",
       ) +
-      `<div class="friend-code panel"><div><span class="eyebrow">YOUR FRIEND CODE</span><strong>${esc(state.account.friend_code)}</strong><small>Share this code with your friends.</small></div><button class="button ghost small" data-action="copy-code">Copy code</button><form id="add-friend" class="input-button"><input name="code" aria-label="Friend code" placeholder="Enter a friend’s code" minlength="6" maxlength="6" required><button class="button">Add friend ${icon("arrow")}</button></form></div><div class="friends-layout"><section class="panel"><h2>Your court <span class="count">${data.friends.length}</span></h2>${data.friends.length ? data.friends.map((f) => `<div class="list-row friend-row"><span class="avatar">${esc(f.username[0])}</span><div><strong>${esc(f.username)}</strong><small>${esc(f.friend_code)}</small></div><button class="text-button" data-action="trade-create" data-id="${esc(f.id)}">Trade ${icon("arrow")}</button><button class="icon-button" data-action="unfriend" data-id="${esc(f.id)}" aria-label="Unfriend ${esc(f.username)}">${icon("close")}</button></div>`).join("") : empty("friends", "No friends. Yet.", "Swap codes and bring your friends into the court.", "", "")}</section><section class="panel"><h2>Private tables</h2><p class="muted">Five minutes. Two friends. Matched stakes. Winner takes 2×.</p><div class="table-controls"><button class="button ghost small" data-action="table-create">Create a table</button><form id="join-table" class="input-button"><input aria-label="Table join code" name="code" placeholder="Join code" required maxlength="6"><button class="button small">Join</button></form></div>${data.tables.map((t) => `<div class="list-row"><div><strong>${esc(t.code)} · ${money(Number(t.stake))}</strong><small>${esc(t.host_name)} ${t.guest_name ? "vs " + esc(t.guest_name) : "· waiting for a friend"}</small></div><span>${t.settled ? (t.winner_id ? (t.winner_id === state.user.id ? "You won!" : "Round complete") : "Expired · refunded") : `<span data-countdown="${t.ends_at}">${countdown(t.ends_at)}</span>`}</span></div>`).join("")}</section></div><section class="panel history"><div class="section-heading"><h2>The trading floor</h2><button class="text-button" data-action="refresh">Refresh ${icon("arrow")}</button></div><p class="muted">Offered cards are reserved. Updating an offer resets both confirmations. Both players must confirm.</p>${data.trades.length ? data.trades.map((t) => `<div class="list-row"><div><strong>${esc(t.name_a)} ↔ ${esc(t.name_b)}</strong><small>${t.offer_a.length} cards for ${t.offer_b.length} cards · ${esc(t.status)}</small></div>${t.status === "open" ? `<button class="button ghost small" data-action="trade-open" data-id="${t.id}">Open trade</button>` : icon("check")}</div>`).join("") : '<p class="muted">Start a trade from your friends list.</p>'}</section>`;
+      `<div class="friend-code panel"><div><span class="eyebrow">YOUR FRIEND CODE</span><strong>${esc(state.account.friend_code)}</strong><small>Share this code with your friends.</small></div><button class="button ghost small" data-action="copy-code">Copy code</button><form id="add-friend" class="input-button"><input name="code" aria-label="Friend code" placeholder="Enter a friend’s code" minlength="6" maxlength="6" required><button class="button">Add friend ${icon("arrow")}</button></form></div><div class="friends-layout"><section class="panel"><h2>Your court <span class="count">${data.friends.length}</span></h2>${data.friends.length ? data.friends.map((f) => `<div class="list-row friend-row"><span class="avatar">${esc(f.username[0])}</span><div><strong>${esc(f.username)}</strong><small>${esc(f.friend_code)}</small></div><button class="text-button" data-action="trade-create" data-id="${esc(f.id)}">Trade ${icon("arrow")}</button><button class="icon-button" data-action="unfriend" data-id="${esc(f.id)}" aria-label="Unfriend ${esc(f.username)}">${icon("close")}</button></div>`).join("") : empty("friends", "No friends. Yet.", "Swap codes and bring your friends into the court.", "", "")}</section><section class="panel"><h2>Private tables</h2><p class="muted">Five minutes. Two friends. Matched stakes. Winner takes 2×.</p><div class="table-controls"><button class="button ghost small" data-action="table-create">Create a table</button><form id="join-table" class="input-button"><input aria-label="Table join code" name="code" placeholder="Join code" required maxlength="6"><button class="button small">Join</button></form></div>${data.tables.map((t) => `<div class="list-row"><div><strong>${esc(t.code)} · ${money(Number(t.stake))}</strong><small>${esc(t.host_name)} ${t.guest_name ? "vs " + esc(t.guest_name) : "· waiting for a friend"}</small></div><span>${t.settled ? (t.winner_id ? (t.winner_id === state.account.id ? "You won!" : "Round complete") : "Expired · refunded") : `<span data-countdown="${t.ends_at}">${countdown(t.ends_at)}</span>`}</span></div>`).join("")}</section></div><section class="panel history"><div class="section-heading"><h2>The trading floor</h2><button class="text-button" data-action="refresh">Refresh ${icon("arrow")}</button></div><p class="muted">Offered cards are reserved. Updating an offer resets both confirmations. Both players must confirm.</p>${data.trades.length ? data.trades.map((t) => `<div class="list-row"><div><strong>${esc(t.name_a)} ↔ ${esc(t.name_b)}</strong><small>${t.offer_a.length} cards for ${t.offer_b.length} cards · ${esc(t.status)}</small></div>${t.status === "open" ? `<button class="button ghost small" data-action="trade-open" data-id="${t.id}">Open trade</button>` : icon("check")}</div>`).join("") : '<p class="muted">Start a trade from your friends list.</p>'}</section>`;
   } catch (e) {
     if (v === renderVersion && request === viewRequest) errorView(e);
   }
@@ -1007,9 +1018,9 @@ function sellModal(selected) {
 async function tradeModal(id) {
   const t = state.friends?.trades.find((t) => t.id === Number(id));
   if (!t) return;
-  const side = t.user_a === state.user.id ? "a" : "b";
+  const side = t.user_a === state.account.id ? "a" : "b";
   const rows = await api("trades/cards?id=" + id);
-  const otherRows = rows.filter((r) => r.owner_id !== state.user.id);
+  const otherRows = rows.filter((r) => r.owner_id !== state.account.id);
   const mine = state.inventory.filter(
     (r) => !r.vaulted && (!r.trade_id || r.trade_id === t.id),
   );
@@ -1113,7 +1124,11 @@ document.addEventListener("click", async (e) => {
             start += sweep;
           }
           $("#spin-status").textContent = "The wheel is spinning…";
-          await new Promise((resolve) => setTimeout(resolve, 4300));
+          const duration = matchMedia("(prefers-reduced-motion: reduce)")
+            .matches
+            ? 0
+            : 4300;
+          await new Promise((resolve) => setTimeout(resolve, duration));
         }
         state.account = result.account;
         if (state.view === "rewards") render();

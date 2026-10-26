@@ -102,7 +102,6 @@ async function transact<T>(fn: (c: Client) => Promise<T>, readOnly = false) {
     await c.query(
       "SELECT set_config('lock_timeout','5s',true),set_config('statement_timeout','15s',true)",
     );
-    if (!readOnly) await c.query("SELECT pg_advisory_xact_lock(8374201)");
     const r = await fn(c);
     await c.query("COMMIT");
     return r;
@@ -116,7 +115,7 @@ async function transact<T>(fn: (c: Client) => Promise<T>, readOnly = false) {
 export async function settle(c: Client) {
   const now = new Date();
   const expired = await c.query(
-    "SELECT * FROM rounds WHERE ends_at<=$1 AND settled=false FOR UPDATE",
+    "SELECT * FROM rounds WHERE ends_at<=$1 AND settled=false ORDER BY id FOR UPDATE SKIP LOCKED",
     [now],
   );
   for (const round of expired.rows) {
@@ -144,7 +143,7 @@ export async function settle(c: Client) {
   }
   for (const table of (
     await c.query(
-      "SELECT * FROM friend_tables WHERE ends_at<=$1 AND settled=false FOR UPDATE",
+      "SELECT * FROM friend_tables WHERE ends_at<=$1 AND settled=false ORDER BY id FOR UPDATE SKIP LOCKED",
       [now],
     )
   ).rows) {
@@ -174,27 +173,59 @@ export async function settleRounds() {
   });
 }
 async function ensureAccount(c: Client, user: SessionUser) {
+  const email = user.email?.trim().toLowerCase() || null;
+  await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+    email ? `google:${email}` : `subject:${user.id}`,
+  ]);
+  if (email) {
+    const linked = (
+      await c.query(
+        "SELECT * FROM accounts WHERE lower(google_email)=lower($1)",
+        [email],
+      )
+    ).rows[0];
+    if (linked) return linked;
+  }
   const existing = (
     await c.query("SELECT * FROM accounts WHERE id=$1", [user.id])
   ).rows[0];
-  if (existing) return existing;
+  if (existing) {
+    if (email && existing.google_email !== email) {
+      await c.query("UPDATE accounts SET google_email=$2 WHERE id=$1", [
+        user.id,
+        email,
+      ]);
+      return (await c.query("SELECT * FROM accounts WHERE id=$1", [user.id]))
+        .rows[0];
+    }
+    return existing;
+  }
   let name =
     String(user.name || "Monarch")
       .replace(/[^a-zA-Z0-9_ -]/g, "")
       .trim()
       .slice(0, 24) || "Monarch";
-  if (
-    (
-      await c.query("SELECT id FROM accounts WHERE lower(username)=lower($1)", [
-        name,
-      ])
-    ).rows.length
-  )
-    name = name.slice(0, 16) + " " + code();
+  const baseName = name.slice(0, 16);
+  let availableName = false;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+      `username:${name.toLowerCase()}`,
+    ]);
+    const taken = await c.query(
+      "SELECT id FROM accounts WHERE lower(username)=lower($1)",
+      [name],
+    );
+    if (!taken.rows.length) {
+      availableName = true;
+      break;
+    }
+    name = `${baseName} ${code()}`;
+  }
+  if (!availableName) throw new Error("Could not reserve a unique username.");
   const a = (
     await c.query(
-      "INSERT INTO accounts(id,username,friend_code) VALUES($1,$2,$3) RETURNING *",
-      [user.id, name, code()],
+      "INSERT INTO accounts(id,google_email,username,friend_code) VALUES($1,$2,$3,$4) RETURNING *",
+      [user.id, email, name, code()],
     )
   ).rows[0];
   await c.query(
@@ -209,6 +240,7 @@ async function pot(c: Client) {
     "INSERT INTO rounds(id,ends_at) VALUES($1,$2) ON CONFLICT DO NOTHING",
     [rid, new Date((rid + 1) * 600000)],
   );
+  await c.query("SELECT id FROM rounds WHERE id=$1 FOR UPDATE", [rid]);
   const contributors = (
     await c.query(
       "SELECT w.user_id,SUM(w.amount)::bigint AS amount FROM wagers w JOIN accounts a ON a.id=w.user_id WHERE w.round_id=$1 AND a.bot=false GROUP BY w.user_id",
@@ -305,17 +337,26 @@ export async function handle(
       const viewer = await readUser(req);
       return Response.json(
         await transact(async (c) => {
+          const viewerId = viewer
+            ? (
+                await c.query(
+                  "SELECT id FROM accounts WHERE id=$1 OR lower(google_email)=lower($2) ORDER BY (lower(google_email)=lower($2)) DESC LIMIT 1",
+                  [viewer.id, viewer.email || null],
+                )
+              ).rows[0]?.id || viewer.id
+            : "";
           return (
             await c.query(
               `WITH scores AS (SELECT a.id,a.username,a.created_at,${metric} AS score FROM accounts a LEFT JOIN inventory i ON i.owner_id=a.id WHERE a.bot=false GROUP BY a.id),ranked AS (SELECT *,ROW_NUMBER() OVER(ORDER BY score DESC,created_at ASC) AS rank FROM scores) SELECT id,username,score,rank FROM ranked WHERE rank<=100 OR id=$1 ORDER BY rank`,
-              [viewer?.id || ""],
+              [viewerId],
             )
           ).rows;
         }, true),
       );
     }
     const user = await readUser(req);
-    if (!user) fail("Sign in to enter the court.", 401);
+    if (!user) throw new GameError("Sign in to enter the court.", 401);
+    const authenticatedUser: SessionUser = user;
     let body: any = {};
     if (req.method === "POST") {
       try {
@@ -328,9 +369,10 @@ export async function handle(
     }
     return Response.json(
       await transact(async (c) => {
-        await ensureAccount(c, user);
+        const player = await ensureAccount(c, authenticatedUser);
         await settle(c);
-        const id = user.id;
+        const id = player.id;
+        await c.query("SELECT id FROM accounts WHERE id=$1 FOR UPDATE", [id]);
         const account = async () =>
           (await c.query("SELECT * FROM accounts WHERE id=$1", [id])).rows[0];
         if (route === "me" && req.method === "GET")
@@ -350,6 +392,10 @@ export async function handle(
             fail(
               "Choose a username with 3–24 letters, numbers, spaces, _ or -.",
             );
+          await c.query(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+            [`username:${username.toLowerCase()}`],
+          );
           const taken = await c.query(
             "SELECT id FROM accounts WHERE lower(username)=lower($1) AND id<>$2",
             [username, id],
@@ -412,7 +458,7 @@ export async function handle(
           ).rows;
         if (route === "open" && req.method === "POST") {
           const pack = packs.find((p) => p.id === body.pack);
-          if (!pack) fail("Unknown pack.");
+          if (!pack) return fail("Unknown pack.");
           await change(c, id, -pack.price, `${pack.name} opened`);
           const currentAccount = await account();
           const epicGuaranteed = packProgress(

@@ -6,8 +6,8 @@ import Google from "@auth/core/providers/google";
 export const googleConfigured = () =>
   Boolean(
     process.env.AUTH_SECRET &&
-      process.env.AUTH_GOOGLE_ID &&
-      process.env.AUTH_GOOGLE_SECRET,
+    process.env.AUTH_GOOGLE_ID &&
+    process.env.AUTH_GOOGLE_SECRET,
   );
 
 function config(): AuthConfig {
@@ -24,6 +24,9 @@ function config(): AuthConfig {
     session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 30 },
     pages: { signIn: "/", error: "/" },
     callbacks: {
+      signIn({ profile }) {
+        return profile?.email_verified === true;
+      },
       // Expose Google's stable account id (the JWT subject) to the browser.
       session({ session, token }) {
         if (session.user && token.sub) (session.user as any).id = token.sub;

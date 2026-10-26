@@ -6,7 +6,7 @@ The vanilla JavaScript SPA includes five pack tiers, an animated card reveal wit
 
 ## Technology
 
-Vite bundles the HTML, CSS, and framework-free JavaScript frontend. A Vercel Function (`api/index.ts`) provides the JSON API and Google sign-in. Supabase provides managed PostgreSQL, accessed with Drizzle and the `pg` driver; transactional game operations use explicit transactions and locking on a pooled connection, and recent pulls use Drizzle ORM. Auth.js (`@auth/core`) handles Google OAuth and issues a signed, HTTP-only session cookie. Vercel Image Optimization serves generated pack/meme artwork and externally sourced leader portraits.
+Vite bundles the HTML, CSS, and framework-free JavaScript frontend. A Vercel Function (`api/index.ts`) provides the JSON API and Google sign-in. Supabase provides managed PostgreSQL, accessed with Drizzle and the `pg` driver; transactional game operations use explicit transactions, per-account and per-round locking on pooled connections, and recent pulls use Drizzle ORM. Independent players can mutate their accounts concurrently while shared pot rounds remain serialized. Auth.js (`@auth/core`) handles Google OAuth and issues a signed, HTTP-only session cookie. Vercel Image Optimization serves generated pack/meme artwork and externally sourced leader portraits.
 
 ## Local development
 
@@ -18,7 +18,7 @@ The Vercel and Supabase migration has not been deployed or run against a live da
 
 ## Accounts and Google login
 
-Sign-in is Google only; email/password accounts were removed with Netlify Identity. A new account is suggested a unique username based on the Google profile name, then must save a public username in the first-sign-in prompt. Open **Settings** to change the name, switch Google accounts, or log out. A new account receives a single £5.00 welcome credit when its game account is first provisioned. No age field is collected. Accounts created under Netlify Identity are not carried over: ids differ, so players start fresh.
+Sign-in is Google only; email/password accounts were removed with Netlify Identity. Each Google login must have a verified email. The Google subject remains the primary account key, and a unique verified-email link lets the same Google account recover its existing game account if its Auth.js subject changes. A new account is suggested a unique username based on the Google profile name, then must save a public username in the first-sign-in prompt. Open **Settings** to change the name, switch Google accounts, or log out. A new account receives a single £5.00 welcome credit when its game account is first provisioned. No age field is collected. Accounts created under Netlify Identity are not carried over: ids differ, so players start fresh.
 
 Create a Google OAuth client (Google Cloud Console, APIs & Services, Credentials, OAuth client ID, Web application). Add `https://YOUR-DOMAIN/api/auth/callback/google` as an authorized redirect URI (plus `http://localhost:3000/api/auth/callback/google` for `vercel dev`) and set `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` and `AUTH_SECRET` (generate one with `openssl rand -base64 32`). The sign-in button is disabled until all three are set. Sessions last 30 days and are verified server-side on every request; the browser never supplies identity. New accounts must save a unique public username in a first-sign-in prompt before using the app; existing accounts retain their current usernames.
 
@@ -27,6 +27,8 @@ Before deploying the first-sign-in username prompt, apply `db/migrations/2026102
 Before deploying the free starter card and stepped play rewards, apply `db/migrations/20261025203000_progressive_rewards_and_starter_pack.sql` with `npm run migrate`. Each existing account receives one starter claim when this migration is applied.
 
 Before deploying the daily Rewards wheel and card loadouts, apply `db/migrations/20261026095000_daily_spin_and_loadout.sql` with `npm run migrate`. It adds per-account spin-day/result state and a three-card loadout.
+
+Before deploying Google account email linking, apply `db/migrations/20261026103000_link_google_email_to_account.sql` with `npm run migrate`. The migration adds a unique, case-insensitive Google email link; it does not merge or delete pre-existing duplicate accounts.
 
 ## Economy and fairness
 
