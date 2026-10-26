@@ -73,6 +73,7 @@ let state = {
   rosterSearch: "",
   rosterKind: "all",
   rosterLimit: 40,
+  indexFamily: "all",
   muted: false,
   busy: false,
 };
@@ -85,6 +86,7 @@ let viewRequest = 0;
 let syncRequest = 0;
 const image = (src, w = 500) => {
   const source = imageSource(src);
+  if (source.startsWith("https://cdn.jsdelivr.net/npm/simple-icons@")) return source;
   return source.startsWith("/img/flags/") ||
     (source.startsWith("/") && source.endsWith(".svg"))
     ? source
@@ -98,7 +100,9 @@ const art = (pack) =>
       ? "/img/mystery-leader.svg"
       : pack.art === "fortnite"
         ? cardMap["fortnite-renegade-raider"].image
-        : "/img/" + pack.art + ".png",
+        : pack.art === "fastfood"
+          ? "/img/fastfood.svg"
+          : "/img/" + pack.art + ".png",
   );
 // Retry the original if image transformation fails, then use a bundled fallback.
 document.addEventListener(
@@ -222,7 +226,7 @@ function title(eyebrow, heading, text) {
   return `<div class="page-heading"><span class="eyebrow">${eyebrow}</span><h1>${heading}</h1><p>${text}</p></div>`;
 }
 function packArt(p, extra = "") {
-  return `<div class="foil-pack ${p.id} ${extra}" style="--pack-color:${p.color}"><img src="${art(p)}" alt="${esc(p.name)} artwork" loading="${extra ? "eager" : "lazy"}"><div class="pack-sheen"></div><div class="pack-brand">${icon("crown")} CARD MONARCHS</div>${p.id === "starter" ? '<div class="starter-pack-seal">FREE · ONE CARD</div>' : ""}<div class="pack-label"><span>${p.id === "starter" ? "A GIFT FOR EVERY PLAYER" : p.id === "brainrot" ? "THE ORIGINAL COLLECTION" : p.id === "apex" ? "THE ULTIMATE COLLECTION" : "THE ROYAL COLLECTION"}</span><strong>${p.short.replace(" ", "<br>")}</strong><small>${p.count} ${p.count === 1 ? "CARD" : "CARDS"} INSIDE</small></div><div class="pack-crimp"></div></div>`;
+  return `<div class="foil-pack ${p.id} ${extra}" style="--pack-color:${p.color}"><img src="${art(p)}" alt="${esc(p.name)} artwork" loading="${extra ? "eager" : "lazy"}"><div class="pack-sheen"></div><div class="pack-brand">${icon("crown")} CARD MONARCHS</div>${p.id === "starter" ? '<div class="starter-pack-seal">FREE · ONE CARD</div>' : ""}<div class="pack-label"><span>${p.id === "starter" ? "A GIFT FOR EVERY PLAYER" : p.id === "brainrot" ? "THE ORIGINAL COLLECTION" : p.id === "apex" ? "THE ULTIMATE COLLECTION" : p.id === "fastfood" ? "THE FAST FOOD COLLECTION" : "THE ROYAL COLLECTION"}</span><strong>${p.short.replace(" ", "<br>")}</strong><small>${p.count} ${p.count === 1 ? "CARD" : "CARDS"} INSIDE</small></div><div class="pack-crimp"></div></div>`;
 }
 const starterPackArt = {
   id: "starter",
@@ -291,6 +295,7 @@ function shop() {
       ["royal", "The royal court"],
       ["world", "World leaders"],
       ["fortnite", "Fortnite"],
+      ["fastfood", "Fast Food"],
     ]
       .map(
         ([id, label]) =>
@@ -298,7 +303,7 @@ function shop() {
       )
       .join(
         "",
-      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product ${state.lastOpenedPackId === p.id ? "last-opened" : ""}" data-pack-id="${p.id}" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : p.set === "fortnite" ? "FORTNITE" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase and Alpha values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>${state.lastOpenedPackId === p.id ? "Open this pack again" : "Open pack"} ${icon("arrow")}</span><b>${money(packPrice(p))}</b></button>${nextPackDiscount() ? '<small class="discount-hint">Loadout boost · 10p off this pack</small>' : ""}${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack" : `Chase pull · 1 in ${p.chaseOdds.toLocaleString()}`}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£15,000</strong><small>Mystery leader · virtual sell value</small><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("collection", "large-icon")}</a></div></section>`;
+      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product ${state.lastOpenedPackId === p.id ? "last-opened" : ""}" data-pack-id="${p.id}" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : p.set === "fortnite" ? "FORTNITE" : p.set === "fastfood" ? "FAST FOOD" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase and Alpha values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>${state.lastOpenedPackId === p.id ? "Open this pack again" : "Open pack"} ${icon("arrow")}</span><b>${money(packPrice(p))}</b></button>${nextPackDiscount() ? '<small class="discount-hint">Loadout boost · 10p off this pack</small>' : ""}${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack" : `Chase pull · 1 in ${p.chaseOdds.toLocaleString()}`}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£15,000</strong><small>Mystery leader · virtual sell value</small><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("collection", "large-icon")}</a></div></section>`;
 }
 function gameCard(
   row,
@@ -408,26 +413,59 @@ function indexView() {
   const rewards = state.account?.set_rewards || {};
   const epicBonus = Number(state.account?.permanent_epic_bonus || 0);
   const crownBonus = Number(state.account?.permanent_crown_bonus || 0);
-  const sections = indexSets.map((set) => {
+  const families = [
+    ["all", "All sets"],
+    ["brainrot", "Meme Hall"],
+    ["royal", "Royal Archive"],
+    ["fortnite", "Fortnite"],
+    ["world", "World Stage"],
+    ["alpha", "Mystery Gold"],
+    ["fastfood", "Fast Food"],
+  ];
+  const visibleSets = state.indexFamily === "all"
+    ? indexSets
+    : indexSets.filter((set) => set.family === state.indexFamily);
+  const familyButtons = families.map(([id, label]) =>
+    '<button class="index-filter ' + (state.indexFamily === id ? "active" : "") + '" data-action="index-family" data-family="' + id + '" aria-pressed="' + (state.indexFamily === id) + '">' + label + (id === "all" ? " · " + indexSets.length : " · " + indexSets.filter((set) => set.family === id).length) + "</button>"
+  ).join("");
+  const sections = visibleSets.map((set) => {
     const cards = set.cardIds.map((id) => cardMap[id]).filter(Boolean);
     const count = cards.filter((card) => discovered.has(card.id)).length;
-    const claimed = rewards[set.id];
     const complete = count === cards.length;
-    const rewardButtons = !complete || claimed ? '' : '<div class="index-reward-actions"><strong>Choose a permanent set bonus</strong>' +
-      '<button class="button small" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="epic" ' + (epicBonus + 500000 > 1000000 ? 'disabled' : '') + '>+0.5% Epic chance</button>' +
-      '<button class="button small ghost" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="crown" ' + (crownBonus + 100000 > 100000 ? 'disabled' : '') + '>+0.1% Crown chance</button>' +
-      (epicBonus + 500000 > 1000000 && crownBonus + 100000 > 100000 ? '<button class="button small ghost" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="badge">Claim set badge</button>' : '') + '</div>';
-    const claimText = claimed === 'epic' ? 'Permanent +0.5% Epic chance claimed' : claimed === 'crown' ? 'Permanent +0.1% Crown chance claimed' : claimed === 'badge' ? 'Set completion badge claimed' : '';
-    return '<section class="index-set panel"><div class="index-set-heading"><div><span class="eyebrow">COLLECTION SET</span><h2>' + esc(set.name) + '</h2><p>' + esc(set.subtitle) + '</p></div><strong>' + count + ' / ' + cards.length + ' discovered</strong></div><div class="index-grid">' + cards.map((card, i) => {
+    const claimed = rewards[set.id];
+    const pct = cards.length ? Math.round(count / cards.length * 100) : 0;
+    let rewardPanel;
+    if (claimed) {
+      const text = claimed === "epic" ? "Permanent +0.5% Epic chance claimed" : claimed === "crown" ? "Permanent +0.1% Crown chance claimed" : "Set badge claimed";
+      rewardPanel = '<div class="index-reward-panel claimed"><div><span class="eyebrow">SET REWARD CLAIMED</span><strong>' + text + '</strong></div><span class="claim-status">COMPLETE</span></div>';
+    } else {
+      const locked = !complete || !state.user;
+      const epicDisabled = locked || epicBonus + 500000 > 1000000;
+      const crownDisabled = locked || crownBonus + 100000 > 100000;
+      const canBadge = epicBonus + 500000 > 1000000 && crownBonus + 100000 > 100000;
+      const buttons = canBadge
+        ? '<button class="button small" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="badge" ' + (locked ? "disabled" : "") + '>Claim set badge</button>'
+        : '<button class="button small" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="epic" ' + (epicDisabled ? "disabled" : "") + '>Claim +0.5% Epic</button><button class="button small ghost" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="crown" ' + (crownDisabled ? "disabled" : "") + '>Claim +0.1% Crown</button>';
+      const prompt = !state.user ? "Sign in to claim this set reward." : complete ? "Set complete — choose one reward." : "Complete the set to unlock these rewards.";
+      rewardPanel = '<div class="index-reward-panel ' + (complete ? "ready" : "locked") + '"><div class="index-reward-copy"><span class="eyebrow">' + (complete ? "REWARD READY" : "SET REWARD") + '</span><strong>' + prompt + '</strong><small>Choose a permanent +0.5% Epic chance or +0.1% Crown chance. Account-wide caps apply.</small></div><div class="index-reward-actions">' + buttons + '</div></div>';
+    }
+    const cardTiles = cards.map((card, i) => {
       const found = discovered.has(card.id);
-      return '<article class="index-card ' + (found ? 'index-found' : 'index-mystery') + '" aria-label="' + (found ? esc(card.name + ', ' + card.rarity) : 'Mystery card ' + (i + 1)) + '">' +
-        '<div class="index-card-art">' + (found ? '<img src="' + image(card.image, 360) + '" alt="' + esc(card.name) + '" loading="lazy">' : '<span aria-hidden="true">?</span>') + '</div>' +
-        '<small>' + (found ? esc(card.rarity.toUpperCase()) : 'UNDISCOVERED') + '</small><h3>' + (found ? esc(card.name) : 'Mystery card') + '</h3><p>' + (found ? money(card.value) + ' sell value' : 'Pull or trade for this card to reveal it.') + '</p></article>';
-    }).join('') + '</div>' + (claimText ? '<p class="index-claimed" role="status">' + claimText + '</p>' : rewardButtons) + '</section>';
-  }).join('');
-  const epicText = epicBonus ? '+' + (epicBonus / 1000000).toFixed(2) + '% Epic' : 'No Epic set bonus';
-  const crownText = crownBonus ? '+' + (crownBonus / 1000000).toFixed(2) + '% Crown' : 'No Crown set bonus';
-  $('#main').innerHTML = title('THE CARD ARCHIVE', 'Character index.', 'Reveal themed sets by collecting or trading for each card. Complete a set to claim a lasting odds bonus.') + '<div class="index-top-actions"><span>' + indexSets.length + ' sets · ' + catalog.length + ' cards</span><strong>Complete a set to unlock its claim button</strong></div><div class="index-bonus-summary panel"><span class="eyebrow">PERMANENT SET BONUSES</span><strong>' + epicText + ' chance · ' + crownText + ' chance</strong><small>Account-wide caps: +1.00% Epic and +0.10% Crown. Bonuses are virtual game odds.</small></div>' + sections;
+      const art = found
+        ? '<img src="' + image(card.image || "/img/leader-placeholder.svg", 360) + '" alt="' + esc(card.name) + '" loading="lazy">'
+        : '<span aria-hidden="true">?</span>';
+      return '<article class="index-card ' + (found ? "index-found" : "index-mystery") + '" aria-label="' + (found ? esc(card.name + ", " + card.rarity) : "Mystery card " + (i + 1)) + '"><div class="index-card-art">' + art + '</div><small>' + (found ? esc(card.rarity.toUpperCase()) : "UNDISCOVERED") + '</small><h3>' + (found ? esc(card.name) : "Mystery card") + '</h3><p>' + (found ? money(card.value) + " sell value" : "Pull or trade this card to reveal it.") + '</p></article>';
+    }).join("");
+    return '<section class="index-set panel"><div class="index-set-heading"><div><span class="eyebrow">COLLECTION SET</span><h2>' + esc(set.name) + '</h2><p>' + esc(set.subtitle) + '</p></div><strong>' + count + ' / ' + cards.length + ' discovered</strong></div><div class="index-progress" role="progressbar" aria-label="' + esc(set.name) + ' completion" aria-valuemin="0" aria-valuemax="' + cards.length + '" aria-valuenow="' + count + '"><span style="width:' + pct + '%"></span></div>' + rewardPanel + '<div class="index-grid">' + cardTiles + '</div></section>';
+  }).join("");
+  const epicText = epicBonus ? "+" + (epicBonus / 1000000).toFixed(2) + "% Epic" : "No Epic set bonus";
+  const crownText = crownBonus ? "+" + (crownBonus / 1000000).toFixed(2) + "% Crown" : "No Crown set bonus";
+  $("#main").innerHTML =
+    title("THE CARD ARCHIVE", "Character index.", "Browse every card, track set progress, and see the reward before you complete a set.") +
+    '<div class="index-top-actions"><span>' + indexSets.length + " sets · " + catalog.length + ' cards</span><strong>' + (indexSets.filter((set) => !rewards[set.id] && set.cardIds.every((id) => discovered.has(id))).length) + ' rewards ready to claim</strong></div>' +
+    '<div class="index-bonus-summary panel"><span class="eyebrow">YOUR PERMANENT SET BONUSES</span><strong>' + epicText + ' chance · ' + crownText + ' chance</strong><small>Caps: +1.00% Epic and +0.10% Crown. Choose one reward for each completed set.</small></div>' +
+    '<nav class="index-filters" aria-label="Filter card index sets">' + familyButtons + '</nav>' +
+    (sections || '<div class="panel index-empty"><h2>No sets in this group yet.</h2><p>Choose another collection filter.</p></div>');
 }
 function collection() {
   const mine = state.inventory;
@@ -1323,6 +1361,11 @@ document.addEventListener("click", async (e) => {
           ? "Card equipped. Its power now affects pack odds."
           : "Card unequipped.",
       );
+      return;
+    }
+    if (action === "index-family") {
+      state.indexFamily = target.dataset.family || "all";
+      render();
       return;
     }
     if (action === "claim-index-reward") {

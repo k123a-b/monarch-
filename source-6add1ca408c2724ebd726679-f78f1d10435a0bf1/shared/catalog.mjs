@@ -178,6 +178,89 @@ const fortniteCards = [
   fortniteCard("fortnite-dynamo", "Dynamo", "Uncommon", 7000, "CID_170_Athena_Commando_F_Luchador", "🤼", "chevrons", ["#4d3b55", "#db8bcb"], "A high-energy luchador."),
   fortniteCard("fortnite-aura", "Aura", "Common", 3200, "CID_397_Athena_Commando_F_TreasureHunterFashion", "💎", "orbs", ["#48584c", "#d3ba73"], "A sharp look for a sharp player."),
 ];
+const fastFoodChains = [
+  ["mcdonalds", "McDonald's"],
+  ["starbucks", "Starbucks"],
+  ["kfc", "KFC"],
+  ["subway", "Subway"],
+  ["burgerking", "Burger King"],
+  ["chickfila", "Chick-fil-A"],
+  ["tacobell", "Taco Bell"],
+  ["dominos", "Domino's"],
+  ["chipotle", "Chipotle"],
+  ["wendys", "Wendy's"],
+  ["pizzahut", "Pizza Hut"],
+  ["dunkindonuts", "Dunkin'"],
+  ["popeyes", "Popeyes"],
+  ["timhortons", "Tim Hortons"],
+  ["pandaexpress", "Panda Express"],
+  ["sonicdrivein", "Sonic Drive-In"],
+  ["littlecaesars", "Little Caesars"],
+  ["papajohns", "Papa John's"],
+  ["wingstop", "Wingstop"],
+  ["raisingcanes", "Raising Cane's"],
+  ["arbys", "Arby's"],
+  ["dairyqueen", "Dairy Queen"],
+  ["panerabread", "Panera Bread"],
+  ["fiveguys", "Five Guys"],
+  ["shakeshack", "Shake Shack"],
+  ["whataburger", "Whataburger"],
+  ["innoutburger", "In-N-Out Burger"],
+  ["culvers", "Culver's"],
+  ["jackinthebox", "Jack in the Box"],
+  ["jerseymikes", "Jersey Mike's"],
+  ["jimmyjohns", "Jimmy John's"],
+  ["firehousesubs", "Firehouse Subs"],
+  ["zaxbys", "Zaxby's"],
+  ["bojangles", "Bojangles"],
+  ["carlsjr", "Carl's Jr."],
+  ["hardees", "Hardee's"],
+  ["deltaco", "Del Taco"],
+  ["qdoba", "QDOBA"],
+  ["cava", "CAVA"],
+  ["pretamanger", "Pret A Manger"],
+  ["greggs", "Greggs"],
+  ["costa", "Costa Coffee"],
+  ["nandos", "Nando's"],
+  ["jollibee", "Jollibee"],
+  ["mixue", "Mixue"],
+  ["luckincoffee", "Luckin Coffee"],
+  ["yoshinoya", "Yoshinoya"],
+  ["wafflehouse", "Waffle House"],
+  ["krispykreme", "Krispy Kreme"],
+  ["elpolloloco", "El Pollo Loco"],
+];
+const fastFoodCards = fastFoodChains.map(([slug, name], index) => {
+  const rank = index + 1;
+  const rarity = rank <= 3 ? "Crown" : rank <= 13 ? "Epic" : rank <= 28 ? "Uncommon" : "Common";
+  const value = rank <= 3
+    ? 161000 - (rank - 1) * 34500
+    : rank <= 13
+      ? 21850 - (rank - 4) * 690
+      : rank <= 28
+        ? 11500 - (rank - 14) * 460
+        : 7475 - (rank - 29) * 207;
+  const colors = rarity === "Crown"
+    ? ["#5b4320", "#e1bc68"]
+    : rarity === "Epic"
+      ? ["#1a345c", "#8bb9ef"]
+      : rarity === "Uncommon"
+        ? ["#243a3c", "#9db9b7"]
+        : ["#3b312b", "#d6a263"];
+  return {
+    id: "food-" + slug,
+    name,
+    set: "fastfood",
+    rarity,
+    value,
+    emoji: "🍔",
+    pattern: patterns[index % patterns.length],
+    colors,
+    image: "/img/fastfood/" + slug + ".png",
+    flavor: "A real restaurant-chain brand card. Its fictional sell value uses a broad popularity tier.",
+  };
+});
+
 const chases = [
   ["crocodilo", "Bombardiro Crocodilo", 10000, "🐊", "brainrot"],
   ["signet", "Gilded Signet", 20000, "🖋", "royal"],
@@ -295,6 +378,7 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
 export const catalog = [
   ...cards,
   ...fortniteCards,
+  ...fastFoodCards,
   ...chases,
   alpha,
   ...leaderData.cards.map(rateLeader),
@@ -304,7 +388,11 @@ export const catalog = [
   value:
     c.id === "kim" || c.id === "fortnite-renegade-raider"
       ? c.value
-      : Math.sign(c.value) * Math.round(Math.abs(c.value) * (c.set === "fortnite" && c.rarity === "Epic" ? 0.6 : 0.75)),
+      : c.name === "Donald Trump"
+        ? 50000
+        : c.set === "fastfood"
+          ? c.value
+          : Math.sign(c.value) * Math.round(Math.abs(c.value) * (c.set === "fortnite" && c.rarity === "Epic" ? 0.45 : 0.73)),
   flag: flags[c.country],
   page:
     c.role === "National flag"
@@ -552,6 +640,21 @@ export const packs = [
     color: "#a8a6ce",
     tag: "THE WORLD IS YOUR COLLECTION",
   },
+  {
+    id: "fastfood",
+    name: "Fast Food Legends Pack",
+    short: "FAST FOOD",
+    subtitle: "50 familiar chains, with a rare top-brand pull.",
+    price: 30000,
+    count: 5,
+    set: "fastfood",
+    odds: [76000000, 23900000, 99000, 1000, 0],
+    chase: "food-mcdonalds",
+    chaseOdds: 50000,
+    art: "fastfood",
+    color: "#df8c46",
+    tag: "50 REAL CHAINS · FICTIONAL CARD VALUES",
+  },
 ];
 const indexFamilies = Object.freeze({
   brainrot: { name: "Meme Hall", subtitle: "The internet oddities collection." },
@@ -559,17 +662,21 @@ const indexFamilies = Object.freeze({
   fortnite: { name: "Fortnite Field Guide", subtitle: "Every Fortnite character in the collection." },
   world: { name: "World Stage", subtitle: "Every leader and flag in the archive." },
   alpha: { name: "Mystery Gold", subtitle: "The one-off Alpha card." },
+  fastfood: { name: "Fast Food Hall of Fame", subtitle: "Fifty real chains, ranked in broad popularity tiers." },
 });
 export const indexSets = Object.freeze(
   Object.entries(indexFamilies).flatMap(([family, info]) => {
     const cards = catalog.filter((card) => card.set === family);
-    return Array.from({ length: Math.ceil(cards.length / 8) }, (_, index) => ({
-      id: family + "-set-" + String(index + 1).padStart(2, "0"),
-      family,
-      name: info.name + " · Set " + String(index + 1).padStart(2, "0"),
-      subtitle: info.subtitle + " Set " + (index + 1) + " of " + Math.ceil(cards.length / 8) + ".",
-      cardIds: cards.slice(index * 8, index * 8 + 8).map((card) => card.id),
-    }));
+    return Array.from({ length: Math.ceil(cards.length / 8) }, (_, index) => {
+      const cardIds = cards.slice(index * 8, index * 8 + 8).map((card) => card.id);
+      return {
+        id: family + "-set-" + String(index + 1).padStart(2, "0"),
+        family,
+        name: info.name + " · Set " + String(index + 1).padStart(2, "0") + " · " + cardIds.length + " cards",
+        subtitle: info.subtitle + " Collect all " + cardIds.length + " cards in this set to claim its reward.",
+        cardIds,
+      };
+    });
   }),
 );
 

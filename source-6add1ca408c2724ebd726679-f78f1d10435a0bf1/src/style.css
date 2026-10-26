@@ -5389,3 +5389,14 @@ body:has(dialog[open]) {
 .index-top-actions span{color:var(--gold);font-weight:800}.index-top-actions strong{font-size:.9rem}
 @media(max-width:900px){.header-index-cta{order:2;margin-left:auto;margin-right:auto;margin-bottom:14px}.header nav{order:4}.claim-dot{top:3px;right:0}}
 @media(max-width:520px){.header-index-cta{padding:8px 10px;font-size:11px}.index-top-actions{align-items:flex-start;flex-direction:column;gap:.35rem}}
+
+/* Compact two-row masthead keeps the main links readable across screen sizes. */
+.header{display:grid;grid-template-columns:minmax(190px,1fr) auto auto;grid-template-rows:auto auto;column-gap:clamp(14px,2vw,30px);row-gap:0;min-height:112px;padding:10px clamp(16px,3vw,48px);align-items:center}
+.header>.brand{grid-column:1;grid-row:1}
+.header-index-cta{grid-column:2;grid-row:1;margin:0}
+.header>.header-actions{grid-column:3;grid-row:1;justify-self:end}
+.header>nav{grid-column:1/-1;grid-row:2;width:100%;margin:0;min-width:0;justify-content:space-between;gap:clamp(8px,1.25vw,20px);overflow-x:auto;scrollbar-width:thin;scrollbar-color:rgba(226,202,142,.35) transparent}
+.header .nav-item{min-height:39px;padding:0 2px;font-size:clamp(10px,.78vw,12px)}
+.header .nav-item .icon{width:15px;height:15px}
+@media(max-width:900px){.header{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto auto;min-height:0;gap:7px 12px;padding:10px 16px}.header>.brand{grid-column:1;grid-row:1}.header>.header-actions{grid-column:2;grid-row:1}.header-index-cta{grid-column:1/-1;grid-row:2;justify-self:start;padding:7px 10px;font-size:11px}.header>nav{grid-column:1/-1;grid-row:3;justify-content:flex-start;gap:18px}.header .nav-item{min-height:36px;font-size:11px}.claim-dot{top:3px;right:0}}
+@media(max-width:520px){.header{padding:9px 12px}.header .brand{font-size:12px}.header .brand-secondary{font-size:9px}.header .brand-mark,.header .brand-mark .icon{width:27px;height:30px}.header-actions{gap:6px}.header-actions .wallet{gap:5px;padding:7px;font-size:10px}.header-actions>.button{padding:8px;font-size:10px}.header-index-cta{margin:0}.header>nav{gap:15px}.header .nav-item{font-size:10px}.header .nav-item .icon{width:14px;height:14px}}
