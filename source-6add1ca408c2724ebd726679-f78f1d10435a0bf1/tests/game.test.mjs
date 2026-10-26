@@ -507,8 +507,11 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   assert.equal(americanLeader.rarity, "Crown");
   assert.equal(greekLeader.rarity, "Uncommon");
   assert.equal(americanLeader.value, 2600);
-  assert.equal(greekLeader.value, 400);
+  assert.equal(greekLeader.value, 120);
   assert.ok(americanLeader.value > greekLeader.value);
+  assert.ok(
+    rateLeader({ name: "King Charles III", country: "Canada" }).value <= 400,
+  );
   assert.deepEqual(
     [
       rateLeader({ name: "Donald Trump", country: "United States" }).rarity,
@@ -528,6 +531,26 @@ test("leader ratings reflect country GDP and recognition while preserving featur
     catalog
       .filter((card) => card.set === "world")
       .every((card) => card.rarity && Number.isInteger(card.value)),
+  );
+  const nonUkCharles = catalog.filter((card) => card.name === "Charles III");
+  assert.equal(nonUkCharles.length, 14);
+  assert.ok(nonUkCharles.every((card) => card.value <= 400));
+  assert.ok(
+    catalog
+      .filter(
+        (card) =>
+          card.set === "world" &&
+          card.rarity === "Uncommon" &&
+          card.role !== "National flag",
+      )
+      .every((card) => card.value <= 400),
+  );
+  assert.ok(
+    catalog
+      .filter(
+        (card) => card.role === "National flag" && card.rarity === "Common",
+      )
+      .every((card) => card.value < 150),
   );
   const macronCards = catalog.filter((card) => card.name === "Emmanuel Macron");
   assert.ok(macronCards.length > 0);
@@ -607,6 +630,10 @@ test("every pack can lose, win modestly, or produce a 10x jackpot", () => {
     assert.ok(outcomes.smallWin > 0, `${pack.name} can return a small win`);
     assert.ok(outcomes.bigWin > 0, `${pack.name} can return at least 2x`);
     assert.ok(outcomes.jackpot > 0, `${pack.name} can return at least 10x`);
+    if (pack.id === "world") {
+      assert.ok(outcomes.loss > 6000 && outcomes.loss < 8000);
+      assert.ok(outcomes.jackpot > 20 && outcomes.jackpot < 200);
+    }
   }
 });
 
