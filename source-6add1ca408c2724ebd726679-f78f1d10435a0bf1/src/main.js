@@ -13,6 +13,7 @@ import {
   starterOdds,
   cardPowerup,
   loadoutPowerup,
+  indexSets,
 } from "../shared/catalog.mjs";
 import { dailySpinSegments, playReward } from "../shared/rules.mjs";
 const $ = (s, root = document) => root.querySelector(s);
@@ -195,6 +196,7 @@ const tabs = [
   "packs",
   "codex",
   "collection",
+  "index",
   "loadout",
   "upgrades",
   "pot",
@@ -203,7 +205,7 @@ const tabs = [
   "leaderboards",
 ];
 function shell() {
-  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${state.view === n ? "active" : ""}">${icon(n === "codex" ? "globe" : n === "upgrades" ? "spark" : n)}<span>${n === "pot" ? "The Pot" : n === "codex" ? "Leaders" : n[0].toUpperCase() + n.slice(1)}</span></a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="button ghost small settings-button" data-action="settings">${icon("settings")} Settings</button><button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
+  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${state.view === n ? "active" : ""}">${icon(n === "codex" || n === "index" ? "globe" : n === "upgrades" ? "spark" : n)}<span>${n === "pot" ? "The Pot" : n === "codex" ? "Leaders" : n === "index" ? "Card Index" : n[0].toUpperCase() + n.slice(1)}</span></a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="button ghost small settings-button" data-action="settings">${icon("settings")} Settings</button><button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
 }
 function title(eyebrow, heading, text) {
   return `<div class="page-heading"><span class="eyebrow">${eyebrow}</span><h1>${heading}</h1><p>${text}</p></div>`;
@@ -261,9 +263,11 @@ function packLoadoutSummary() {
     effect.epicBonus && `${effect.epicBonus > 0 ? "+" : ""}${(effect.epicBonus / 1000000).toFixed(2)}% Epic odds`,
     effect.crownBonus && `+${(effect.crownBonus / 1000000).toFixed(2)}% Crown odds`,
     effect.everyOtherCard && "Every 2nd card is Uncommon+",
+    state.account?.permanent_epic_bonus && `Permanent +${(Number(state.account.permanent_epic_bonus) / 1000000).toFixed(2)}% Epic odds`,
+    state.account?.permanent_crown_bonus && `Permanent +${(Number(state.account.permanent_crown_bonus) / 1000000).toFixed(2)}% Crown odds`,
     effect.packDiscount && "10p off every 3rd pack",
   ].filter(Boolean);
-  return `<aside class="pack-loadout-hud" aria-label="Equipped loadout effects"><span class="eyebrow">LOADOUT EFFECTS</span>${cards.length ? `<div class="pack-loadout-cards">${equipped.map((card) => `<span><strong>${esc(cardMap[card.template_id]?.name)}</strong><small>${esc(powerupDescription(cardPowerup(card)))}</small></span>`).join("")}</div><p>${totals.length ? totals.join(" · ") : "No odds changes active."}</p>` : "<p>No cards equipped.</p>"}</aside>`;
+  return `<aside class="pack-loadout-hud" aria-label="Equipped loadout effects"><span class="eyebrow">LOADOUT EFFECTS</span>${cards.length ? `<div class="pack-loadout-cards">${equipped.map((card) => `<span><strong>${esc(cardMap[card.template_id]?.name)}</strong><small>${esc(powerupDescription(cardPowerup(card)))}</small></span>`).join("")}</div>` : ""}<p>${totals.length ? totals.join(" · ") : "No odds changes active."}</p></aside>`;
 }
 function shop() {
   const visible = packs.filter((p) =>
@@ -385,6 +389,35 @@ function fortniteCollectionAlbum() {
     })
     .join("")}</div></section>`;
 }
+function indexView() {
+  const discovered = new Set([
+    ...(Array.isArray(state.account?.character_index) ? state.account.character_index : []),
+    ...(Array.isArray(state.account?.fortnite_collection) ? state.account.fortnite_collection : []),
+  ]);
+  const rewards = state.account?.set_rewards || {};
+  const epicBonus = Number(state.account?.permanent_epic_bonus || 0);
+  const crownBonus = Number(state.account?.permanent_crown_bonus || 0);
+  const sections = indexSets.map((set) => {
+    const cards = set.cardIds.map((id) => cardMap[id]).filter(Boolean);
+    const count = cards.filter((card) => discovered.has(card.id)).length;
+    const claimed = rewards[set.id];
+    const complete = count === cards.length;
+    const rewardButtons = !complete || claimed ? '' : '<div class="index-reward-actions"><strong>Choose a permanent set bonus</strong>' +
+      '<button class="button small" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="epic" ' + (epicBonus + 500000 > 1000000 ? 'disabled' : '') + '>+0.5% Epic chance</button>' +
+      '<button class="button small ghost" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="crown" ' + (crownBonus + 100000 > 100000 ? 'disabled' : '') + '>+0.1% Crown chance</button>' +
+      (epicBonus + 500000 > 1000000 && crownBonus + 100000 > 100000 ? '<button class="button small ghost" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="badge">Claim set badge</button>' : '') + '</div>';
+    const claimText = claimed === 'epic' ? 'Permanent +0.5% Epic chance claimed' : claimed === 'crown' ? 'Permanent +0.1% Crown chance claimed' : claimed === 'badge' ? 'Set completion badge claimed' : '';
+    return '<section class="index-set panel"><div class="index-set-heading"><div><span class="eyebrow">COLLECTION SET</span><h2>' + esc(set.name) + '</h2><p>' + esc(set.subtitle) + '</p></div><strong>' + count + ' / ' + cards.length + ' discovered</strong></div><div class="index-grid">' + cards.map((card, i) => {
+      const found = discovered.has(card.id);
+      return '<article class="index-card ' + (found ? 'index-found' : 'index-mystery') + '" aria-label="' + (found ? esc(card.name + ', ' + card.rarity) : 'Mystery card ' + (i + 1)) + '">' +
+        '<div class="index-card-art">' + (found ? '<img src="' + image(card.image, 360) + '" alt="' + esc(card.name) + '" loading="lazy">' : '<span aria-hidden="true">?</span>') + '</div>' +
+        '<small>' + (found ? esc(card.rarity.toUpperCase()) : 'UNDISCOVERED') + '</small><h3>' + (found ? esc(card.name) : 'Mystery card') + '</h3><p>' + (found ? money(card.value) + ' sell value' : 'Pull or trade for this card to reveal it.') + '</p></article>';
+    }).join('') + '</div>' + (claimText ? '<p class="index-claimed" role="status">' + claimText + '</p>' : rewardButtons) + '</section>';
+  }).join('');
+  const epicText = epicBonus ? '+' + (epicBonus / 1000000).toFixed(2) + '% Epic' : 'No Epic set bonus';
+  const crownText = crownBonus ? '+' + (crownBonus / 1000000).toFixed(2) + '% Crown' : 'No Crown set bonus';
+  $('#main').innerHTML = title('THE CARD ARCHIVE', 'Character index.', 'Reveal themed sets by collecting or trading for each card. Complete a set to claim a lasting odds bonus.') + '<div class="index-bonus-summary panel"><span class="eyebrow">PERMANENT SET BONUSES</span><strong>' + epicText + ' chance · ' + crownText + ' chance</strong><small>Account-wide caps: +1.00% Epic and +0.10% Crown. Bonuses are virtual game odds.</small></div>' + sections;
+}
 function collection() {
   const mine = state.inventory;
   let filtered = mine.filter((c) => {
@@ -487,7 +520,7 @@ function loadoutEffectModal(cardId) {
     after.crownBonus && `Crown odds ${points(after.crownBonus)}`,
   ].filter(Boolean).join(" · ") || "No net rarity odds adjustment.";
   showModal(
-    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Uncommon adjustments shift odds between Common and Uncommon. Positive Epic adjustments shift odds from Common, then Uncommon, into Epic; negative Epic adjustments return odds to Common. Renegade Raider shifts odds into Crown by up to 0.70 percentage points. Combined loadout adjustments are capped at ±0.60 percentage points for Uncommon and ±1.00 for Epic.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
+    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Uncommon adjustments shift odds between Common and Uncommon. Positive Epic adjustments shift odds from Common, then Uncommon, into Epic; negative Epic adjustments return odds to Common. Renegade Raider shifts odds into Crown by up to 0.70 percentage points. Loadout adjustments are capped at ±0.40 percentage points for Uncommon and ±0.75 for Epic.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
     "odds-effect-modal",
   );
 }
@@ -519,7 +552,7 @@ function loadoutView() {
       "Build your card loadout.",
       "Mix boosts and trade-offs to shape your pack odds. Equipped cards stay yours, but must be unequipped before selling, vaulting, or trading.",
     ) +
-    `<div class="loadout-summary panel"><div><span class="eyebrow">ACTIVE POWER</span><h2>${equipped.length} / ${slotLimit} cards equipped</h2><p>Epic odds effects combine to a maximum of ±4.00 percentage points. Frugal cards can reduce every third pack by 10p.</p></div>${slotLimit < 4 ? `<aside class="slot-upgrade"><span class="eyebrow">EXPAND YOUR STRATEGY</span><strong>Unlock a fourth card slot</strong><small>One-time purchase · ${money(35000)} virtual cash</small><button class="button small" data-action="loadout-upgrade" ${Number(state.account?.balance || 0) < 35000 ? "disabled" : ""}>${Number(state.account?.balance || 0) < 35000 ? "Need more virtual cash" : `Unlock slot · ${money(35000)}`}</button></aside>` : '<span class="slot-unlocked">FOURTH SLOT UNLOCKED</span>'}${equipped
+    `<div class="loadout-summary panel"><div><span class="eyebrow">ACTIVE POWER</span><h2>${equipped.length} / ${slotLimit} cards equipped</h2><p>Loadout odds shifts are capped at ±0.75 percentage points for Epic and ±0.40 for Uncommon. Index rewards are permanent but capped account-wide. Frugal cards can reduce every third pack by 10p.</p></div>${slotLimit < 4 ? `<aside class="slot-upgrade"><span class="eyebrow">EXPAND YOUR STRATEGY</span><strong>Unlock a fourth card slot</strong><small>One-time purchase · ${money(35000)} virtual cash</small><button class="button small" data-action="loadout-upgrade" ${Number(state.account?.balance || 0) < 35000 ? "disabled" : ""}>${Number(state.account?.balance || 0) < 35000 ? "Need more virtual cash" : `Unlock slot · ${money(35000)}`}</button></aside>` : '<span class="slot-unlocked">FOURTH SLOT UNLOCKED</span>'}${equipped
       .map((id) =>
         state.inventory.find((card) => Number(card.id) === Number(id)),
       )
@@ -801,6 +834,7 @@ function render() {
     ({
       packs: shop,
       collection,
+      index: indexView,
       loadout: loadoutView,
       upgrades: upgradesView,
       rewards: rewardsView,
@@ -826,7 +860,7 @@ window.addEventListener("hashchange", () => {
     render();
     if (
       state.user &&
-      ["collection", "loadout", "upgrades", "profile", "friends"].includes(v)
+      ["collection", "index", "loadout", "upgrades", "profile", "friends"].includes(v)
     )
       sync()
         .then(() => {
@@ -1274,6 +1308,18 @@ document.addEventListener("click", async (e) => {
           ? "Card equipped. Its power now affects pack odds."
           : "Card unequipped.",
       );
+      return;
+    }
+    if (action === "claim-index-reward") {
+      if (!requireUser()) return;
+      target.disabled = true;
+      try {
+        const result = await api("index/claim", { set_id: target.dataset.set, reward: target.dataset.reward });
+        state.account = result.account;
+        updateWallet();
+        render();
+        toast("Character set reward claimed.");
+      } catch (e) { target.disabled = false; throw e; }
       return;
     }
     if (action === "pack-opening-upgrade") {
