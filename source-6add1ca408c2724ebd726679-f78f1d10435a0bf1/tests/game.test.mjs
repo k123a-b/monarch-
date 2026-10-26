@@ -129,7 +129,7 @@ test("Fortnite Drop Pack keeps 50/50 loss odds while making Epic characters much
       cardMap["fortnite-midas"].value,
       cardMap["fortnite-renegade-raider"].value,
     ],
-    [1500, 3500, 3000, 10000, 17500, 25000, 400000],
+    [1500, 3500, 3000, 8000, 14000, 20000, 400000],
   );
   const fortniteCards = catalog.filter((card) => card.set === "fortnite");
   assert.equal(fortniteCards.length, 30);
@@ -848,3 +848,4 @@ test("a heartbeat crossing UTC midnight credits only the new day’s seconds", (
     steps: 0,
   });
 });
+

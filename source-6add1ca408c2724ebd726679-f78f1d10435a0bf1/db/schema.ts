@@ -30,6 +30,7 @@ export const accounts = pgTable("accounts", {
   loadout: integer().array().notNull().default([]),
   fortniteCollection: text("fortnite_collection").array().notNull().default([]),
   loadoutSlots: integer("loadout_slots").notNull().default(3),
+  packSlots: integer("pack_slots").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -117,3 +118,4 @@ export const trades = pgTable("trades", {
     .defaultNow()
     .notNull(),
 });
+

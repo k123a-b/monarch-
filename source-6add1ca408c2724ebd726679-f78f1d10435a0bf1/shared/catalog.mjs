@@ -304,7 +304,7 @@ export const catalog = [
   value:
     c.id === "kim" || c.id === "fortnite-renegade-raider"
       ? c.value
-      : Math.sign(c.value) * Math.round(Math.abs(c.value) * 0.75),
+      : Math.sign(c.value) * Math.round(Math.abs(c.value) * (c.set === "fortnite" && c.rarity === "Epic" ? 0.6 : 0.75)),
   flag: flags[c.country],
   page:
     c.role === "National flag"
@@ -712,3 +712,4 @@ export function packValueRange(pack) {
     .map((c) => c.value);
   return { min: Math.min(...values), max: Math.max(...values) };
 }
+

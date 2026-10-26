@@ -196,13 +196,14 @@ const tabs = [
   "codex",
   "collection",
   "loadout",
+  "upgrades",
   "pot",
   "friends",
   "rewards",
   "leaderboards",
 ];
 function shell() {
-  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${state.view === n ? "active" : ""}">${icon(n === "codex" ? "globe" : n)}<span>${n === "pot" ? "The Pot" : n === "codex" ? "Leaders" : n[0].toUpperCase() + n.slice(1)}</span></a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="button ghost small settings-button" data-action="settings">${icon("settings")} Settings</button><button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
+  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${state.view === n ? "active" : ""}">${icon(n === "codex" ? "globe" : n === "upgrades" ? "spark" : n)}<span>${n === "pot" ? "The Pot" : n === "codex" ? "Leaders" : n[0].toUpperCase() + n.slice(1)}</span></a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="button ghost small settings-button" data-action="settings">${icon("settings")} Settings</button><button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
 }
 function title(eyebrow, heading, text) {
   return `<div class="page-heading"><span class="eyebrow">${eyebrow}</span><h1>${heading}</h1><p>${text}</p></div>`;
@@ -785,6 +786,14 @@ function errorView(e) {
     `<div class="error-box" role="alert">${esc(e.message)} <button class="text-button" data-action="refresh">Try again</button></div>`;
   $(".loading-panel")?.remove();
 }
+function upgradesView() {
+  const slots = Math.max(1, Math.min(3, Number(state.account?.pack_slots || 1)));
+  const balance = Number(state.account?.balance || 0);
+  const upgrade = (target, price) => slots >= target
+    ? '<span class="slot-unlocked">' + target + '-PACK OPENINGS UNLOCKED</span>'
+    : '<article class="panel upgrade-card"><span class="eyebrow">PACK OPENING UPGRADE</span><h2>Open up to ' + target + ' packs</h2><p>Choose several copies of one pack and open them together.</p><strong>' + money(price) + ' virtual cash · one time</strong><button class="button" data-action="pack-opening-upgrade" data-slots="' + target + '" ' + (balance < price || slots < target - 1 ? 'disabled' : '') + '>' + (slots < target - 1 ? 'Unlock the previous step first' : balance < price ? 'Need more virtual cash' : 'Unlock · ' + money(price)) + '</button></article>';
+  $('#main').innerHTML = title('MAKE IT A BIGGER OPENING', 'Pack upgrades.', 'Unlock batch openings with virtual cash. Your opening limit is ' + slots + ' pack' + (slots === 1 ? '' : 's') + '.') + '<div class="upgrades-grid">' + upgrade(2,45000) + upgrade(3,55000) + '</div><p class="fine-print">The second slot costs £450. The third slot costs £550. Prices are fictional GBP.</p>';
+}
 function render() {
   renderVersion++;
   shell();
@@ -793,6 +802,7 @@ function render() {
       packs: shop,
       collection,
       loadout: loadoutView,
+      upgrades: upgradesView,
       rewards: rewardsView,
       pot: potView,
       friends: friendsView,
@@ -816,7 +826,7 @@ window.addEventListener("hashchange", () => {
     render();
     if (
       state.user &&
-      ["collection", "loadout", "profile", "friends"].includes(v)
+      ["collection", "loadout", "upgrades", "profile", "friends"].includes(v)
     )
       sync()
         .then(() => {
@@ -903,30 +913,33 @@ function sound(rarity) {
 async function buyPack(id) {
   if (!requireUser()) return;
   await sync();
-  const p = packs.find((p) => p.id === id);
-  const discount = nextPackDiscount();
-  const price = packPrice(p);
-  if (Number(state.account?.balance) < price) {
-    toast("Not enough virtual cash. Sell cards or earn active-play rewards.");
-    return;
-  }
-  showModal(
-    `<span class="eyebrow">YOUR NEXT ROYAL MISTAKE</span><h2>Open ${p.name}?</h2><p>${p.count} cards. Independent random rolls. One pack costs ${money(p.price)} of virtual cash${discount ? `, reduced to <strong>${money(price)}</strong> by your loadout` : ""}.</p>${guaranteeProgress()}<div class="purchase-preview">${packArt(p)}</div><p class="fine-print">You might pull less than you spend, or something worth much more. Chase odds: 1 in ${p.chaseOdds.toLocaleString()}.${p.id === "world" ? " Includes former leaders and a satirical −£25 Keir Starmer card. Negative cards reduce collection value; discarding one charges its penalty. No automatic penalty debit on opening." : ""}</p><button class="button full" data-action="confirm-buy" data-id="${p.id}">Open for ${money(price)} ${icon("arrow")}</button>`,
-    "purchase-modal",
-  );
+  const p = packs.find((entry) => entry.id === id);
+  const limit = Math.max(1, Math.min(3, Number(state.account?.pack_slots || 1)));
+  const opened = Number(state.account?.packs || 0);
+  const discountPerMilestone = (() => {
+    const equippedCards = (state.account?.loadout || []).map((cardId) => state.inventory.find((card) => Number(card.id) === Number(cardId))).filter(Boolean).map((card) => cardMap[card.template_id]).filter(Boolean);
+    return loadoutPowerup(equippedCards).packDiscount;
+  })();
+  const buttons = Array.from({length: limit}, (_, index) => index + 1).map((quantity) => {
+    const milestones = Math.floor((opened + quantity) / 3) - Math.floor(opened / 3);
+    const discount = Math.min(p.price * quantity, discountPerMilestone * milestones);
+    const price = p.price * quantity - discount;
+    return '<button class="button full" data-action="confirm-buy" data-id="' + p.id + '" data-quantity="' + quantity + '" ' + (Number(state.account?.balance || 0) < price ? 'disabled' : '') + '>Open ' + quantity + ' pack' + (quantity === 1 ? '' : 's') + ' for ' + money(price) + (discount ? ' · saves ' + money(discount) : '') + ' ' + icon('arrow') + '</button>';
+  }).join('');
+  showModal('<span class="eyebrow">YOUR NEXT ROYAL MISTAKE</span><h2>Open ' + p.name + '?</h2><p>' + p.count + ' cards per pack. Select how many identical packs to open. One-time limit: ' + limit + '.</p>' + guaranteeProgress() + '<div class="purchase-preview">' + packArt(p) + '</div><p class="fine-print">You might pull less than you spend, or something worth much more. Chase odds: 1 in ' + p.chaseOdds.toLocaleString() + '.' + (p.id === 'world' ? ' Includes former leaders and a satirical −£25 Keir Starmer card. Negative cards reduce collection value; discarding one charges its penalty. No automatic penalty debit on opening.' : '') + '</p><div class="purchase-quantities">' + buttons + '</div>', 'purchase-modal');
 }
-async function openPack(id) {
+async function openPack(id, quantity = 1) {
   if (state.busy) return;
   state.busy = true;
   state.lastOpenedPackId = id;
   const p = packs.find((p) => p.id === id);
   showModal(
-    `${packLoadoutSummary()}<span class="eyebrow">THE COURT HOLDS ITS BREATH</span><h2>A little suspense…</h2><div class="opening-pack">${packArt(p)}</div><p class="muted">Opening your ${p.name}.</p>`,
+    `${packLoadoutSummary()}<span class="eyebrow">THE COURT HOLDS ITS BREATH</span><h2>A little suspense…</h2><div class="opening-pack">${packArt(p)}</div><p class="muted">Opening ${quantity} ${p.name} pack${quantity === 1 ? "" : "s"}.</p>`,
     "opening-modal",
   );
   try {
     const [result] = await Promise.all([
-      api("open", { pack: id }),
+      api("open", { pack: id, quantity }),
       new Promise((resolve) => setTimeout(resolve, 950)),
     ]);
     state.account = result.account;
@@ -938,7 +951,7 @@ async function openPack(id) {
     const total = cards.reduce((s, c) => s + Number(c.value), 0);
     function revealMarkup() {
       showModal(
-        `${packLoadoutSummary()}<span class="eyebrow">${esc(p.name.toUpperCase())} · ${revealed} / ${cards.length} REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}${result.discount ? `<p class="guarantee-earned" role="status">Loadout discount · ${money(Number(result.discount))} off this pack</p>` : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= p.price - Number(result.discount || 0) ? "positive" : "negative"}">${total >= p.price - Number(result.discount || 0) ? "+" : ""}${money(total - p.price + Number(result.discount || 0))} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : ""}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "Open another pack" : "Reveal all cards"} ${icon("arrow")}</button>`,
+        `${packLoadoutSummary()}<span class="eyebrow">${esc(p.name.toUpperCase())} · ${quantity} PACK${quantity === 1 ? "" : "S"} · ${revealed} / ${cards.length} CARDS REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}${result.discount ? `<p class="guarantee-earned" role="status">Loadout discount · ${money(Number(result.discount))} off this opening</p>` : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= Number(result.pricePaid ?? (p.price * quantity - Number(result.discount || 0))) ? "positive" : "negative"}">${total >= Number(result.pricePaid ?? (p.price * quantity - Number(result.discount || 0))) ? "+" : ""}${money(total - Number(result.pricePaid ?? (p.price * quantity - Number(result.discount || 0))))} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : ""}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "Open another pack" : "Reveal all cards"} ${icon("arrow")}</button>`,
         "reveal-modal",
       );
     }
@@ -1263,6 +1276,18 @@ document.addEventListener("click", async (e) => {
       );
       return;
     }
+    if (action === "pack-opening-upgrade") {
+      if (!requireUser()) return;
+      target.disabled = true;
+      try {
+        const result = await api("upgrades/pack-opening", { pack_slots: Number(target.dataset.slots) });
+        state.account = result.account;
+        updateWallet();
+        render();
+        toast(Number(result.account.pack_slots) === 2 ? "Two-pack openings unlocked." : "Three-pack openings unlocked.");
+      } catch (e) { target.disabled = false; throw e; }
+      return;
+    }
     if (action === "loadout-upgrade") {
       if (!requireUser()) return;
       target.disabled = true;
@@ -1385,7 +1410,7 @@ document.addEventListener("click", async (e) => {
     if (action === "odds") return oddsModal(id);
     if (action === "all-odds") return oddsModal();
     if (action === "buy") return buyPack(id);
-    if (action === "confirm-buy") return openPack(id);
+    if (action === "confirm-buy") return openPack(id, Number(target.dataset.quantity || 1));
     if (action === "claim-starter") {
       if (!requireUser() || state.busy) return;
       showModal(
@@ -1771,3 +1796,4 @@ function codexView() {
         "",
       )}</div>${matched.length > state.rosterLimit ? '<button class="button ghost full" data-action="roster-more">Show more cards ' + icon("arrow") + "</button>" : ""}`;
 }
+
