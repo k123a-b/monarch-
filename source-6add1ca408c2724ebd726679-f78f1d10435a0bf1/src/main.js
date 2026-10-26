@@ -95,7 +95,9 @@ const art = (pack) =>
   image(
     pack.art === "world"
       ? "/img/mystery-leader.svg"
-      : "/img/" + pack.art + ".png",
+      : pack.art === "fortnite"
+        ? cardMap["fortnite-renegade-raider"].image
+        : "/img/" + pack.art + ".png",
   );
 // Retry the original if image transformation fails, then use a bundled fallback.
 document.addEventListener(
@@ -235,22 +237,41 @@ function nextPackDiscount() {
 function packPrice(pack) {
   return Math.max(0, pack.price - nextPackDiscount());
 }
+function powerupDescription(powerup) {
+  const effects = [];
+  if (powerup.everyOtherCard) effects.push("Every 2nd pack card · Uncommon+");
+  if (powerup.epicBonus)
+    effects.push(`${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`);
+  if (powerup.crownBonus)
+    effects.push(`+${(powerup.crownBonus / 1000000).toFixed(2)}% Crown odds`);
+  if (powerup.packDiscount) effects.push("10p off every 3rd pack");
+  return effects.join(" · ") || "No power-up";
+}
+function packLoadoutSummary() {
+  const equipped = (state.account?.loadout || [])
+    .map((id) => state.inventory.find((card) => Number(card.id) === Number(id)))
+    .filter(Boolean);
+  const cards = equipped.map((card) => cardMap[card.template_id]).filter(Boolean);
+  const effect = loadoutPowerup(cards);
+  const totals = [
+    effect.epicBonus && `${effect.epicBonus > 0 ? "+" : ""}${(effect.epicBonus / 1000000).toFixed(2)}% Epic odds`,
+    effect.crownBonus && `+${(effect.crownBonus / 1000000).toFixed(2)}% Crown odds`,
+    effect.everyOtherCard && "Every 2nd card is Uncommon+",
+    effect.packDiscount && "10p off every 3rd pack",
+  ].filter(Boolean);
+  return `<aside class="pack-loadout-hud" aria-label="Equipped loadout effects"><span class="eyebrow">LOADOUT EFFECTS</span>${cards.length ? `<div class="pack-loadout-cards">${equipped.map((card) => `<span><strong>${esc(cardMap[card.template_id]?.name)}</strong><small>${esc(powerupDescription(cardPowerup(card)))}</small></span>`).join("")}</div><p>${totals.length ? totals.join(" · ") : "No odds changes active."}</p>` : "<p>No cards equipped.</p>"}</aside>`;
+}
 function shop() {
   const visible = packs.filter((p) =>
-    state.filter === "all"
-      ? true
-      : state.filter === "brainrot"
-        ? p.set === "brainrot"
-        : state.filter === "royal"
-          ? p.set === "royal"
-          : p.set === "world",
+    state.filter === "all" ? true : p.set === state.filter,
   );
   $("#main").innerHTML =
-    `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="tiny-crown">${icon("crown")}</span> WELCOME TO YOUR KINGDOM</div><h1>Chaos is<br><span>collectible.</span></h1><p>Ridiculous cards. Royal-level pulls.<br>Open packs, trade with your court, and play for the pot.</p><div class="hero-buttons"><a href="#shop" class="button" data-action="scroll-shop">Explore packs ${icon("arrow")}</a><button class="button ghost" data-action="how">How it works ${icon("info")}</button></div><div class="hero-note"><span class="green-dot"></span> Real fun. Fictional money. <span>Always.</span></div></div><div class="hero-stage" aria-label="Featured collectible cards"><div class="orbital"></div><span class="stage-star s1">✦</span><span class="stage-star s2">✧</span><div class="hero-card back-left"><div class="ornate-corner"></div><img src="${image("/img/royal.png")}" alt="Royal crown"><span>THE ROYAL COURT</span><strong>Crown of Eternity</strong><b>CROWN • ${money(6000)}</b></div><div class="hero-card back-right"><img src="${image("/img/apex.png")}" alt="Mystery Gold crown"><span>THE ONE. THE ONLY.</span><strong>Mystery Gold</strong><b>ALPHA • SERIAL № 001</b></div><div class="hero-card front"><div class="hero-card-top">${icon("crown")} THE BRAINROT COLLECTION <span>001</span></div><img src="${image("/img/brainrot.png", 650)}" alt="Tralalero Tralala, a crowned shark wearing blue sneakers"><div class="hero-card-bottom"><span>COMMON</span><strong>Tralalero<br>Tralala</strong><small>All hail the king of absolutely nothing.</small><div><span>SELL VALUE</span><b>£0.28</b></div></div></div><div class="floating-label">${icon("spark")} Your next legendary pull?</div></div></section><section class="trust-strip"><div>${icon("rewards")}<span><strong>£5 on the house</strong><small>Your welcome bonus awaits.</small></span></div><div>${icon("collection")}<span><strong>Collect. Trade. Reign.</strong><small>Build a collection fit for a monarch.</small></span></div><div>${icon("coin")}<span><strong>Growing play rewards</strong><small>Earn more the longer you play.</small></span></div><span class="play-label">100% VIRTUAL<br><strong>0% REAL MONEY</strong></span></section><section id="shop" class="shop-section"><div class="section-heading"><div><span class="eyebrow">THE ROYAL PACK SHOP</span><h2>Pick your poison.<span> Or your crown.</span></h2></div><button class="text-button odds-link" data-action="all-odds">${icon("info")} Transparent odds. Always.</button></div>${guaranteeProgress()}<div class="shop-filters" role="group" aria-label="Pack collection"><div>${[
+    `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="tiny-crown">${icon("crown")}</span> WELCOME TO YOUR KINGDOM</div><h1>Chaos is<br><span>collectible.</span></h1><p>Ridiculous cards. Royal-level pulls.<br>Open packs, trade with your court, and play for the pot.</p><div class="hero-buttons"><a href="#shop" class="button" data-action="scroll-shop">Explore packs ${icon("arrow")}</a><button class="button ghost" data-action="how">How it works ${icon("info")}</button></div><div class="hero-note"><span class="green-dot"></span> Real fun. Fictional money. <span>Always.</span></div></div><div class="hero-stage" aria-label="Featured collectible cards"><div class="orbital"></div><span class="stage-star s1">✦</span><span class="stage-star s2">✧</span><div class="hero-card back-left"><div class="ornate-corner"></div><img src="${image("/img/royal.png")}" alt="Royal crown"><span>THE ROYAL COURT</span><strong>Crown of Eternity</strong><b>CROWN • ${money(4500)}</b></div><div class="hero-card back-right"><img src="${image("/img/apex.png")}" alt="Mystery Gold crown"><span>THE ONE. THE ONLY.</span><strong>Mystery Gold</strong><b>ALPHA • SERIAL № 001</b></div><div class="hero-card front"><div class="hero-card-top">${icon("crown")} THE BRAINROT COLLECTION <span>001</span></div><img src="${image("/img/brainrot.png", 650)}" alt="Tralalero Tralala, a crowned shark wearing blue sneakers"><div class="hero-card-bottom"><span>COMMON</span><strong>Tralalero<br>Tralala</strong><small>All hail the king of absolutely nothing.</small><div><span>SELL VALUE</span><b>£0.21</b></div></div></div><div class="floating-label">${icon("spark")} Your next legendary pull?</div></div></section><section class="trust-strip"><div>${icon("rewards")}<span><strong>£5 on the house</strong><small>Your welcome bonus awaits.</small></span></div><div>${icon("collection")}<span><strong>Collect. Trade. Reign.</strong><small>Build a collection fit for a monarch.</small></span></div><div>${icon("coin")}<span><strong>Growing play rewards</strong><small>Earn more the longer you play.</small></span></div><span class="play-label">100% VIRTUAL<br><strong>0% REAL MONEY</strong></span></section><section id="shop" class="shop-section"><div class="section-heading"><div><span class="eyebrow">THE ROYAL PACK SHOP</span><h2>Pick your poison.<span> Or your crown.</span></h2></div><button class="text-button odds-link" data-action="all-odds">${icon("info")} Transparent odds. Always.</button></div>${guaranteeProgress()}<div class="shop-filters" role="group" aria-label="Pack collection"><div>${[
       ["all", "All packs"],
       ["brainrot", "Brainrot collection"],
       ["royal", "The royal court"],
       ["world", "World leaders"],
+      ["fortnite", "Fortnite"],
     ]
       .map(
         ([id, label]) =>
@@ -258,7 +279,7 @@ function shop() {
       )
       .join(
         "",
-      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase and Alpha values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>Open pack ${icon("arrow")}</span><b>${money(packPrice(p))}</b></button>${nextPackDiscount() ? '<small class="discount-hint">Loadout boost · 10p off this pack</small>' : ""}${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack" : `Chase pull · 1 in ${p.chaseOdds.toLocaleString()}`}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£250</strong><small>Mystery leader · virtual sell value</small><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("collection", "large-icon")}</a></div></section>`;
+      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product ${state.lastOpenedPackId === p.id ? "last-opened" : ""}" data-pack-id="${p.id}" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : p.set === "fortnite" ? "FORTNITE" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase and Alpha values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>${state.lastOpenedPackId === p.id ? "Open this pack again" : "Open pack"} ${icon("arrow")}</span><b>${money(packPrice(p))}</b></button>${nextPackDiscount() ? '<small class="discount-hint">Loadout boost · 10p off this pack</small>' : ""}${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack" : `Chase pull · 1 in ${p.chaseOdds.toLocaleString()}`}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£15,000</strong><small>Mystery leader · virtual sell value</small><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("collection", "large-icon")}</a></div></section>`;
 }
 function gameCard(
   row,
@@ -319,21 +340,18 @@ function gameCard(
       : `<div class="card-portrait">${countryFlag}<img src="${image(t.image || (t.set === "world" ? "/img/leader-placeholder.svg" : "/img/apex.png"), 400)}" loading="lazy" alt="${portraitAlt}"></div>`;
   const powerup = cardPowerup(t);
   const noPowerup =
-    powerup.epicBonus === 0 && !powerup.packDiscount && !powerup.everyOtherCard;
-  const powerupText = powerup.everyOtherCard
-    ? "Every 2nd pack card · Uncommon+"
-    : powerup.packDiscount
-      ? "10p off every 3rd pack"
-      : noPowerup
-        ? "No power-up"
-        : `${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`;
+    powerup.epicBonus === 0 &&
+    !powerup.crownBonus &&
+    !powerup.packDiscount &&
+    !powerup.everyOtherCard;
+  const powerupText = powerupDescription(powerup);
   const loadoutIds = state.account?.loadout || [];
   const equipped = owned && loadoutIds.includes(Number(row.id));
   const slotLimit = Number(state.account?.loadout_slots || 3);
   const loadoutFull = loadoutIds.length >= slotLimit && !equipped;
   const boostTone = noPowerup
     ? "boost-none"
-    : powerup.epicBonus > 0
+    : powerup.epicBonus > 0 || powerup.crownBonus > 0
       ? "boost-positive"
       : powerup.epicBonus < 0
         ? "boost-negative"
@@ -365,6 +383,7 @@ function collection() {
       ["brainrot", "Brainrot"],
       ["royal", "Royal court"],
       ["world", "World leaders"],
+      ["fortnite", "Fortnite"],
       ["alpha", "Mystery Gold"],
     ]
       .map(
@@ -398,30 +417,40 @@ function loadoutEffectModal(cardId) {
     : previewAtCapacity
       ? current
       : loadoutPowerup([...equippedCards, row]);
-  const change = previewAtCapacity
+  const epicChange = previewAtCapacity
     ? powerup.epicBonus
     : after.epicBonus - before.epicBonus;
+  const crownChange = previewAtCapacity
+    ? powerup.crownBonus || 0
+    : after.crownBonus - before.crownBonus;
   const points = (value) =>
     `${value > 0 ? "+" : ""}${(value / 1000000).toFixed(2)} percentage points`;
   const effects = [];
-  if (change)
+  if (epicChange)
     effects.push(
       previewAtCapacity
-        ? `This card's power would ${change > 0 ? "increase" : "decrease"} Epic odds by ${points(change)} if equipped.`
-        : `Epic odds ${change > 0 ? "increase" : "decrease"} by ${points(change)}.`,
+        ? `This card would ${epicChange > 0 ? 'increase' : 'decrease'} Epic odds by ${points(epicChange)} if equipped.`
+        : `Epic odds ${epicChange > 0 ? 'increase' : 'decrease'} by ${points(epicChange)}.`,
     );
   else effects.push("This card makes no additional change to Epic odds.");
+  if (crownChange)
+    effects.push(
+      previewAtCapacity
+        ? `This card would increase Crown odds by ${points(crownChange)} if equipped.`
+        : `Crown odds increase by ${points(crownChange)}.`,
+    );
   if (powerup.everyOtherCard)
     effects.push("Every second card in a pack is guaranteed Uncommon or better.");
   if (powerup.packDiscount)
     effects.push(`Every third pack costs ${powerup.packDiscount}p less.`);
-  if (!change && !powerup.everyOtherCard && !powerup.packDiscount)
+  if (!epicChange && !crownChange && !powerup.everyOtherCard && !powerup.packDiscount)
     effects.push("This card has no active odds or price effect.");
-  const combined = after.epicBonus
-    ? `With this card, your loadout shifts ${points(after.epicBonus)} into Epic odds.`
-    : "With this card, your loadout has no net Epic odds adjustment.";
+  const combined = [
+    after.epicBonus && `Epic odds ${points(after.epicBonus)}`,
+    after.crownBonus && `Crown odds ${points(after.crownBonus)}`,
+  ].filter(Boolean).join(" · ") || "No net rarity odds adjustment.";
   showModal(
-    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Positive adjustments shift odds from Common, then Uncommon, into Epic. Negative adjustments shift odds from Epic to Common. The loadout adjustment is capped at ±4.00 percentage points.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
+    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Positive Epic adjustments shift odds from Common, then Uncommon, into Epic. Negative Epic adjustments shift odds from Epic to Common. Renegade Raider shifts odds from Common/Uncommon into Crown by up to 0.70 percentage points. Epic adjustments are capped at ±4.00 percentage points.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
     "odds-effect-modal",
   );
 }
@@ -810,7 +839,7 @@ function oddsModal(id) {
       )
       .join(
         "",
-      )}<p class="fine-print">Chase rolls are separate and replace the lowest-value eligible card. Alpha cards are never replaced. No duplicate template unless its rarity pool is exhausted. Mystery Gold: £10,000 base value, globally numbered. All values are fictional.</p>`,
+      )}<p class="fine-print">Chase rolls are separate and replace the lowest-value eligible card. Alpha cards are never replaced. No duplicate template unless its rarity pool is exhausted. Mystery Gold: £7,500 base value, globally numbered. All values are fictional.</p>`,
     "odds-modal",
   );
 }
@@ -853,9 +882,10 @@ async function buyPack(id) {
 async function openPack(id) {
   if (state.busy) return;
   state.busy = true;
+  state.lastOpenedPackId = id;
   const p = packs.find((p) => p.id === id);
   showModal(
-    `<span class="eyebrow">THE COURT HOLDS ITS BREATH</span><h2>A little suspense…</h2><div class="opening-pack">${packArt(p)}</div><p class="muted">Opening your ${p.name}.</p>`,
+    `${packLoadoutSummary()}<span class="eyebrow">THE COURT HOLDS ITS BREATH</span><h2>A little suspense…</h2><div class="opening-pack">${packArt(p)}</div><p class="muted">Opening your ${p.name}.</p>`,
     "opening-modal",
   );
   try {
@@ -872,7 +902,7 @@ async function openPack(id) {
     const total = cards.reduce((s, c) => s + Number(c.value), 0);
     function revealMarkup() {
       showModal(
-        `<span class="eyebrow">${esc(p.name.toUpperCase())} · ${revealed} / ${cards.length} REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}${result.discount ? `<p class="guarantee-earned" role="status">Loadout discount · ${money(Number(result.discount))} off this pack</p>` : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= p.price - Number(result.discount || 0) ? "positive" : "negative"}">${total >= p.price - Number(result.discount || 0) ? "+" : ""}${money(total - p.price + Number(result.discount || 0))} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : ""}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "To my collection" : "Reveal all cards"} ${icon("arrow")}</button>`,
+        `${packLoadoutSummary()}<span class="eyebrow">${esc(p.name.toUpperCase())} · ${revealed} / ${cards.length} REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}${result.discount ? `<p class="guarantee-earned" role="status">Loadout discount · ${money(Number(result.discount))} off this pack</p>` : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= p.price - Number(result.discount || 0) ? "positive" : "negative"}">${total >= p.price - Number(result.discount || 0) ? "+" : ""}${money(total - p.price + Number(result.discount || 0))} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : ""}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "Open another pack" : "Reveal all cards"} ${icon("arrow")}</button>`,
         "reveal-modal",
       );
     }
@@ -1048,17 +1078,18 @@ async function openPack(id) {
           animationTimer = setTimeout(() => {
             releaseEffects();
             if (hasKim && modal.open)
-              toast("SUPREME PULL · KIM JONG UN · £250 VIRTUAL");
+              toast("SUPREME PULL · KIM JONG UN · £15,000 VIRTUAL");
           }, duration);
         } else {
           releaseEffects();
-          if (hasKim) toast("SUPREME PULL · KIM JONG UN · £250 VIRTUAL");
+          if (hasKim) toast("SUPREME PULL · KIM JONG UN · £15,000 VIRTUAL");
         }
       }
       if (b.dataset.action === "reveal-done") {
         modal.removeEventListener("click", handler);
         closeModal();
-        navigate("collection");
+        render();
+        document.querySelector(`[data-pack-id="${id}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
       }
       if (b.dataset.action === "sell-pack") {
         modal.removeEventListener("click", handler);
@@ -1362,7 +1393,7 @@ document.addEventListener("click", async (e) => {
       state.selected.clear();
       await sync();
       closeModal();
-      navigate("collection");
+      render();
       toast("Cards sold. The treasury thanks you.");
       return;
     }
@@ -1684,7 +1715,7 @@ function codexView() {
       "A world of questionable power.",
       `${all.length - 40} leader cards and 40 standalone national flag cards. Browse the flags separately or explore the full collection.`,
     ) +
-    `<div class="codex-intro panel"><div><h2>Leaders and 40 standalone national flags</h2><p>The £10 World Leaders Pack contains four independently rolled cards. The mystery chase leader is isolated from normal pools: a separate 1-in-45,000 pack roll, with a £250 virtual sell value and a special unlock animation. Its identity stays hidden until you reveal the card. King Charles III is an Epic worth £75; Donald Trump is an Epic worth £230; and Israel’s flag is an Epic worth £50. Flag rarity and value are fictional game assignments based on a broad power-tier estimate, not real-world financial values.</p></div><button class="button" data-action="buy" data-id="world">Open for £10 ${icon("arrow")}</button></div><div class="toolbar"><input id="roster-search" aria-label="Search leaders or countries" placeholder="Search leaders, flags, countries, or roles…" value="${esc(state.rosterSearch)}"><div class="roster-filters" role="group" aria-label="Filter the World Leaders collection">${filters.map(([filter, label]) => `<button class="button ghost small ${state.rosterKind === filter ? "active" : ""}" data-action="roster-filter" data-filter="${filter}" aria-pressed="${state.rosterKind === filter}">${label}</button>`).join("")}</div><button class="button ghost small" data-action="odds" data-id="world">Pack odds ${icon("info")}</button></div><p class="source-note">Roster snapshot: ${esc(leaderSource.retrieved)}. <a href="${esc(leaderSource.source)}" target="_blank" rel="noopener noreferrer">Current heads of state and government ↗</a>. Flag values are fictional game ratings informed by a broad power-tier estimate; they do not represent real-world value. Portrait links on leader cards provide individual sources.</p><p class="muted">${matched.length} matching cards · Showing ${Math.min(matched.length, state.rosterLimit)}</p><div class="collection-grid">${matched
+    `<div class="codex-intro panel"><div><h2>Leaders and 40 standalone national flags</h2><p>The £10 World Leaders Pack contains four independently rolled cards. The mystery chase leader is isolated from normal pools: a separate 1-in-45,000 pack roll, with a £15,000 virtual sell value and a special unlock animation. Its identity stays hidden until you reveal the card. King Charles III is an Epic worth £56.25; Donald Trump is an Epic worth £172.50; and Israel’s flag is an Epic worth £37.50. Flag rarity and value are fictional game assignments based on a broad power-tier estimate, not real-world financial values.</p></div><button class="button" data-action="buy" data-id="world">Open for £10 ${icon("arrow")}</button></div><div class="toolbar"><input id="roster-search" aria-label="Search leaders or countries" placeholder="Search leaders, flags, countries, or roles…" value="${esc(state.rosterSearch)}"><div class="roster-filters" role="group" aria-label="Filter the World Leaders collection">${filters.map(([filter, label]) => `<button class="button ghost small ${state.rosterKind === filter ? "active" : ""}" data-action="roster-filter" data-filter="${filter}" aria-pressed="${state.rosterKind === filter}">${label}</button>`).join("")}</div><button class="button ghost small" data-action="odds" data-id="world">Pack odds ${icon("info")}</button></div><p class="source-note">Roster snapshot: ${esc(leaderSource.retrieved)}. <a href="${esc(leaderSource.source)}" target="_blank" rel="noopener noreferrer">Current heads of state and government ↗</a>. Flag values are fictional game ratings informed by a broad power-tier estimate; they do not represent real-world value. Portrait links on leader cards provide individual sources.</p><p class="muted">${matched.length} matching cards · Showing ${Math.min(matched.length, state.rosterLimit)}</p><div class="collection-grid">${matched
       .slice(0, state.rosterLimit)
       .map((c) => gameCard(c))
       .join(

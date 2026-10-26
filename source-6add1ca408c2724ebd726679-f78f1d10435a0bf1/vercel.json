@@ -36,6 +36,11 @@
         "protocol": "https",
         "hostname": "thumb.wikimedia.org",
         "pathname": "/**"
+      },
+      {
+        "protocol": "https",
+        "hostname": "fortnite-api.com",
+        "pathname": "/images/**"
       }
     ]
   }

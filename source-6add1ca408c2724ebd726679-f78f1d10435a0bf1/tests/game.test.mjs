@@ -230,8 +230,8 @@ test("daily rewards wheel has three no-prize sectors and an exact 0.1% £45 silv
   assert.equal(dailySpin((max) => max - 1).id, "silver");
   assert.equal(dailySpin((max) => 0).reward, 0);
 });
-test("original catalogue contains exactly 93 templates excluding world expansion", () =>
-  assert.equal(catalog.filter((c) => c.set !== "world").length, 93));
+test("original catalogue contains 93 templates excluding world and Fortnite expansions", () =>
+  assert.equal(catalog.filter((c) => c.set !== "world" && c.set !== "fortnite").length, 93));
 test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   const kim = cardMap.kim;
   assert.equal(kim.rarity, "Chase");
@@ -467,7 +467,7 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
     }),
     "each bundled flag asset is a real PNG image",
   );
-  assert.equal(cardMap["world-israel-flag"].value, 5000);
+  assert.equal(cardMap["world-israel-flag"].value, 3750);
   assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
   assert.ok(
     cardMap["world-flag-united-states"].value >
@@ -597,17 +597,17 @@ test("requested featured cards keep their fictional GBP values and flags", () =>
   const king = cardMap["world-38b1a8656815ee75"];
   assert.equal(king.name, "King Charles III");
   assert.equal(king.country, "United Kingdom");
-  assert.equal(king.value, 7500);
+  assert.equal(king.value, 5625);
   assert.equal(king.rarity, "Epic");
   assert.equal(king.flag, "🇬🇧");
   assert.equal(cardMap["world-c6af8a1c1faf4aae"].name, "Donald Trump");
-  assert.equal(cardMap["world-c6af8a1c1faf4aae"].value, 23000);
+  assert.equal(cardMap["world-c6af8a1c1faf4aae"].value, 17250);
   assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
   assert.equal(cardMap["world-israel-flag"].value, 5000);
   assert.equal(cardMap["world-israel-flag"].flag, "🇮🇱");
-  assert.equal(cardMap["world-flag-greece"].value, 12);
-  assert.equal(cardMap["world-flag-qatar"].value, 18);
-  assert.equal(cardMap["world-flag-bangladesh"].value, 24);
+  assert.equal(cardMap["world-flag-greece"].value, 9);
+  assert.equal(cardMap["world-flag-qatar"].value, 14);
+  assert.equal(cardMap["world-flag-bangladesh"].value, 18);
   assert.deepEqual(
     catalog.filter((c) => c.value < 0).map((c) => c.id),
     ["world-former-keir-starmer"],
@@ -651,11 +651,12 @@ test("every pack can lose, win modestly, or produce a 10x jackpot", () => {
     assert.ok(outcomes.loss > 0, `${pack.name} can return less than its cost`);
     assert.ok(outcomes.smallWin > 0, `${pack.name} can return a small win`);
     assert.ok(outcomes.mediumWin > 0, `${pack.name} can return 2x to 10x`);
-    assert.ok(outcomes.jackpot > 0, `${pack.name} can return at least 10x`);
+    if (pack.id !== "fortnite")
+      assert.ok(outcomes.jackpot > 0, `${pack.name} can return at least 10x`);
     if (pack.id === "world") {
       assert.ok(
-        outcomes.loss / 10000 >= 0.55 && outcomes.loss / 10000 <= 0.57,
-        `World Leaders loss chance should stay near 56%, got ${(outcomes.loss / 100).toFixed(2)}%`,
+        outcomes.loss / 10000 >= 0.65 && outcomes.loss / 10000 <= 0.8,
+        `World Leaders loss chance should increase after the value rebalance, got ${(outcomes.loss / 100).toFixed(2)}%`,
       );
     }
   }

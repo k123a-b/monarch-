@@ -141,6 +141,15 @@ add(
   [3000, 3500, 4000, 4500, 5000, 5500, 6000],
   ["👑"],
 );
+const fortniteCards = [
+  { id: "fortnite-recruit", name: "Recruit", set: "fortnite", rarity: "Common", value: 8, emoji: "🪖", pattern: "grid", colors: ["#39495b", "#a4b9c8"], image: "https://fortnite-api.com/images/cosmetics/br/CID_001_Athena_Commando_F_Default/icon.png", flavor: "The original recruit, ready for one more match." },
+  { id: "fortnite-jonesy", name: "Jonesy the First", set: "fortnite", rarity: "Uncommon", value: 50, emoji: "🧢", pattern: "waves", colors: ["#46586a", "#d0bd91"], image: "https://fortnite-api.com/images/cosmetics/br/CID_883_Athena_Commando_M_ChOneJones/icon.png", flavor: "A familiar face from the very first run." },
+  { id: "fortnite-commando", name: "Commando", set: "fortnite", rarity: "Uncommon", value: 35, emoji: "🎖️", pattern: "chevrons", colors: ["#43533e", "#c6b27a"], image: "https://fortnite-api.com/images/cosmetics/br/CID_016_Athena_Commando_F/icon.png", flavor: "A classic outfit from the early days." },
+  { id: "fortnite-fishstick", name: "Fishstick", set: "fortnite", rarity: "Epic", value: 180, emoji: "🐟", pattern: "waves", colors: ["#344f62", "#e4a07a"], image: "https://fortnite-api.com/images/cosmetics/br/CID_315_Athena_Commando_M_TeriyakiFish/icon.png", flavor: "A fish out of water, and somehow still winning." },
+  { id: "fortnite-agent-peely", name: "Agent Peely", set: "fortnite", rarity: "Epic", value: 260, emoji: "🍌", pattern: "rays", colors: ["#66551f", "#f1db65"], image: "https://fortnite-api.com/images/cosmetics/br/CID_701_Athena_Commando_M_BananaAgent/icon.png", flavor: "Undercover, but never underdressed." },
+  { id: "fortnite-midas", name: "Midas", set: "fortnite", rarity: "Epic", value: 420, emoji: "🪙", pattern: "orbs", colors: ["#554321", "#f0cd72"], image: "https://fortnite-api.com/images/cosmetics/br/CID_694_Athena_Commando_M_CatBurglar/icon.png", flavor: "Every match turns to gold." },
+  { id: "fortnite-renegade-raider", name: "Renegade Raider", set: "fortnite", rarity: "Crown", value: 400000, emoji: "🛩️", pattern: "scales", colors: ["#4e3919", "#f0ca77"], image: "https://fortnite-api.com/images/cosmetics/br/CID_028_Athena_Commando_F/icon.png", flavor: "A rare Crown pull with a special odds power." },
+];
 const chases = [
   ["crocodilo", "Bombardiro Crocodilo", 10000, "🐊", "brainrot"],
   ["signet", "Gilded Signet", 20000, "🖋", "royal"],
@@ -257,12 +266,17 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
 });
 export const catalog = [
   ...cards,
+  ...fortniteCards,
   ...chases,
   alpha,
   ...leaderData.cards.map(rateLeader),
   ...nationFlagCards,
 ].map((c) => ({
   ...c,
+  value:
+    c.id === "kim" || c.id === "fortnite-renegade-raider"
+      ? c.value
+      : Math.sign(c.value) * Math.round(Math.abs(c.value) * 0.75),
   flag: flags[c.country],
   page:
     c.role === "National flag"
@@ -306,17 +320,17 @@ const rarityPowerups = Object.freeze({
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
-    { name: "Tiny lift", epicBonus: 50000 },
-    { name: "Slight stumble", epicBonus: -25000 },
+    { name: "Tiny lift", epicBonus: 10000 },
+    { name: "Slight stumble", epicBonus: -10000 },
     { name: "Thrifty crown", epicBonus: 0, packDiscount: 10 },
   ],
   Uncommon: [
-    { name: "Lucky charm", epicBonus: 50000 },
-    { name: "Crooked luck", epicBonus: -50000 },
+    { name: "Lucky charm", epicBonus: 20000 },
+    { name: "Crooked luck", epicBonus: -20000 },
   ],
   Epic: [
-    { name: "Court's favor", epicBonus: 250000 },
-    { name: "Court intrigue", epicBonus: -250000 },
+    { name: "Court's favor", epicBonus: 100000 },
+    { name: "Court intrigue", epicBonus: -100000 },
   ],
   Crown: [
     { name: "Royal decree", epicBonus: 1500000 },
@@ -338,12 +352,20 @@ export function cardPowerup(card) {
   let hash = 0;
   for (const character of template.id)
     hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  if (template.id === "fortnite-renegade-raider")
+    return {
+      name: "Renegade's command",
+      epicBonus: 0,
+      crownBonus: 700000,
+      everyOtherCard: false,
+    };
   const powerup =
     rarityPowerups[template.rarity][
       hash % rarityPowerups[template.rarity].length
     ];
   return {
     ...powerup,
+    crownBonus: 0,
     everyOtherCard: template.id === "kim",
   };
 }
@@ -358,8 +380,16 @@ export function loadoutPowerup(cards) {
       powerups.reduce((total, powerup) => total + powerup.epicBonus, 0),
     ),
   );
+  const crownBonus = Math.max(
+    0,
+    Math.min(
+      700000,
+      powerups.reduce((total, powerup) => total + (powerup.crownBonus || 0), 0),
+    ),
+  );
   return {
     epicBonus,
+    crownBonus,
     everyOtherCard: powerups.some((powerup) => powerup.everyOtherCard),
     packDiscount: Math.max(
       0,
@@ -435,6 +465,21 @@ export const packs = [
     tag: "CROWN OR BETTER GUARANTEED",
   },
   {
+    id: "fortnite",
+    name: "Fortnite Drop Pack",
+    short: "FORTNITE DROP",
+    subtitle: "Drop in with familiar faces and rare pulls.",
+    price: 12500,
+    count: 4,
+    set: "fortnite",
+    odds: [86000000, 11990000, 1999000, 1000, 10],
+    chase: "fortnite-renegade-raider",
+    chaseOdds: 40000,
+    art: "fortnite",
+    color: "#81a2b7",
+    tag: "DROP IN · BUILD YOUR SQUAD",
+  },
+  {
     id: "world",
     name: "World Leaders Pack",
     short: "WORLD LEADERS",
@@ -480,6 +525,15 @@ export function rollPack(
     const shifted = Math.min(odds[2], -effect.epicBonus);
     odds[2] -= shifted;
     odds[0] += shifted;
+  }
+  if (effect.crownBonus > 0) {
+    let remaining = effect.crownBonus;
+    for (const index of [0, 1]) {
+      const shifted = Math.min(odds[index], remaining);
+      odds[index] -= shifted;
+      odds[3] += shifted;
+      remaining -= shifted;
+    }
   }
   function rollRarity(minimumIndex = 0) {
     const total = odds
@@ -549,14 +603,23 @@ export function rollStarterPack(randomInt) {
   const sets = [
     ...new Set(
       catalog
-        .filter((card) => card.rarity === rarity && card.value >= 0)
+        .filter(
+          (card) =>
+            card.rarity === rarity &&
+            card.value >= 0 &&
+            ["brainrot", "royal", "world"].includes(card.set),
+        )
         .map((card) => card.set),
     ),
   ];
   if (!sets.length) throw Error("Empty starter pack rarity pool");
   const set = sets[randomInt(sets.length)];
   const pool = catalog.filter(
-    (card) => card.rarity === rarity && card.set === set && card.value >= 0,
+    (card) =>
+      card.rarity === rarity &&
+      card.set === set &&
+      card.value >= 0 &&
+      ["brainrot", "royal", "world"].includes(card.set),
   );
   return { ...pool[randomInt(pool.length)] };
 }

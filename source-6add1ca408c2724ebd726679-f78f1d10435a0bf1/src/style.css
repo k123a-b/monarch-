@@ -5120,3 +5120,45 @@ body:has(dialog[open]) {
 .odds-effect-detail p {
   margin: 0.6rem 0;
 }
+
+.pack-loadout-hud {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(225, 188, 104, 0.28);
+  border-radius: 12px;
+  background: rgba(18, 25, 35, 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.pack-loadout-hud p {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+}
+
+.pack-loadout-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
+.pack-loadout-cards span {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.75rem;
+}
+
+.pack-loadout-cards small {
+  opacity: 0.75;
+}
+
+.pack-product.last-opened {
+  outline: 2px solid var(--pack-color);
+  outline-offset: 4px;
+}
