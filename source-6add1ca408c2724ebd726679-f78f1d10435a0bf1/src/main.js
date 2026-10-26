@@ -338,7 +338,7 @@ function gameCard(
       : powerup.epicBonus < 0
         ? "boost-negative"
         : "boost-neutral";
-  return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><small class="card-powerup ${boostTone}">${icon("spark")} ${esc(powerupText)}</small><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id || equipped ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id || equipped ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}${loadoutAction ? `<div class="card-actions loadout-card-actions"><button class="button ${equipped ? "ghost" : "small"}" data-action="loadout-toggle" data-id="${row.id}" ${row.vaulted || row.trade_id || loadoutFull ? "disabled" : ""}>${equipped ? "Unequip" : loadoutFull ? "Loadout full" : "Equip power"}</button></div>` : ""}</article>`;
+  return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${loadoutAction ? `data-action="loadout-preview" data-id="${row.id}" tabindex="0" role="button" aria-label="View odds effect for ${esc(t.name)}"` : selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><small class="card-powerup ${boostTone}">${icon("spark")} ${esc(powerupText)}</small><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id || equipped ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id || equipped ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}${loadoutAction ? `<div class="card-actions loadout-card-actions"><button class="button ${equipped ? "ghost" : "small"}" data-action="loadout-toggle" data-id="${row.id}" ${row.vaulted || row.trade_id || loadoutFull ? "disabled" : ""}>${equipped ? "Unequip" : loadoutFull ? "Loadout full" : "Equip power"}</button></div>` : ""}</article>`;
 }
 function collection() {
   const mine = state.inventory;
@@ -374,6 +374,47 @@ function collection() {
       .join(
         "",
       )}</select><select id="sort-filter" aria-label="Sort cards"><option value="recent">Most recent</option><option value="value" ${state.sort === "value" ? "selected" : ""}>Highest value</option></select><button class="button ghost small" data-action="sell-selected" ${state.selected.size ? "" : "disabled"}>Sell selected (${state.selected.size})</button></div>${filtered.length ? `<p class="muted">${filtered.length} cards · Click cards to select for a bulk sale. Duplicates: ${mine.length - new Set(mine.map((c) => c.template_id)).size}</p>      <div class="collection-grid">${filtered.map((row) => gameCard(row, { selectable: !row.vaulted && !row.trade_id && !(state.account?.loadout || []).includes(Number(row.id)), actions: true, owned: true })).join("")}</div>` : empty("collection", state.user ? "Your court is looking a little empty." : "Your collection starts with a crown.", "Open a pack to discover your first cards.", state.user ? "Explore packs" : "Join the court", state.user ? "go-packs" : "auth")}`;
+}
+function loadoutEffectModal(cardId) {
+  const row = state.inventory.find((card) => Number(card.id) === Number(cardId));
+  if (!row) return toast("That card is no longer in your collection.");
+  const template = cardMap[row.template_id];
+  const equippedIds = (state.account?.loadout || []).map(Number);
+  const isEquipped = equippedIds.includes(Number(row.id));
+  const equippedCards = equippedIds
+    .map((id) => state.inventory.find((card) => Number(card.id) === id))
+    .filter(Boolean);
+  const withoutCard = equippedCards.filter(
+    (card) => Number(card.id) !== Number(row.id),
+  );
+  const current = loadoutPowerup(equippedCards);
+  const before = isEquipped ? loadoutPowerup(withoutCard) : current;
+  const after = isEquipped
+    ? current
+    : loadoutPowerup([...equippedCards, row]);
+  const change = after.epicBonus - before.epicBonus;
+  const points = (value) =>
+    `${value > 0 ? "+" : ""}${(value / 1000000).toFixed(2)} percentage points`;
+  const powerup = cardPowerup(row);
+  const effects = [];
+  if (change)
+    effects.push(
+      `Epic odds ${change > 0 ? "increase" : "decrease"} by ${points(change)}.`,
+    );
+  else effects.push("This card makes no additional change to Epic odds.");
+  if (powerup.everyOtherCard)
+    effects.push("Every second card in a pack is guaranteed Uncommon or better.");
+  if (powerup.packDiscount)
+    effects.push(`Every third pack costs ${powerup.packDiscount}p less.`);
+  if (!change && !powerup.everyOtherCard && !powerup.packDiscount)
+    effects.push("This card has no active odds or price effect.");
+  const combined = after.epicBonus
+    ? `With this card, your loadout shifts ${points(after.epicBonus)} into Epic odds.`
+    : "With this card, your loadout has no net Epic odds adjustment.";
+  showModal(
+    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Positive adjustments shift odds from Common, then Uncommon, into Epic. Negative adjustments shift odds from Epic to Common. The loadout adjustment is capped at ±4.00 percentage points.</small></div>${!isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
+    "odds-effect-modal",
+  );
 }
 function loadoutView() {
   if (!state.user) {
@@ -1111,6 +1152,11 @@ document.addEventListener("click", async (e) => {
     if (action === "profile") return navigate("profile");
     if (action === "settings") return settingsModal();
     if (action === "go-packs") return navigate("packs");
+    if (action === "loadout-preview") {
+      if (!requireUser()) return;
+      loadoutEffectModal(id);
+      return;
+    }
     if (action === "loadout-toggle") {
       if (!requireUser()) return;
       const selected = (state.account?.loadout || []).map(Number);
@@ -1510,7 +1556,7 @@ document.addEventListener("input", (e) => {
 document.addEventListener("keydown", (e) => {
   if (
     (e.key === "Enter" || e.key === " ") &&
-    e.target.matches("[data-action=select-card]")
+    e.target.matches("[data-action=select-card], [data-action=loadout-preview]")
   ) {
     e.preventDefault();
     e.target.click();
