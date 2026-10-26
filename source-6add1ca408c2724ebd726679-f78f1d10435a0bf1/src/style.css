@@ -1649,6 +1649,103 @@ form input {
   font-size: 11px;
   padding: 12px;
 }
+.fortnite-album {
+  margin: 28px 0 36px;
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid #53627a;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #182438, #101722 75%);
+}
+.fortnite-album-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.fortnite-album-heading h2 {
+  margin: 5px 0;
+  font-size: clamp(22px, 3vw, 30px);
+}
+.fortnite-album-heading p {
+  margin: 0;
+  color: var(--muted);
+}
+.fortnite-album-heading > strong {
+  white-space: nowrap;
+  color: #f0cf80;
+}
+.fortnite-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 14px;
+}
+.fortnite-album-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #ffffff20;
+  border-radius: 12px;
+  background: #111925;
+}
+.fortnite-album-art {
+  position: relative;
+  display: grid;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #31435b, #111925 72%);
+}
+.fortnite-album-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: filter 0.35s ease, transform 0.35s ease;
+}
+.fortnite-album-card.mystery .fortnite-album-art img {
+  filter: blur(18px) brightness(0.42) saturate(0.45);
+  transform: scale(1.12);
+}
+.fortnite-album-art > span {
+  position: absolute;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #ffffff72;
+  border-radius: 50%;
+  background: #0b111dce;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+}
+.fortnite-album-info {
+  padding: 12px;
+}
+.fortnite-album-info > small {
+  color: #e2c77f;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+.fortnite-album-info h3 {
+  min-height: 2.4em;
+  margin: 5px 0;
+  font-size: 14px;
+}
+.fortnite-album-info p {
+  min-height: 2.8em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .fortnite-album-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+  .fortnite-album-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .collection-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
