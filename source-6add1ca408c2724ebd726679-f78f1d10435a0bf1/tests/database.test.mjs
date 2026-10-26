@@ -12,8 +12,21 @@ test(
     const { pool: getPool } = await import("../db/index.ts");
     const pool = getPool();
     const suffix = randomUUID().slice(0, 8);
-    const a = { id: randomUUID(), name: "Test Monarch " + suffix },
-      b = { id: randomUUID(), name: "Test Courtier " + suffix };
+    const a = {
+        id: randomUUID(),
+        name: "Test Monarch " + suffix,
+        email: `test-monarch-${suffix}@example.test`,
+      },
+      b = {
+        id: randomUUID(),
+        name: "Test Courtier " + suffix,
+        email: `test-courtier-${suffix}@example.test`,
+      };
+    const alternateLogin = {
+      id: randomUUID(),
+      name: "Test Monarch Alternate " + suffix,
+      email: a.email,
+    };
     const milestoneUser = {
       id: randomUUID(),
       name: "Test Milestone " + suffix,
@@ -58,6 +71,29 @@ test(
           1,
         );
       });
+      await t.test(
+        "the verified Google email reuses its existing game account",
+        async () => {
+          const responses = await Promise.all([
+            request(a, "me"),
+            request(alternateLogin, "me"),
+          ]);
+          assert.ok(responses.every((response) => response.status === 200));
+          assert.equal(responses[0].data.account.id, a.id);
+          assert.equal(responses[1].data.account.id, a.id);
+          assert.equal(
+            Number(
+              (
+                await query(
+                  "SELECT COUNT(*) AS n FROM accounts WHERE lower(google_email)=lower($1)",
+                  [a.email],
+                )
+              ).rows[0].n,
+            ),
+            1,
+          );
+        },
+      );
       await t.test(
         "new accounts choose a public username before continuing",
         async () => {
@@ -550,7 +586,7 @@ test(
         },
       );
     } finally {
-      const users = [a.id, b.id, milestoneUser.id];
+      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id];
       await query("DELETE FROM inventory WHERE owner_id=ANY($1::text[])", [
         users,
       ]);

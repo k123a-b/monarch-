@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 export const accounts = pgTable("accounts", {
   id: text().primaryKey(),
+  googleEmail: text("google_email"),
   username: text().notNull().unique(),
   usernameSet: boolean("username_set").notNull().default(false),
   friendCode: text("friend_code").notNull().unique(),
