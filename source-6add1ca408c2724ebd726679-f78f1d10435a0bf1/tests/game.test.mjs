@@ -602,8 +602,16 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   const macronCards = catalog.filter((card) => card.name === "Emmanuel Macron");
   assert.ok(macronCards.length > 0);
   assert.ok(macronCards.every((card) => card.rarity === "Epic"));
+  const trump = catalog.find((card) => card.name === "Donald Trump");
+  assert.equal(trump.rarity, "Crown");
+  assert.equal(trump.value, 250000);
+  const netanyahu = catalog.find((card) => card.name === "Benjamin Netanyahu");
+  assert.equal(netanyahu.rarity, "Crown");
+  assert.equal(netanyahu.value, 100000);
   const andy = catalog.find((card) => card.name === "Andy Burnham");
   assert.equal(andy.rarity, "Epic");
+  assert.equal(andy.value, 8000);
+  assert.equal(andy.flavor, "Just a normal bloke");
   assert.equal(andy.role, "MP · Greater Manchester");
   assert.ok(andy.image.includes("Official_portrait_of_Andy_Burnham_MP_2026"));
   assert.match(andy.imageSource, /commons\.wikimedia\.org/);
