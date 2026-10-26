@@ -289,13 +289,30 @@ const rarityPowerups = Object.freeze({
     { name: "No effect", epicBonus: 0 },
     { name: "Faint spark", epicBonus: 25000 },
     { name: "Slight stumble", epicBonus: -25000 },
-    { name: "Quiet luck", epicBonus: 0 },
+    { name: "Small stumble", epicBonus: -50000 },
+    { name: "Tiny lift", epicBonus: 50000 },
+    { name: "Thrifty crown", epicBonus: 0, packDiscount: 10 },
   ],
-  Uncommon: [{ name: "Lucky charm", epicBonus: 150000 }],
-  Epic: [{ name: "Court's favor", epicBonus: 750000 }],
-  Crown: [{ name: "Royal decree", epicBonus: 2000000 }],
-  Chase: [{ name: "Chase energy", epicBonus: 3000000 }],
-  Alpha: [{ name: "Golden touch", epicBonus: 4000000 }],
+  Uncommon: [
+    { name: "Lucky charm", epicBonus: 150000 },
+    { name: "Crooked luck", epicBonus: -150000 },
+  ],
+  Epic: [
+    { name: "Court's favor", epicBonus: 750000 },
+    { name: "Court intrigue", epicBonus: -750000 },
+  ],
+  Crown: [
+    { name: "Royal decree", epicBonus: 1500000 },
+    { name: "Royal blunder", epicBonus: -1500000 },
+  ],
+  Chase: [
+    { name: "Chase energy", epicBonus: 3000000 },
+    { name: "Chase misstep", epicBonus: -3000000 },
+  ],
+  Alpha: [
+    { name: "Golden touch", epicBonus: 4000000 },
+    { name: "Gilded curse", epicBonus: -4000000 },
+  ],
 });
 export function cardPowerup(card) {
   const template = cardMap[card?.template_id || card?.id] || card;
@@ -314,8 +331,8 @@ export function cardPowerup(card) {
   };
 }
 export function loadoutPowerup(cards) {
-  if (!Array.isArray(cards) || cards.length > 3)
-    throw Error("A loadout can contain at most three cards.");
+  if (!Array.isArray(cards) || cards.length > 4)
+    throw Error("A loadout can contain at most four cards.");
   const powerups = cards.map(cardPowerup);
   const epicBonus = Math.max(
     -4000000,
@@ -327,6 +344,10 @@ export function loadoutPowerup(cards) {
   return {
     epicBonus,
     everyOtherCard: powerups.some((powerup) => powerup.everyOtherCard),
+    packDiscount: Math.max(
+      0,
+      ...powerups.map((powerup) => powerup.packDiscount || 0),
+    ),
   };
 }
 export const leaderSource = {

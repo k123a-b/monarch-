@@ -30,6 +30,8 @@ Before deploying the daily Rewards wheel and card loadouts, apply `db/migrations
 
 Before deploying Google account email linking, apply `db/migrations/20261026103000_link_google_email_to_account.sql` with `npm run migrate`. The migration adds a unique, case-insensitive Google email link; it does not merge or delete pre-existing duplicate accounts.
 
+Before deploying the fourth loadout slot, apply `db/migrations/20261026110000_fourth_loadout_slot.sql` with `npm run migrate`. Existing accounts keep three slots; the fourth can be unlocked once for £350 in virtual cash.
+
 ## Economy and fairness
 
 The four original packs use the base per-card odds, expressed as integers out of 100,000,000. Alpha/Mystery Gold is isolated from regular pools and numbered using a database sequence. Apex guarantees at least a Crown by replacing its lowest card if necessary. Chase rolls are per pack; they replace only an eligible lower-value, non-Alpha card. Normal template duplicates are avoided until a rarity pool is exhausted. Pack value may be above or below the purchase price; card values enter the balance only when cards are sold.
@@ -44,7 +46,7 @@ Active play sends visible-tab heartbeats every 30 seconds, only treating a tab w
 
 Rewards also includes one server-recorded daily spin per account and UTC day: three separate 25% no-prize slices, 10% for 25p, 7% for 50p, 5% for £1, 2.9% for £5, and 0.1% for £45. Positive prizes are credited to the virtual balance and ledger in the same transaction that marks the spin complete.
 
-Every card displays a power-up based on its rarity. Common cards have no effect or a tiny ±0.025 percentage-point Epic-odds adjustment; Uncommon adds 0.15 points, Epic 0.75, Crown 2, Chase 3, and Alpha 4. Players can equip up to three available cards in **Loadout**. Their combined Epic-odds adjustment is capped at ±4 percentage points and shifts probability from Common/Uncommon into Epic when available. Equipping Kim Jong Un guarantees every second card in a pack is Uncommon or better. Equipped cards cannot be sold, vaulted, or offered in trades until unequipped.
+Every card displays a power-up based on its rarity. Common cards can have no effect, a tiny ±0.025 or ±0.05 percentage-point Epic-odds adjustment, or a 10p discount on every third successful pack opening. Uncommon adjusts Epic odds by ±0.15 points, Epic by ±0.75, Crown by ±1.5, Chase by ±3, and Alpha by ±4. Positive and negative effects are both possible. Players can equip up to three available cards in **Loadout**, then unlock a fourth slot once for £350 virtual cash. Their combined Epic-odds adjustment is capped at ±4 percentage points and shifts probability from Common/Uncommon into Epic when available. Equipping Kim Jong Un guarantees every second card in a pack is Uncommon or better. Equipped cards cannot be sold, vaulted, or offered in trades until unequipped.
 
 Run `node scripts/balance-audit.mjs` for a reproducible 500,000-pack simulation including tenth-pack guarantees, median sell values, and rates for losses, small wins, 2× wins, and 10× jackpots. Each pack is regression-tested to allow all four outcomes. The audit does not connect to the database or change live randomness. Results describe virtual inventory values, not automatic cash credits or guaranteed returns.
 

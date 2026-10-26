@@ -12,6 +12,7 @@ import {
   packValueRange,
   starterOdds,
   cardPowerup,
+  loadoutPowerup,
 } from "../shared/catalog.mjs";
 import { dailySpinSegments, playReward } from "../shared/rules.mjs";
 const $ = (s, root = document) => root.querySelector(s);
@@ -221,6 +222,19 @@ function guaranteeProgress() {
   );
   return `<aside class="epic-progress ${nextGuaranteed ? "guarantee-ready" : ""}" data-pack-progress><div>${icon("spark")}<span class="eyebrow">THE TENTH-PACK PROMISE</span><strong>${state.user ? (nextGuaranteed ? "Next pack: Epic or better" : `${remaining} packs to your guaranteed Epic`) : "An Epic or better every 10 packs"}</strong></div><progress max="10" value="${progress}" aria-label="Packs toward your next guaranteed Epic">${progress} / 10</progress><p>${state.user ? `${progress} / 10 packs · ` : "Sign in to track your progress. "}All pack types count. Every tenth successful purchase contains an Epic or better. Earlier lucky pulls never reset this promise. Rarity does not guarantee profit.</p></aside>`;
 }
+function nextPackDiscount() {
+  const nextPack = Number(state.account?.packs || 0) + 1;
+  if (!state.user || nextPack % 3 !== 0) return 0;
+  const equippedCards = (state.account?.loadout || [])
+    .map((id) => state.inventory.find((card) => Number(card.id) === Number(id)))
+    .filter(Boolean)
+    .map((card) => cardMap[card.template_id])
+    .filter(Boolean);
+  return loadoutPowerup(equippedCards).packDiscount;
+}
+function packPrice(pack) {
+  return Math.max(0, pack.price - nextPackDiscount());
+}
 function shop() {
   const visible = packs.filter((p) =>
     state.filter === "all"
@@ -244,7 +258,7 @@ function shop() {
       )
       .join(
         "",
-      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase and Alpha values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>Open pack ${icon("arrow")}</span><b>${money(p.price)}</b></button>${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack" : `Chase pull · 1 in ${p.chaseOdds.toLocaleString()}`}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£210,000</strong><small>Mystery leader · virtual sell value</small><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("arrow")}</a>${icon("collection", "large-icon")}</div></section>`;
+      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase and Alpha values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>Open pack ${icon("arrow")}</span><b>${money(packPrice(p))}</b></button>${nextPackDiscount() ? '<small class="discount-hint">Loadout boost · 10p off this pack</small>' : ""}${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack" : `Chase pull · 1 in ${p.chaseOdds.toLocaleString()}`}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£210,000</strong><small>Mystery leader · virtual sell value</small><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("collection", "large-icon")}</a></div></section>`;
 }
 function gameCard(
   row,
@@ -306,13 +320,22 @@ function gameCard(
   const powerup = cardPowerup(t);
   const powerupText = powerup.everyOtherCard
     ? "Every 2nd pack card · Uncommon+"
-    : powerup.epicBonus === 0
-      ? powerup.name
-      : `${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`;
+    : powerup.packDiscount
+      ? "10p off every 3rd pack"
+      : powerup.epicBonus === 0
+        ? powerup.name
+        : `${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`;
   const loadoutIds = state.account?.loadout || [];
   const equipped = owned && loadoutIds.includes(Number(row.id));
-  const loadoutFull = loadoutIds.length >= 3 && !equipped;
-  return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><small class="card-powerup">${icon("spark")} ${esc(powerupText)}</small><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id || equipped ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id || equipped ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}${loadoutAction ? `<div class="card-actions loadout-card-actions"><button class="button ${equipped ? "ghost" : "small"}" data-action="loadout-toggle" data-id="${row.id}" ${row.vaulted || row.trade_id || loadoutFull ? "disabled" : ""}>${equipped ? "Unequip" : loadoutFull ? "Loadout full" : "Equip power"}</button></div>` : ""}</article>`;
+  const slotLimit = Number(state.account?.loadout_slots || 3);
+  const loadoutFull = loadoutIds.length >= slotLimit && !equipped;
+  const boostTone =
+    powerup.epicBonus > 0
+      ? "boost-positive"
+      : powerup.epicBonus < 0
+        ? "boost-negative"
+        : "boost-neutral";
+  return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><small class="card-powerup ${boostTone}">${icon("spark")} ${esc(powerupText)}</small><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id || equipped ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id || equipped ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}${loadoutAction ? `<div class="card-actions loadout-card-actions"><button class="button ${equipped ? "ghost" : "small"}" data-action="loadout-toggle" data-id="${row.id}" ${row.vaulted || row.trade_id || loadoutFull ? "disabled" : ""}>${equipped ? "Unequip" : loadoutFull ? "Loadout full" : "Equip power"}</button></div>` : ""}</article>`;
 }
 function collection() {
   const mine = state.inventory;
@@ -354,29 +377,30 @@ function loadoutView() {
     $("#main").innerHTML =
       title(
         "YOUR CARD POWER",
-        "Build a three-card loadout.",
-        "Equip cards to improve your pack odds.",
+        "Build your card loadout.",
+        "Equip cards to shape your pack odds.",
       ) +
       empty(
         "collection",
         "Your loadout awaits.",
-        "Sign in to equip up to three cards from your collection.",
+        "Sign in to equip cards from your collection.",
         "Join the court",
         "auth",
       );
     return;
   }
   const equipped = state.account?.loadout || [];
+  const slotLimit = Number(state.account?.loadout_slots || 3);
   const cards = state.inventory.filter(
     (row) => cardMap[row.template_id] && !row.vaulted && !row.trade_id,
   );
   $("#main").innerHTML =
     title(
       "YOUR CARD POWER",
-      "Build a three-card loadout.",
-      "Equip up to three cards for passive pack bonuses. Equipped cards stay yours, but must be unequipped before selling, vaulting, or trading.",
+      "Build your card loadout.",
+      "Mix boosts and trade-offs to shape your pack odds. Equipped cards stay yours, but must be unequipped before selling, vaulting, or trading.",
     ) +
-    `<div class="loadout-summary panel"><div><span class="eyebrow">ACTIVE POWER</span><h2>${equipped.length} / 3 cards equipped</h2><p>Epic odds bonus capped at +4.00 percentage points. Bonuses come from the cards in your loadout.</p></div>${equipped
+    `<div class="loadout-summary panel"><div><span class="eyebrow">ACTIVE POWER</span><h2>${equipped.length} / ${slotLimit} cards equipped</h2><p>Epic odds effects combine to a maximum of ±4.00 percentage points. Frugal cards can reduce every third pack by 10p.</p></div>${slotLimit < 4 ? `<aside class="slot-upgrade"><span class="eyebrow">EXPAND YOUR STRATEGY</span><strong>Unlock a fourth card slot</strong><small>One-time purchase · ${money(35000)} virtual cash</small><button class="button small" data-action="loadout-upgrade" ${Number(state.account?.balance || 0) < 35000 ? "disabled" : ""}>${Number(state.account?.balance || 0) < 35000 ? "Need more virtual cash" : `Unlock slot · ${money(35000)}`}</button></aside>` : '<span class="slot-unlocked">FOURTH SLOT UNLOCKED</span>'}${equipped
       .map((id) =>
         state.inventory.find((card) => Number(card.id) === Number(id)),
       )
@@ -762,12 +786,14 @@ async function buyPack(id) {
   if (!requireUser()) return;
   await sync();
   const p = packs.find((p) => p.id === id);
-  if (Number(state.account?.balance) < p.price) {
+  const discount = nextPackDiscount();
+  const price = packPrice(p);
+  if (Number(state.account?.balance) < price) {
     toast("Not enough virtual cash. Sell cards or earn active-play rewards.");
     return;
   }
   showModal(
-    `<span class="eyebrow">YOUR NEXT ROYAL MISTAKE</span><h2>Open ${p.name}?</h2><p>${p.count} cards. Independent random rolls. One pack costs ${money(p.price)} of virtual cash.</p>${guaranteeProgress()}<div class="purchase-preview">${packArt(p)}</div><p class="fine-print">You might pull less than you spend, or something worth much more. Chase odds: 1 in ${p.chaseOdds.toLocaleString()}.${p.id === "world" ? " Includes former leaders and a satirical −£25 Keir Starmer card. Negative cards reduce collection value; discarding one charges its penalty. No automatic penalty debit on opening." : ""}</p><button class="button full" data-action="confirm-buy" data-id="${p.id}">Open for ${money(p.price)} ${icon("arrow")}</button>`,
+    `<span class="eyebrow">YOUR NEXT ROYAL MISTAKE</span><h2>Open ${p.name}?</h2><p>${p.count} cards. Independent random rolls. One pack costs ${money(p.price)} of virtual cash${discount ? `, reduced to <strong>${money(price)}</strong> by your loadout` : ""}.</p>${guaranteeProgress()}<div class="purchase-preview">${packArt(p)}</div><p class="fine-print">You might pull less than you spend, or something worth much more. Chase odds: 1 in ${p.chaseOdds.toLocaleString()}.${p.id === "world" ? " Includes former leaders and a satirical −£25 Keir Starmer card. Negative cards reduce collection value; discarding one charges its penalty. No automatic penalty debit on opening." : ""}</p><button class="button full" data-action="confirm-buy" data-id="${p.id}">Open for ${money(price)} ${icon("arrow")}</button>`,
     "purchase-modal",
   );
 }
@@ -793,7 +819,7 @@ async function openPack(id) {
     const total = cards.reduce((s, c) => s + Number(c.value), 0);
     function revealMarkup() {
       showModal(
-        `<span class="eyebrow">${esc(p.name.toUpperCase())} · ${revealed} / ${cards.length} REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= p.price ? "positive" : "negative"}">${total >= p.price ? "+" : ""}${money(total - p.price)} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : ""}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "To my collection" : "Reveal all cards"} ${icon("arrow")}</button>`,
+        `<span class="eyebrow">${esc(p.name.toUpperCase())} · ${revealed} / ${cards.length} REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}${result.discount ? `<p class="guarantee-earned" role="status">Loadout discount · ${money(Number(result.discount))} off this pack</p>` : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= p.price - Number(result.discount || 0) ? "positive" : "negative"}">${total >= p.price - Number(result.discount || 0) ? "+" : ""}${money(total - p.price + Number(result.discount || 0))} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : ""}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "To my collection" : "Reveal all cards"} ${icon("arrow")}</button>`,
         "reveal-modal",
       );
     }
@@ -1097,6 +1123,15 @@ document.addEventListener("click", async (e) => {
           ? "Card equipped. Its power now affects pack odds."
           : "Card unequipped.",
       );
+      return;
+    }
+    if (action === "loadout-upgrade") {
+      if (!requireUser()) return;
+      target.disabled = true;
+      const result = await api("loadout/upgrade", {});
+      state.account = result.account;
+      render();
+      toast("Fourth loadout slot unlocked for £350 virtual cash.");
       return;
     }
     if (action === "spin-wheel") {
