@@ -126,6 +126,8 @@ test("Apex replaces exactly one low card with Crown when all rolls are Epic", ()
 test("card powerups are defined and Kim guarantees every second pack card Uncommon+", () => {
   const bonuses = [];
   let discountCard;
+  let commonCards = 0;
+  let commonCardsWithoutPowerup = 0;
   for (const card of catalog) {
     assert.ok(
       Number.isSafeInteger(card.value),
@@ -134,15 +136,27 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
     const powerup = cardPowerup(card);
     assert.equal(typeof powerup.name, "string");
     assert.ok(Number.isInteger(powerup.epicBonus));
-    assert.ok(
-      powerup.epicBonus !== 0 ||
-        powerup.packDiscount > 0 ||
-        powerup.everyOtherCard,
-      `${card.id} has an active power-up`,
-    );
+    if (card.rarity === "Common") {
+      commonCards++;
+      if (
+        powerup.epicBonus === 0 &&
+        !powerup.packDiscount &&
+        !powerup.everyOtherCard
+      )
+        commonCardsWithoutPowerup++;
+    } else {
+      assert.ok(
+        powerup.epicBonus !== 0 || powerup.everyOtherCard,
+        `${card.id} has an active power-up`,
+      );
+    }
     bonuses.push(powerup.epicBonus);
     if (powerup.packDiscount) discountCard = card;
   }
+  assert.ok(
+    commonCardsWithoutPowerup / commonCards >= 0.7,
+    "most Common cards should not have a power-up",
+  );
   assert.ok(bonuses.some((bonus) => bonus > 0));
   assert.ok(bonuses.some((bonus) => bonus < 0));
   assert.ok(discountCard);

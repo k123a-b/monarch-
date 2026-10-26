@@ -318,19 +318,22 @@ function gameCard(
       ? `<div class="card-portrait national-flag-portrait">${countryFlag}<img src="${image(t.image, 320)}" loading="lazy" alt="${portraitAlt}"></div>`
       : `<div class="card-portrait">${countryFlag}<img src="${image(t.image || (t.set === "world" ? "/img/leader-placeholder.svg" : "/img/apex.png"), 400)}" loading="lazy" alt="${portraitAlt}"></div>`;
   const powerup = cardPowerup(t);
+  const noPowerup =
+    powerup.epicBonus === 0 && !powerup.packDiscount && !powerup.everyOtherCard;
   const powerupText = powerup.everyOtherCard
     ? "Every 2nd pack card · Uncommon+"
     : powerup.packDiscount
       ? "10p off every 3rd pack"
-      : powerup.epicBonus === 0
-        ? powerup.name
+      : noPowerup
+        ? "No power-up"
         : `${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`;
   const loadoutIds = state.account?.loadout || [];
   const equipped = owned && loadoutIds.includes(Number(row.id));
   const slotLimit = Number(state.account?.loadout_slots || 3);
   const loadoutFull = loadoutIds.length >= slotLimit && !equipped;
-  const boostTone =
-    powerup.epicBonus > 0
+  const boostTone = noPowerup
+    ? "boost-none"
+    : powerup.epicBonus > 0
       ? "boost-positive"
       : powerup.epicBonus < 0
         ? "boost-negative"

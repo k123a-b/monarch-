@@ -2271,6 +2271,11 @@ form input {
 .card-powerup.boost-neutral {
   color: #ddd3b9;
 }
+.card-powerup.boost-none {
+  border-color: #8a8d9666;
+  color: #aaadb7;
+  background: #8a8d9612;
+}
 .discount-hint {
   display: block;
   margin-top: 9px;
