@@ -240,6 +240,8 @@ function packPrice(pack) {
 function powerupDescription(powerup) {
   const effects = [];
   if (powerup.everyOtherCard) effects.push("Every 2nd pack card · Uncommon+");
+  if (powerup.uncommonBonus)
+    effects.push(`${powerup.uncommonBonus > 0 ? "+" : ""}${(powerup.uncommonBonus / 1000000).toFixed(2)}% Uncommon odds`);
   if (powerup.epicBonus)
     effects.push(`${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`);
   if (powerup.crownBonus)
@@ -254,6 +256,7 @@ function packLoadoutSummary() {
   const cards = equipped.map((card) => cardMap[card.template_id]).filter(Boolean);
   const effect = loadoutPowerup(cards);
   const totals = [
+    effect.uncommonBonus && `${effect.uncommonBonus > 0 ? "+" : ""}${(effect.uncommonBonus / 1000000).toFixed(2)}% Uncommon odds`,
     effect.epicBonus && `${effect.epicBonus > 0 ? "+" : ""}${(effect.epicBonus / 1000000).toFixed(2)}% Epic odds`,
     effect.crownBonus && `+${(effect.crownBonus / 1000000).toFixed(2)}% Crown odds`,
     effect.everyOtherCard && "Every 2nd card is Uncommon+",
@@ -341,6 +344,7 @@ function gameCard(
   const powerup = cardPowerup(t);
   const noPowerup =
     powerup.epicBonus === 0 &&
+    !powerup.uncommonBonus &&
     !powerup.crownBonus &&
     !powerup.packDiscount &&
     !powerup.everyOtherCard;
@@ -351,7 +355,7 @@ function gameCard(
   const loadoutFull = loadoutIds.length >= slotLimit && !equipped;
   const boostTone = noPowerup
     ? "boost-none"
-    : powerup.epicBonus > 0 || powerup.crownBonus > 0
+    : powerup.epicBonus > 0 || powerup.uncommonBonus > 0 || powerup.crownBonus > 0
       ? "boost-positive"
       : powerup.epicBonus < 0
         ? "boost-negative"
@@ -442,6 +446,9 @@ function loadoutEffectModal(cardId) {
   const epicChange = previewAtCapacity
     ? powerup.epicBonus
     : after.epicBonus - before.epicBonus;
+  const uncommonChange = previewAtCapacity
+    ? powerup.uncommonBonus || 0
+    : after.uncommonBonus - before.uncommonBonus;
   const crownChange = previewAtCapacity
     ? powerup.crownBonus || 0
     : after.crownBonus - before.crownBonus;
@@ -455,6 +462,12 @@ function loadoutEffectModal(cardId) {
         : `Epic odds ${epicChange > 0 ? 'increase' : 'decrease'} by ${points(epicChange)}.`,
     );
   else effects.push("This card makes no additional change to Epic odds.");
+  if (uncommonChange)
+    effects.push(
+      previewAtCapacity
+        ? `This card would ${uncommonChange > 0 ? 'increase' : 'decrease'} Uncommon odds by ${points(uncommonChange)} if equipped.`
+        : `Uncommon odds ${uncommonChange > 0 ? 'increase' : 'decrease'} by ${points(uncommonChange)}.`,
+    );
   if (crownChange)
     effects.push(
       previewAtCapacity
@@ -465,14 +478,15 @@ function loadoutEffectModal(cardId) {
     effects.push("Every second card in a pack is guaranteed Uncommon or better.");
   if (powerup.packDiscount)
     effects.push(`Every third pack costs ${powerup.packDiscount}p less.`);
-  if (!epicChange && !crownChange && !powerup.everyOtherCard && !powerup.packDiscount)
+  if (!epicChange && !uncommonChange && !crownChange && !powerup.everyOtherCard && !powerup.packDiscount)
     effects.push("This card has no active odds or price effect.");
   const combined = [
+    after.uncommonBonus && `Uncommon odds ${points(after.uncommonBonus)}`,
     after.epicBonus && `Epic odds ${points(after.epicBonus)}`,
     after.crownBonus && `Crown odds ${points(after.crownBonus)}`,
   ].filter(Boolean).join(" · ") || "No net rarity odds adjustment.";
   showModal(
-    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Positive Epic adjustments shift odds from Common, then Uncommon, into Epic. Negative Epic adjustments shift odds from Epic to Common. Renegade Raider shifts odds from Common/Uncommon into Crown by up to 0.70 percentage points. Epic adjustments are capped at ±4.00 percentage points.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
+    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Uncommon adjustments shift odds between Common and Uncommon. Positive Epic adjustments shift odds from Common, then Uncommon, into Epic; negative Epic adjustments return odds to Common. Renegade Raider shifts odds into Crown by up to 0.70 percentage points. Combined loadout adjustments are capped at ±0.60 percentage points for Uncommon and ±1.00 for Epic.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
     "odds-effect-modal",
   );
 }
