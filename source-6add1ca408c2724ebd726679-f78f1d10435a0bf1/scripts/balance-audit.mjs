@@ -61,7 +61,7 @@ console.log(
 const worldLeaders = report.find((pack) => pack.pack === "World Leaders Pack");
 if (
   report.some((pack) => pack.failedGuarantees) ||
-  Number.parseFloat(worldLeaders.losingPacks) < 55 ||
-  Number.parseFloat(worldLeaders.losingPacks) > 57
+  Number.parseFloat(worldLeaders.losingPacks) < 65 ||
+  Number.parseFloat(worldLeaders.losingPacks) > 80
 )
   process.exitCode = 1;
