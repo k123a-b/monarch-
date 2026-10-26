@@ -146,7 +146,7 @@ const chases = [
   ["signet", "Gilded Signet", 20000, "🖋", "royal"],
   ["sovereign", "Vault Sovereign", 50000, "🏛", "royal"],
   ["apex-crown", "Apex Crown", 150000, "⚡", "royal"],
-  ["kim", "Kim Jong Un", 21000000, "🌏", "world"],
+  ["kim", "Kim Jong Un", 25000, "🌏", "world"],
 ].map(([id, name, value, emoji, set]) => ({
   id,
   name,
@@ -234,7 +234,7 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
     role: "National flag",
     set: "world",
     rarity,
-    value,
+    value: Math.round(value * 0.4),
     page: `https://flagcdn.com/w320/${flagCode(country)}.png`,
     emoji: flags[country],
     pattern: patterns[index % patterns.length],

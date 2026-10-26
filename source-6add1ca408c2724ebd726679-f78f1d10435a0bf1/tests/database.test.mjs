@@ -467,12 +467,20 @@ test(
         async () => {
           const card = (
             await query(
-              "INSERT INTO inventory(owner_id,template_id,value,rarity) VALUES($1,'world-former-keir-starmer',-2500,'Common') RETURNING id",
+              "INSERT INTO inventory(owner_id,template_id,value,rarity) VALUES($1,'world-former-keir-starmer',-250,'Common') RETURNING id",
               [a.id],
             )
           ).rows[0];
+          const previousBalance = Number(
+            (await request(a, "me")).data.account.balance,
+          );
+          await query("UPDATE accounts SET balance=100 WHERE id=$1", [a.id]);
+          await query(
+            "INSERT INTO ledger(user_id,amount,balance,reason) VALUES($1,$2,100,'test setup')",
+            [a.id, 100 - previousBalance],
+          );
           const before = Number((await request(a, "me")).data.account.balance);
-          assert.ok(before < 2500);
+          assert.ok(before < 250);
           assert.equal(
             (await request(a, "sell", { ids: [card.id] })).status,
             409,

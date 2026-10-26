@@ -235,7 +235,7 @@ test("original catalogue contains exactly 93 templates excluding world expansion
 test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   const kim = cardMap.kim;
   assert.equal(kim.rarity, "Chase");
-  assert.equal(kim.value, 21000000);
+  assert.equal(kim.value, 25000);
   const world = packs.find((p) => p.id === "world");
   assert.equal(world.chaseOdds, 45000);
   assert.equal(world.price, 1000);
@@ -506,6 +506,8 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   });
   assert.equal(americanLeader.rarity, "Crown");
   assert.equal(greekLeader.rarity, "Uncommon");
+  assert.equal(americanLeader.value, 2600);
+  assert.equal(greekLeader.value, 400);
   assert.ok(americanLeader.value > greekLeader.value);
   assert.deepEqual(
     [
@@ -565,7 +567,7 @@ test("requested featured cards keep their fictional GBP values and flags", () =>
     catalog.filter((c) => c.value < 0).map((c) => c.id),
     ["world-former-keir-starmer"],
   );
-  assert.equal(cardMap["world-former-keir-starmer"].value, -2500);
+  assert.equal(cardMap["world-former-keir-starmer"].value, -250);
 });
 test("world packs can return less or more than their purchase price", () => {
   const p = packs.find((p) => p.id === "world");
