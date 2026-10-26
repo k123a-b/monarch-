@@ -127,9 +127,19 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
   const bonuses = [];
   let discountCard;
   for (const card of catalog) {
+    assert.ok(
+      Number.isSafeInteger(card.value),
+      `${card.id} has a whole-pence value`,
+    );
     const powerup = cardPowerup(card);
     assert.equal(typeof powerup.name, "string");
     assert.ok(Number.isInteger(powerup.epicBonus));
+    assert.ok(
+      powerup.epicBonus !== 0 ||
+        powerup.packDiscount > 0 ||
+        powerup.everyOtherCard,
+      `${card.id} has an active power-up`,
+    );
     bonuses.push(powerup.epicBonus);
     if (powerup.packDiscount) discountCard = card;
   }
@@ -166,6 +176,25 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
   assert.equal(cards.length, world.count);
   assert.ok(["Uncommon", "Epic", "Crown", "Alpha"].includes(cards[1].rarity));
   assert.ok(["Uncommon", "Epic", "Crown", "Alpha"].includes(cards[3].rarity));
+});
+test("a pack's card values can total below or above its virtual price", () => {
+  const pack = packs.find((entry) => entry.id === "brainrot");
+  const loss = rollPack(pack, rng(0)).reduce(
+    (total, card) => total + card.value,
+    0,
+  );
+  const gain = rollPack(pack, rng(99999999, true)).reduce(
+    (total, card) => total + card.value,
+    0,
+  );
+  assert.ok(
+    loss < pack.price,
+    "a pack can return less than its purchase price",
+  );
+  assert.ok(
+    gain > pack.price,
+    "a pack can return more than its purchase price",
+  );
 });
 test("daily rewards wheel has three no-prize sectors and an exact 0.1% £45 silver prize", () => {
   assert.equal(

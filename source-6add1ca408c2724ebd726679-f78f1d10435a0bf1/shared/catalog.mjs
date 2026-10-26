@@ -286,7 +286,7 @@ export const catalog = [
 export const cardMap = Object.fromEntries(catalog.map((c) => [c.id, c]));
 const rarityPowerups = Object.freeze({
   Common: [
-    { name: "No effect", epicBonus: 0 },
+    { name: "Gentle nudge", epicBonus: 10000 },
     { name: "Faint spark", epicBonus: 25000 },
     { name: "Slight stumble", epicBonus: -25000 },
     { name: "Small stumble", epicBonus: -50000 },
