@@ -461,14 +461,14 @@ export async function handle(
           const crownBonus = Number(current.permanent_crown_bonus || 0);
           if (body.reward === "epic") {
             if (epicBonus + 500000 > 1000000) fail("Your permanent Epic chance reward is already at its limit.", 409);
-            await c.query("UPDATE accounts SET permanent_epic_bonus=permanent_epic_bonus+500000,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2,'epic') WHERE id=$1", [id, set.id]);
+            await c.query("UPDATE accounts SET permanent_epic_bonus=permanent_epic_bonus+500000,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'epic') WHERE id=$1", [id, set.id]);
           } else if (body.reward === "crown") {
             if (crownBonus + 100000 > 100000) fail("Your permanent Crown chance reward is already at its limit.", 409);
-            await c.query("UPDATE accounts SET permanent_crown_bonus=permanent_crown_bonus+100000,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2,'crown') WHERE id=$1", [id, set.id]);
+            await c.query("UPDATE accounts SET permanent_crown_bonus=permanent_crown_bonus+100000,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'crown') WHERE id=$1", [id, set.id]);
           } else if (body.reward === "badge") {
             if (epicBonus + 500000 <= 1000000 || crownBonus + 100000 <= 100000)
               fail("A permanent odds reward is still available.", 409);
-            await c.query("UPDATE accounts SET set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2,'badge') WHERE id=$1", [id, set.id]);
+            await c.query("UPDATE accounts SET set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'badge') WHERE id=$1", [id, set.id]);
           } else fail("Choose a valid set reward.");
           return { account: await account() };
         }
