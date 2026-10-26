@@ -11,8 +11,9 @@ import {
   packProgress,
   packValueRange,
   starterOdds,
+  cardPowerup,
 } from "../shared/catalog.mjs";
-import { playReward } from "../shared/rules.mjs";
+import { dailySpinSegments, playReward } from "../shared/rules.mjs";
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) =>
   String(s ?? "").replace(
@@ -191,6 +192,7 @@ const tabs = [
   "packs",
   "codex",
   "collection",
+  "loadout",
   "pot",
   "friends",
   "rewards",
@@ -246,7 +248,12 @@ function shop() {
 }
 function gameCard(
   row,
-  { selectable = false, actions = false, owned = false } = {},
+  {
+    selectable = false,
+    actions = false,
+    owned = false,
+    loadoutAction = false,
+  } = {},
 ) {
   const template = cardMap[row.template_id || row.id] || row;
   const t = presentedCard(
@@ -296,7 +303,16 @@ function gameCard(
     t.role === "National flag"
       ? `<div class="card-portrait national-flag-portrait">${countryFlag}<img src="${image(t.image, 320)}" loading="lazy" alt="${portraitAlt}"></div>`
       : `<div class="card-portrait">${countryFlag}<img src="${image(t.image || (t.set === "world" ? "/img/leader-placeholder.svg" : "/img/apex.png"), 400)}" loading="lazy" alt="${portraitAlt}"></div>`;
-  return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}</article>`;
+  const powerup = cardPowerup(t);
+  const powerupText = powerup.everyOtherCard
+    ? "Every 2nd pack card · Uncommon+"
+    : powerup.epicBonus === 0
+      ? powerup.name
+      : `${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`;
+  const loadoutIds = state.account?.loadout || [];
+  const equipped = owned && loadoutIds.includes(Number(row.id));
+  const loadoutFull = loadoutIds.length >= 3 && !equipped;
+  return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><small class="card-powerup">${icon("spark")} ${esc(powerupText)}</small><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id || equipped ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id || equipped ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}${loadoutAction ? `<div class="card-actions loadout-card-actions"><button class="button ${equipped ? "ghost" : "small"}" data-action="loadout-toggle" data-id="${row.id}" ${row.vaulted || row.trade_id || loadoutFull ? "disabled" : ""}>${equipped ? "Unequip" : loadoutFull ? "Loadout full" : "Equip power"}</button></div>` : ""}</article>`;
 }
 function collection() {
   const mine = state.inventory;
@@ -331,7 +347,47 @@ function collection() {
       )
       .join(
         "",
-      )}</select><select id="sort-filter" aria-label="Sort cards"><option value="recent">Most recent</option><option value="value" ${state.sort === "value" ? "selected" : ""}>Highest value</option></select><button class="button ghost small" data-action="sell-selected" ${state.selected.size ? "" : "disabled"}>Sell selected (${state.selected.size})</button></div>${filtered.length ? `<p class="muted">${filtered.length} cards · Click cards to select for a bulk sale. Duplicates: ${mine.length - new Set(mine.map((c) => c.template_id)).size}</p><div class="collection-grid">${filtered.map((row) => gameCard(row, { selectable: !row.vaulted && !row.trade_id, actions: true, owned: true })).join("")}</div>` : empty("collection", state.user ? "Your court is looking a little empty." : "Your collection starts with a crown.", "Open a pack to discover your first cards.", state.user ? "Explore packs" : "Join the court", state.user ? "go-packs" : "auth")}`;
+      )}</select><select id="sort-filter" aria-label="Sort cards"><option value="recent">Most recent</option><option value="value" ${state.sort === "value" ? "selected" : ""}>Highest value</option></select><button class="button ghost small" data-action="sell-selected" ${state.selected.size ? "" : "disabled"}>Sell selected (${state.selected.size})</button></div>${filtered.length ? `<p class="muted">${filtered.length} cards · Click cards to select for a bulk sale. Duplicates: ${mine.length - new Set(mine.map((c) => c.template_id)).size}</p>      <div class="collection-grid">${filtered.map((row) => gameCard(row, { selectable: !row.vaulted && !row.trade_id && !(state.account?.loadout || []).includes(Number(row.id)), actions: true, owned: true })).join("")}</div>` : empty("collection", state.user ? "Your court is looking a little empty." : "Your collection starts with a crown.", "Open a pack to discover your first cards.", state.user ? "Explore packs" : "Join the court", state.user ? "go-packs" : "auth")}`;
+}
+function loadoutView() {
+  if (!state.user) {
+    $("#main").innerHTML =
+      title(
+        "YOUR CARD POWER",
+        "Build a three-card loadout.",
+        "Equip cards to improve your pack odds.",
+      ) +
+      empty(
+        "collection",
+        "Your loadout awaits.",
+        "Sign in to equip up to three cards from your collection.",
+        "Join the court",
+        "auth",
+      );
+    return;
+  }
+  const equipped = state.account?.loadout || [];
+  const cards = state.inventory.filter(
+    (row) => cardMap[row.template_id] && !row.vaulted && !row.trade_id,
+  );
+  $("#main").innerHTML =
+    title(
+      "YOUR CARD POWER",
+      "Build a three-card loadout.",
+      "Equip up to three cards for passive pack bonuses. Equipped cards stay yours, but must be unequipped before selling, vaulting, or trading.",
+    ) +
+    `<div class="loadout-summary panel"><div><span class="eyebrow">ACTIVE POWER</span><h2>${equipped.length} / 3 cards equipped</h2><p>Epic odds bonus capped at +4.00 percentage points. Bonuses come from the cards in your loadout.</p></div>${equipped
+      .map((id) =>
+        state.inventory.find((card) => Number(card.id) === Number(id)),
+      )
+      .filter(Boolean)
+      .map(
+        (row) =>
+          `<span class="loadout-chip">${esc(cardMap[row.template_id].name)} · ${esc(cardPowerup(row).name)}</span>`,
+      )
+      .join(
+        "",
+      )}</div>${cards.length ? `<div class="collection-grid loadout-grid">${cards.map((row) => gameCard(row, { owned: true, loadoutAction: true })).join("")}</div>` : empty("collection", "No available cards.", "Open a pack to find cards for your loadout.", "Explore packs", "go-packs")}`;
 }
 function empty(symbol, heading, text, button, action) {
   return `<div class="empty-state">${icon(symbol)}<h2>${heading}</h2><p>${text}</p>${button ? `<button class="button" data-action="${action}">${button} ${icon("arrow")}</button>` : ""}</div>`;
@@ -421,6 +477,45 @@ function rewardsView() {
   const starterButton = $('[data-action="claim-starter"]');
   if (starterButton)
     starterButton.innerHTML = `Open Starter Pack ${icon("arrow")}`;
+  const spunToday = a?.spin_day === new Date().toISOString().slice(0, 10);
+  $(".rewards-layout").insertAdjacentHTML(
+    "beforeend",
+    `<section class="panel daily-spin"><span class="eyebrow">ONCE PER UTC DAY</span><h2>Daily spin</h2><p>Three no-prize slices, small virtual-cash wins, and a 0.1% shot at £45.</p>${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p><div class="spin-prizes">${dailySpinSegments.map((segment) => `<span>${esc(segment.label)} <small>${(segment.weight / 1000000).toFixed(2)}%</small></span>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin</button>' : spunToday ? `<p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p><button class="button ghost full" disabled>Come back tomorrow</button>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></section>`,
+  );
+}
+function dailySpinWheel() {
+  let angle = -90;
+  const sectors = dailySpinSegments
+    .map((segment) => {
+      const sweep = (segment.weight / 100000000) * 360;
+      const start = angle;
+      const end = angle + sweep;
+      const point = (degrees, radius) => {
+        const radians = (degrees * Math.PI) / 180;
+        return [
+          110 + Math.cos(radians) * radius,
+          110 + Math.sin(radians) * radius,
+        ];
+      };
+      const [x1, y1] = point(start, 104);
+      const [x2, y2] = point(end, 104);
+      const [tx, ty] = point((start + end) / 2, 67);
+      const large = sweep > 180 ? 1 : 0;
+      const missIndex = ["miss-a", "miss-b", "miss-c"].indexOf(segment.id);
+      const color =
+        segment.id === "silver"
+          ? "#dfe5ef"
+          : segment.reward
+            ? segment.reward >= 500
+              ? "#c49b53"
+              : "#427d69"
+            : ["#3b4050", "#4b5060", "#303544"][missIndex];
+      const textColor = segment.id === "silver" ? "#18202a" : "#fff5dc";
+      angle = end;
+      return `<path d="M 110 110 L ${x1.toFixed(2)} ${y1.toFixed(2)} A 104 104 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z" fill="${color}" stroke="#181b24" stroke-width="2"/>${segment.id === "silver" ? "" : `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" fill="${textColor}" transform="rotate(${((start + end) / 2 + 90).toFixed(2)} ${tx.toFixed(2)} ${ty.toFixed(2)})">${esc(segment.label.toUpperCase())}</text>`}`;
+    })
+    .join("");
+  return `<div class="spin-wheel-wrap"><span class="spin-pointer" aria-hidden="true"></span><svg class="spin-wheel" data-wheel viewBox="0 0 220 220" role="img" aria-label="Daily prize wheel with three no-prize slices, virtual cash prizes, and a 0.1 percent chance to win £45"><circle cx="110" cy="110" r="108" fill="#13161e" stroke="#e2ca8e" stroke-width="3"/>${sectors}<circle cx="110" cy="110" r="20" fill="#171a22" stroke="#e2ca8e" stroke-width="3"/><text class="spin-wheel-center" x="110" y="114">SPIN</text></svg></div>`;
 }
 async function friendsView() {
   const v = renderVersion,
@@ -544,6 +639,7 @@ function render() {
     ({
       packs: shop,
       collection,
+      loadout: loadoutView,
       rewards: rewardsView,
       pot: potView,
       friends: friendsView,
@@ -565,7 +661,10 @@ window.addEventListener("hashchange", () => {
     state.view = v;
     state.selected.clear();
     render();
-    if (state.user && ["collection", "profile", "friends"].includes(v))
+    if (
+      state.user &&
+      ["collection", "loadout", "profile", "friends"].includes(v)
+    )
       sync()
         .then(() => {
           if (state.view === v) render();
@@ -972,6 +1071,63 @@ document.addEventListener("click", async (e) => {
     if (action === "profile") return navigate("profile");
     if (action === "settings") return settingsModal();
     if (action === "go-packs") return navigate("packs");
+    if (action === "loadout-toggle") {
+      if (!requireUser()) return;
+      const selected = (state.account?.loadout || []).map(Number);
+      const cardId = Number(id);
+      const next = selected.includes(cardId)
+        ? selected.filter((existing) => existing !== cardId)
+        : [...selected, cardId];
+      const result = await api("loadout", { ids: next });
+      state.account = result.account;
+      render();
+      toast(
+        next.includes(cardId)
+          ? "Card equipped. Its power now affects pack odds."
+          : "Card unequipped.",
+      );
+      return;
+    }
+    if (action === "spin-wheel") {
+      if (!requireUser() || state.busy) return;
+      state.busy = true;
+      target.disabled = true;
+      try {
+        const result = await api("rewards/spin", {});
+        const wheel = $("[data-wheel]");
+        if (wheel) {
+          let start = -90;
+          const segment = dailySpinSegments.find(
+            (entry) => entry.id === result.prize.id,
+          );
+          if (!segment)
+            throw Error("The rewards wheel returned an unknown prize.");
+          for (const entry of dailySpinSegments) {
+            const sweep = (entry.weight / 100000000) * 360;
+            if (entry.id === segment.id) {
+              const midpoint = start + sweep / 2;
+              const settle = (((-90 - midpoint) % 360) + 360) % 360;
+              wheel.style.transform = `rotate(${1440 + settle}deg)`;
+              break;
+            }
+            start += sweep;
+          }
+          $("#spin-status").textContent = "The wheel is spinning…";
+          await new Promise((resolve) => setTimeout(resolve, 4300));
+        }
+        state.account = result.account;
+        if (state.view === "rewards") render();
+        toast(
+          result.prize.reward
+            ? `Daily spin prize: ${money(result.prize.reward)}!`
+            : "No prize this time. Your next spin is available tomorrow.",
+        );
+      } finally {
+        state.busy = false;
+        if (target.isConnected) target.disabled = false;
+      }
+      return;
+    }
     if (action === "mute") {
       state.muted = !state.muted;
       target.innerHTML =

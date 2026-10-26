@@ -12,6 +12,29 @@ export const playReward = Object.freeze({
   increasePence: 25,
   dailyCap: 500,
 });
+export const dailySpinSegments = Object.freeze([
+  { id: "miss-a", label: "No prize", reward: 0, weight: 25000000 },
+  { id: "miss-b", label: "No prize", reward: 0, weight: 25000000 },
+  { id: "miss-c", label: "No prize", reward: 0, weight: 25000000 },
+  { id: "small", label: "25p", reward: 25, weight: 10000000 },
+  { id: "nice", label: "50p", reward: 50, weight: 7000000 },
+  { id: "bright", label: "£1", reward: 100, weight: 5000000 },
+  { id: "gold", label: "£5", reward: 500, weight: 2900000 },
+  { id: "silver", label: "£45", reward: 4500, weight: 100000 },
+]);
+export function dailySpin(randomInt) {
+  const total = dailySpinSegments.reduce(
+    (sum, segment) => sum + segment.weight,
+    0,
+  );
+  if (total !== 100000000) throw Error("Daily spin odds must total 100%.");
+  let roll = randomInt(total);
+  for (const segment of dailySpinSegments) {
+    if (roll < segment.weight) return segment;
+    roll -= segment.weight;
+  }
+  throw Error("Daily spin roll was outside its odds.");
+}
 export function friendTablePayout(stake, hasOpponent) {
   if (!Number.isSafeInteger(stake) || stake < 1)
     throw Error("Stake must be a positive whole-pence amount.");
