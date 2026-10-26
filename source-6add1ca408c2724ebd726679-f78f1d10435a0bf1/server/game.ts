@@ -7,6 +7,7 @@ import {
   weightedWinner,
   packProgress,
   loadoutPowerup,
+  indexSets,
 } from "../shared/catalog.mjs";
 import { database, pool, databaseTarget } from "../db/index.js";
 import { accounts, inventory } from "../db/schema.js";
@@ -447,6 +448,30 @@ export async function handle(
           ]);
           return { account: await account() };
         }
+        if (route === "index/claim" && req.method === "POST") {
+          const set = indexSets.find((entry) => entry.id === body.set_id);
+          if (!set) fail("Unknown character index set.", 404);
+          const current = await account();
+          const discovered = new Set(current.character_index || []);
+          if (!set.cardIds.every((cardId: string) => discovered.has(cardId)))
+            fail("Discover every card in this set before claiming its reward.", 409);
+          const setRewards = current.set_rewards || {};
+          if (setRewards[set.id]) fail("This set reward has already been claimed.", 409);
+          const epicBonus = Number(current.permanent_epic_bonus || 0);
+          const crownBonus = Number(current.permanent_crown_bonus || 0);
+          if (body.reward === "epic") {
+            if (epicBonus + 500000 > 1000000) fail("Your permanent Epic chance reward is already at its limit.", 409);
+            await c.query("UPDATE accounts SET permanent_epic_bonus=permanent_epic_bonus+500000,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2,'epic') WHERE id=$1", [id, set.id]);
+          } else if (body.reward === "crown") {
+            if (crownBonus + 100000 > 100000) fail("Your permanent Crown chance reward is already at its limit.", 409);
+            await c.query("UPDATE accounts SET permanent_crown_bonus=permanent_crown_bonus+100000,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2,'crown') WHERE id=$1", [id, set.id]);
+          } else if (body.reward === "badge") {
+            if (epicBonus + 500000 <= 1000000 || crownBonus + 100000 <= 100000)
+              fail("A permanent odds reward is still available.", 409);
+            await c.query("UPDATE accounts SET set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2,'badge') WHERE id=$1", [id, set.id]);
+          } else fail("Choose a valid set reward.");
+          return { account: await account() };
+        }
         if (route === "upgrades/pack-opening" && req.method === "POST") {
           const currentAccount = await account();
           const slots = Number(currentAccount.pack_slots || 1);
@@ -507,7 +532,7 @@ export async function handle(
           for (let offset = 0; offset < quantity; offset++) {
             const guaranteedEpic = packProgress(opened + offset).nextGuaranteed;
             if (guaranteedEpic) guaranteedPacks.push(offset + 1);
-            cards.push(...rollPack(pack, randomInt, { guaranteedEpic, powerups: powerCards }));
+            cards.push(...rollPack(pack, randomInt, { guaranteedEpic, powerups: powerCards, permanentEpicBonus: Number(currentAccount.permanent_epic_bonus || 0), permanentCrownBonus: Number(currentAccount.permanent_crown_bonus || 0) }));
           }
           const minted = [];
           for (const card of cards) {
@@ -533,6 +558,8 @@ export async function handle(
           } else {
             await c.query("UPDATE accounts SET packs=packs+$2,pulled=pulled+$3 WHERE id=$1", [id, quantity, cards.length]);
           }
+          const discoveredTemplates = cards.map((card: any) => card.id);
+          await c.query("UPDATE accounts SET character_index=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.character_index || $2::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1", [id, discoveredTemplates]);
           return { cards: result, account: await account(), packCount: quantity, epicGuaranteed: guaranteedPacks.length > 0, guaranteedPacks, discount, pricePaid };
         }
         if (route === "rewards/starter" && req.method === "POST") {
@@ -549,6 +576,7 @@ export async function handle(
               [id, card.id, card.value, card.rarity],
             )
           ).rows[0];
+          await c.query("UPDATE accounts SET character_index=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.character_index || $2::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1", [id, [card.id]]);
           return {
             card: { ...card, ...stored },
             account: await account(),
@@ -828,6 +856,12 @@ export async function handle(
               const valid = validTradeCards(t, offered);
               if (!valid)
                 fail("The offered cards changed. Update the trade.", 409);
+              const discoveredByA = offered.filter((card: any) => card.owner_id === t.user_b).map((card: any) => card.template_id);
+              const discoveredByB = offered.filter((card: any) => card.owner_id === t.user_a).map((card: any) => card.template_id);
+              if (discoveredByA.length)
+                await c.query("UPDATE accounts SET character_index=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.character_index || $2::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1", [t.user_a, discoveredByA]);
+              if (discoveredByB.length)
+                await c.query("UPDATE accounts SET character_index=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.character_index || $2::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1", [t.user_b, discoveredByB]);
               await c.query(
                 "UPDATE inventory SET owner_id=CASE WHEN owner_id=$2 THEN $3 ELSE $2 END,trade_id=NULL WHERE trade_id=$1",
                 [t.id, t.user_a, t.user_b],
