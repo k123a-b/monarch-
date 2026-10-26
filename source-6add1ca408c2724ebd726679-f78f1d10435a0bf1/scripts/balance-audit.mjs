@@ -58,10 +58,9 @@ console.log(JSON.stringify(report, null, 2));
 console.log(
   "Simulated sell values, not automatic cash credits. Rare jackpots do not establish a stable average return or guarantee profit.",
 );
-const worldLeaders = report.find((pack) => pack.pack === "World Leaders Pack");
-if (
-  report.some((pack) => pack.failedGuarantees) ||
-  Number.parseFloat(worldLeaders.losingPacks) < 65 ||
-  Number.parseFloat(worldLeaders.losingPacks) > 80
-)
+const outsideBalancedRange = report.some((pack) => {
+  const lossRate = Number.parseFloat(pack.losingPacks);
+  return lossRate < 45 || lossRate > 55;
+});
+if (report.some((pack) => pack.failedGuarantees) || outsideBalancedRange)
   process.exitCode = 1;

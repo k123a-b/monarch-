@@ -115,9 +115,9 @@ for (const p of packs) {
       });
   });
 }
-test("Fortnite Drop Pack shifts 12 points out of Common and prices the roster for £125 packs", () => {
+test("Fortnite Drop Pack keeps 50/50 loss odds while making Epic characters much rarer", () => {
   const pack = packs.find((entry) => entry.id === "fortnite");
-  assert.deepEqual(pack.odds, [74000000, 20000000, 5998990, 1000, 10]);
+  assert.deepEqual(pack.odds, [55000000, 43998990, 1000000, 1000, 10]);
   assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), 100000000);
   assert.deepEqual(
     [
