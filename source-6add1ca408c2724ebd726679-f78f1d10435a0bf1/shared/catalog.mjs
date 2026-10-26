@@ -348,29 +348,40 @@ const rarityPowerups = Object.freeze({
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
-    { name: "Tiny lift", epicBonus: 10000 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "Small lucky lift", epicBonus: 25000 },
+    { name: "Uncommon nudge", epicBonus: 0, uncommonBonus: 50000 },
     { name: "Slight stumble", epicBonus: -10000 },
     { name: "Thrifty crown", epicBonus: 0, packDiscount: 10 },
   ],
   Uncommon: [
-    { name: "Lucky charm", epicBonus: 20000 },
-    { name: "Crooked luck", epicBonus: -20000 },
+    { name: "Uncommon lift", epicBonus: 0, uncommonBonus: 80000 },
+    { name: "A little luck", epicBonus: 70000 },
+    { name: "Steady hands", epicBonus: 40000 },
+    { name: "Gentle stumble", epicBonus: -25000 },
+    { name: "No power-up", epicBonus: 0 },
   ],
   Epic: [
-    { name: "Court's favor", epicBonus: 100000 },
-    { name: "Court intrigue", epicBonus: -100000 },
+    { name: "Court's favor", epicBonus: 180000 },
+    { name: "Measured momentum", epicBonus: 140000 },
+    { name: "Uncommon boost", epicBonus: 0, uncommonBonus: 150000 },
+    { name: "No power-up", epicBonus: 0 },
+    { name: "Small setback", epicBonus: -35000 },
   ],
   Crown: [
-    { name: "Royal decree", epicBonus: 1500000 },
-    { name: "Royal blunder", epicBonus: -1500000 },
+    { name: "Royal decree", epicBonus: 400000 },
+    { name: "Crown's favor", epicBonus: 350000, uncommonBonus: 100000 },
+    { name: "Golden momentum", epicBonus: 300000 },
+    { name: "Sovereign chance", epicBonus: 250000, uncommonBonus: 150000 },
   ],
   Chase: [
-    { name: "Chase energy", epicBonus: 3000000 },
-    { name: "Chase misstep", epicBonus: -3000000 },
+    { name: "Chase energy", epicBonus: 250000 },
+    { name: "Chase insight", epicBonus: 0, uncommonBonus: 200000 },
+    { name: "Chase misstep", epicBonus: -50000 },
   ],
   Alpha: [
-    { name: "Golden touch", epicBonus: 4000000 },
-    { name: "Gilded curse", epicBonus: -4000000 },
+    { name: "Mystery Gold", epicBonus: 150000, uncommonBonus: 100000 },
   ],
 });
 export function cardPowerup(card) {
@@ -384,8 +395,17 @@ export function cardPowerup(card) {
     return {
       name: "Renegade's command",
       epicBonus: 0,
+      uncommonBonus: 0,
       crownBonus: 700000,
       everyOtherCard: false,
+    };
+  if (template.id === "kim")
+    return {
+      name: "Every other card · Uncommon+",
+      epicBonus: 0,
+      uncommonBonus: 0,
+      crownBonus: 0,
+      everyOtherCard: true,
     };
   const powerup =
     rarityPowerups[template.rarity][
@@ -393,8 +413,10 @@ export function cardPowerup(card) {
     ];
   return {
     ...powerup,
+    epicBonus: powerup.epicBonus || 0,
+    uncommonBonus: powerup.uncommonBonus || 0,
     crownBonus: 0,
-    everyOtherCard: template.id === "kim",
+    everyOtherCard: false,
   };
 }
 export function loadoutPowerup(cards) {
@@ -402,10 +424,17 @@ export function loadoutPowerup(cards) {
     throw Error("A loadout can contain at most four cards.");
   const powerups = cards.map(cardPowerup);
   const epicBonus = Math.max(
-    -4000000,
+    -1000000,
     Math.min(
-      4000000,
+      1000000,
       powerups.reduce((total, powerup) => total + powerup.epicBonus, 0),
+    ),
+  );
+  const uncommonBonus = Math.max(
+    -600000,
+    Math.min(
+      600000,
+      powerups.reduce((total, powerup) => total + (powerup.uncommonBonus || 0), 0),
     ),
   );
   const crownBonus = Math.max(
@@ -417,6 +446,7 @@ export function loadoutPowerup(cards) {
   );
   return {
     epicBonus,
+    uncommonBonus,
     crownBonus,
     everyOtherCard: powerups.some((powerup) => powerup.everyOtherCard),
     packDiscount: Math.max(
@@ -541,6 +571,15 @@ export function rollPack(
 ) {
   const effect = loadoutPowerup(powerups);
   const odds = [...pack.odds];
+  if (effect.uncommonBonus > 0) {
+    const shifted = Math.min(odds[0], effect.uncommonBonus);
+    odds[0] -= shifted;
+    odds[1] += shifted;
+  } else if (effect.uncommonBonus < 0) {
+    const shifted = Math.min(odds[1], -effect.uncommonBonus);
+    odds[1] -= shifted;
+    odds[0] += shifted;
+  }
   if (effect.epicBonus > 0) {
     let remaining = effect.epicBonus;
     for (const index of [0, 1]) {
