@@ -388,18 +388,27 @@ function loadoutEffectModal(cardId) {
     (card) => Number(card.id) !== Number(row.id),
   );
   const current = loadoutPowerup(equippedCards);
+  const powerup = cardPowerup(row);
+  const previewAtCapacity =
+    !isEquipped &&
+    equippedCards.length >= Number(state.account?.loadout_slots || 3);
   const before = isEquipped ? loadoutPowerup(withoutCard) : current;
   const after = isEquipped
     ? current
-    : loadoutPowerup([...equippedCards, row]);
-  const change = after.epicBonus - before.epicBonus;
+    : previewAtCapacity
+      ? current
+      : loadoutPowerup([...equippedCards, row]);
+  const change = previewAtCapacity
+    ? powerup.epicBonus
+    : after.epicBonus - before.epicBonus;
   const points = (value) =>
     `${value > 0 ? "+" : ""}${(value / 1000000).toFixed(2)} percentage points`;
-  const powerup = cardPowerup(row);
   const effects = [];
   if (change)
     effects.push(
-      `Epic odds ${change > 0 ? "increase" : "decrease"} by ${points(change)}.`,
+      previewAtCapacity
+        ? `This card's power would ${change > 0 ? "increase" : "decrease"} Epic odds by ${points(change)} if equipped.`
+        : `Epic odds ${change > 0 ? "increase" : "decrease"} by ${points(change)}.`,
     );
   else effects.push("This card makes no additional change to Epic odds.");
   if (powerup.everyOtherCard)
@@ -412,7 +421,7 @@ function loadoutEffectModal(cardId) {
     ? `With this card, your loadout shifts ${points(after.epicBonus)} into Epic odds.`
     : "With this card, your loadout has no net Epic odds adjustment.";
   showModal(
-    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Positive adjustments shift odds from Common, then Uncommon, into Epic. Negative adjustments shift odds from Epic to Common. The loadout adjustment is capped at ±4.00 percentage points.</small></div>${!isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
+    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Positive adjustments shift odds from Common, then Uncommon, into Epic. Negative adjustments shift odds from Epic to Common. The loadout adjustment is capped at ±4.00 percentage points.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
     "odds-effect-modal",
   );
 }
