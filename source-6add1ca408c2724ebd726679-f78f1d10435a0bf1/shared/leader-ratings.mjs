@@ -12,7 +12,7 @@ const countryTiers = [
 ];
 const worldLeaderValueScale = 1.13;
 const notableFigures = {
-  "Donald Trump": { rarity: "Crown", value: 333333 },
+  "Donald Trump": { rarity: "Crown", value: 50000 },
   "King Charles III": { rarity: "Epic", value: 7500 },
   "Xi Jinping": { rarity: "Crown", value: 5600 },
   "Vladimir Putin": { rarity: "Crown", value: 5000 },
