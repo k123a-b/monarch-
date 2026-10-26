@@ -534,9 +534,12 @@ export async function handle(
           const result = stored.rows
             .sort((a: any, b: any) => a.id - b.id)
             .map((row: any) => ({ ...cardMap[row.template_id], ...row }));
+          const discoveredFortnite = cards
+            .filter((card: any) => card.set === "fortnite")
+            .map((card: any) => card.id);
           await c.query(
-            "UPDATE accounts SET packs=packs+1,pulled=pulled+$2 WHERE id=$1",
-            [id, cards.length],
+            "UPDATE accounts SET packs=packs+1,pulled=pulled+$2,fortnite_collection=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(fortnite_collection || $3::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1",
+            [id, cards.length, discoveredFortnite],
           );
           return {
             cards: result,
