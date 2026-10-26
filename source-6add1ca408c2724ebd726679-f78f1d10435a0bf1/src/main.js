@@ -990,6 +990,11 @@ async function openPack(id) {
             newCards.includes(c) &&
             cardMap[c.template_id]?.name === "Donald Trump",
         );
+        const netanyahuIndex = cards.findIndex(
+          (c) =>
+            newCards.includes(c) &&
+            cardMap[c.template_id]?.name === "Benjamin Netanyahu",
+        );
         const charlesIndex = cards.findIndex(
           (c) =>
             newCards.includes(c) &&
@@ -1016,7 +1021,15 @@ async function openPack(id) {
             andyIndex,
             "andy-stage",
             "andy-card",
-            '<div class="andy-northern-lights"><span>✦</span><span>✧</span><i>✦</i></div>',
+            '<div class="andy-northern-lights"><span>✦</span><span>✧</span><i>✦</i></div><strong class="andy-normal-bloke">Just a normal bloke</strong>',
+          );
+        }
+        if (netanyahuIndex >= 0 && !reduced) {
+          addCenteredRevealStage(
+            netanyahuIndex,
+            "netanyahu-stage",
+            "netanyahu-card",
+            '<div class="netanyahu-glints" aria-hidden="true"><span>✦</span><i>✧</i><i>✦</i></div>',
           );
         }
         if (israelIndex >= 0 && !reduced) {

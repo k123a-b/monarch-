@@ -4391,6 +4391,7 @@ body:has(dialog[open]) {
     0 0 32px #f6d57d88;
 }
 .andy-stage,
+.netanyahu-stage,
 .israel-stage {
   position: fixed;
   inset: 0;
@@ -4404,11 +4405,11 @@ body:has(dialog[open]) {
   background:
     radial-gradient(ellipse at center, #5ca9bc29 0 26%, transparent 68%),
     linear-gradient(110deg, #183c50b0, #14233025 55%, #d8b55618);
-  animation: andy-stage-glide 3.2s ease-out both;
+  animation: andy-stage-glide 5s ease-out both;
 }
 .andy-card {
   width: min(340px, 76vw);
-  animation: andy-card-flight 3.2s cubic-bezier(0.22, 0.66, 0.24, 1) both;
+  animation: andy-card-flight 5s cubic-bezier(0.22, 0.66, 0.24, 1) both;
   box-shadow:
     0 0 36px #73bdd477,
     0 0 90px #3f718b55;
@@ -4418,6 +4419,63 @@ body:has(dialog[open]) {
   box-shadow:
     inset 0 0 28px #61bccb38,
     0 0 30px #b2ecdf70;
+}
+.andy-normal-bloke {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 7vh;
+  z-index: 2;
+  color: #f3fffb;
+  font-size: clamp(1.25rem, 4vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.015em;
+  text-align: center;
+  text-shadow: 0 3px 18px #07151dcc, 0 0 24px #83dcca;
+  animation: andy-caption-show 5s ease both;
+}
+.netanyahu-stage {
+  background:
+    radial-gradient(ellipse at center, #4a91c844 0 24%, transparent 68%),
+    linear-gradient(135deg, #09265399, #14233024 55%, #f4d27b22);
+  animation: netanyahu-stage-glow 3.4s ease-out both;
+}
+.netanyahu-card {
+  width: min(340px, 76vw);
+  animation: netanyahu-card-arrive 3.4s cubic-bezier(0.18, 0.72, 0.24, 1) both;
+  box-shadow: 0 0 38px #71b7ef88, 0 0 95px #e4c47755;
+}
+.netanyahu-card:before {
+  border-color: #cfeaff !important;
+  box-shadow: inset 0 0 30px #4a9bd544, 0 0 32px #e9cb7b77;
+}
+.netanyahu-glints {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: #f7e8b2;
+  text-shadow: 0 0 22px #9bd7ff, 0 0 35px #e4c477;
+}
+.netanyahu-glints span,
+.netanyahu-glints i {
+  position: absolute;
+  font-size: clamp(2rem, 7vw, 4rem);
+  font-style: normal;
+  animation: netanyahu-glint 2.6s ease-out both;
+}
+.netanyahu-glints span {
+  top: 16%;
+  left: 20%;
+}
+.netanyahu-glints i:first-of-type {
+  top: 23%;
+  right: 19%;
+  animation-delay: 0.18s;
+}
+.netanyahu-glints i:last-of-type {
+  bottom: 15%;
+  right: 25%;
+  animation-delay: 0.35s;
 }
 .andy-northern-lights,
 .israel-star-glow {
@@ -4496,6 +4554,60 @@ body:has(dialog[open]) {
   right: 20%;
   bottom: 18%;
   animation-delay: 0.2s;
+}
+@keyframes andy-caption-show {
+  0%, 14% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  28%, 88% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes netanyahu-stage-glow {
+  0%, 12% {
+    opacity: 0;
+  }
+  34%, 78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes netanyahu-card-arrive {
+  0% {
+    opacity: 0;
+    transform: translate(var(--start-x), calc(var(--start-y) + 7vh)) scale(0.52)
+      rotateY(-14deg);
+  }
+  42% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1.06) rotateY(4deg);
+  }
+  76%, 100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotateY(0);
+  }
+}
+@keyframes netanyahu-glint {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-25deg);
+  }
+  42% {
+    opacity: 1;
+    transform: scale(1.15) rotate(15deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.65) rotate(35deg);
+  }
 }
 @keyframes andy-stage-glide {
   0%,
