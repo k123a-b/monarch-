@@ -72,6 +72,19 @@ test(
         },
       );
       await t.test(
+        "username changes reject duplicates without changing the saved name",
+        async () => {
+          const response = await request(a, "account/username", {
+            username: bb.username,
+          });
+          assert.equal(response.status, 409);
+          assert.equal(
+            (await request(a, "me")).data.account.username,
+            aa.username,
+          );
+        },
+      );
+      await t.test(
         "authentication boundary rejects absent or expired Identity sessions",
         async () => {
           assert.equal((await request(null, "me")).status, 401);
@@ -154,6 +167,61 @@ test(
             ),
             5,
           );
+        },
+      );
+      await t.test(
+        "daily spin pays its recorded prize once per UTC day",
+        async () => {
+          const before = Number((await request(a, "me")).data.account.balance);
+          const spin = await request(a, "rewards/spin", {});
+          assert.equal(spin.status, 200);
+          assert.equal(
+            spin.data.account.spin_day,
+            new Date().toISOString().slice(0, 10),
+          );
+          assert.equal(
+            Number(spin.data.account.balance),
+            before + spin.data.prize.reward,
+          );
+          assert.equal((await request(a, "rewards/spin", {})).status, 409);
+        },
+      );
+      await t.test(
+        "equipped Kim improves packs and cannot be sold or vaulted",
+        async () => {
+          const kim = (
+            await query(
+              "INSERT INTO inventory(owner_id,template_id,value,rarity) VALUES($1,$2,$3,'Chase') RETURNING *",
+              [a.id, cardMap.kim.id, cardMap.kim.value],
+            )
+          ).rows[0];
+          try {
+            const equipped = await request(a, "loadout", { ids: [kim.id] });
+            assert.equal(equipped.status, 200);
+            assert.deepEqual(equipped.data.account.loadout, [kim.id]);
+            assert.equal(
+              (await request(a, "sell", { ids: [kim.id] })).status,
+              409,
+            );
+            assert.equal(
+              (await request(a, "vault", { id: kim.id })).status,
+              409,
+            );
+            const pack = await request(a, "open", { pack: "brainrot" });
+            assert.equal(pack.status, 200);
+            assert.ok(
+              ["Uncommon", "Epic", "Crown", "Alpha"].includes(
+                pack.data.cards[1].rarity,
+              ),
+            );
+            assert.ok(
+              ["Uncommon", "Epic", "Crown", "Alpha"].includes(
+                pack.data.cards[3].rarity,
+              ),
+            );
+          } finally {
+            await request(a, "loadout", { ids: [] });
+          }
         },
       );
       const ca = (

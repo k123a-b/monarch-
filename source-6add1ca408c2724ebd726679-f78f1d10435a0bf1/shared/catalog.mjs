@@ -284,6 +284,51 @@ export const catalog = [
   ),
 }));
 export const cardMap = Object.fromEntries(catalog.map((c) => [c.id, c]));
+const rarityPowerups = Object.freeze({
+  Common: [
+    { name: "No effect", epicBonus: 0 },
+    { name: "Faint spark", epicBonus: 25000 },
+    { name: "Slight stumble", epicBonus: -25000 },
+    { name: "Quiet luck", epicBonus: 0 },
+  ],
+  Uncommon: [{ name: "Lucky charm", epicBonus: 150000 }],
+  Epic: [{ name: "Court's favor", epicBonus: 750000 }],
+  Crown: [{ name: "Royal decree", epicBonus: 2000000 }],
+  Chase: [{ name: "Chase energy", epicBonus: 3000000 }],
+  Alpha: [{ name: "Golden touch", epicBonus: 4000000 }],
+});
+export function cardPowerup(card) {
+  const template = cardMap[card?.template_id || card?.id] || card;
+  if (!template?.id || !rarityPowerups[template.rarity])
+    throw Error("Card powerup requires a known card template.");
+  let hash = 0;
+  for (const character of template.id)
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  const powerup =
+    rarityPowerups[template.rarity][
+      hash % rarityPowerups[template.rarity].length
+    ];
+  return {
+    ...powerup,
+    everyOtherCard: template.id === "kim",
+  };
+}
+export function loadoutPowerup(cards) {
+  if (!Array.isArray(cards) || cards.length > 3)
+    throw Error("A loadout can contain at most three cards.");
+  const powerups = cards.map(cardPowerup);
+  const epicBonus = Math.max(
+    -4000000,
+    Math.min(
+      4000000,
+      powerups.reduce((total, powerup) => total + powerup.epicBonus, 0),
+    ),
+  );
+  return {
+    epicBonus,
+    everyOtherCard: powerups.some((powerup) => powerup.everyOtherCard),
+  };
+}
 export const leaderSource = {
   source: leaderData.source,
   retrieved: leaderData.retrieved,
@@ -378,7 +423,38 @@ for (const card of catalog) {
   normalPools.get(key).push(card);
 }
 // All randomness is injected; production supplies cryptographic integer sampling.
-export function rollPack(pack, randomInt, { guaranteedEpic = false } = {}) {
+export function rollPack(
+  pack,
+  randomInt,
+  { guaranteedEpic = false, powerups = [] } = {},
+) {
+  const effect = loadoutPowerup(powerups);
+  const odds = [...pack.odds];
+  if (effect.epicBonus > 0) {
+    let remaining = effect.epicBonus;
+    for (const index of [0, 1]) {
+      const shifted = Math.min(odds[index], remaining);
+      odds[index] -= shifted;
+      odds[2] += shifted;
+      remaining -= shifted;
+    }
+  } else if (effect.epicBonus < 0) {
+    const shifted = Math.min(odds[2], -effect.epicBonus);
+    odds[2] -= shifted;
+    odds[0] += shifted;
+  }
+  function rollRarity(minimumIndex = 0) {
+    const total = odds
+      .slice(minimumIndex)
+      .reduce((sum, weight) => sum + weight, 0);
+    if (total <= 0) throw Error("Empty rarity odds pool.");
+    let roll = randomInt(total);
+    for (let index = minimumIndex; index < odds.length; index++) {
+      if (roll < odds[index]) return rarities[index];
+      roll -= odds[index];
+    }
+    throw Error("Rarity roll was outside its odds.");
+  }
   const used = new Set();
   function pick(rarity) {
     if (rarity === "Alpha") return { ...alpha };
@@ -390,11 +466,9 @@ export function rollPack(pack, randomInt, { guaranteedEpic = false } = {}) {
     used.add(card.id);
     return { ...card };
   }
-  const result = Array.from({ length: pack.count }, () => {
-    const n = randomInt(100000000);
-    let cumulative = 0;
-    const idx = pack.odds.findIndex((w) => (cumulative += w) > n);
-    return pick(rarities[idx]);
+  const result = Array.from({ length: pack.count }, (_, index) => {
+    const floor = effect.everyOtherCard && index % 2 === 1 ? 1 : 0;
+    return pick(rollRarity(floor));
   });
   if (
     pack.guarantee &&

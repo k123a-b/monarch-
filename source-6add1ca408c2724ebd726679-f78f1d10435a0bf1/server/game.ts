@@ -14,6 +14,7 @@ import { eq, desc, inArray } from "drizzle-orm";
 
 import {
   activityReward,
+  dailySpin,
   validTradeCards,
   validFriendCode,
   validUsername,
@@ -360,6 +361,48 @@ export async function handle(
           );
           return { account: await account() };
         }
+        if (route === "loadout" && req.method === "POST") {
+          const selected = ids(body.ids);
+          if (selected.length > 3)
+            fail("Choose up to three cards for your loadout.");
+          if (
+            Array.isArray(body.ids) &&
+            new Set(body.ids).size !== body.ids.length
+          )
+            fail("Each loadout card can only be selected once.");
+          const owned = selected.length
+            ? (
+                await c.query(
+                  "SELECT id FROM inventory WHERE owner_id=$1 AND id=ANY($2::int[]) AND vaulted=false AND trade_id IS NULL",
+                  [id, selected],
+                )
+              ).rows
+            : [];
+          if (owned.length !== selected.length)
+            fail("Loadout cards must be available in your collection.", 409);
+          await c.query("UPDATE accounts SET loadout=$2::int[] WHERE id=$1", [
+            id,
+            selected,
+          ]);
+          return { account: await account() };
+        }
+        if (route === "rewards/spin" && req.method === "POST") {
+          const today = new Date().toISOString().slice(0, 10);
+          const current = await account();
+          if (current.spin_day === today)
+            fail(
+              "You have already used today’s spin. Come back tomorrow.",
+              409,
+            );
+          const prize = dailySpin(randomInt);
+          if (prize.reward > 0)
+            await change(c, id, prize.reward, "Daily rewards wheel");
+          await c.query(
+            "UPDATE accounts SET spin_day=$2,spin_reward=$3 WHERE id=$1",
+            [id, today, prize.reward],
+          );
+          return { prize, account: await account() };
+        }
         if (route === "ledger" && req.method === "GET")
           return (
             await c.query(
@@ -375,8 +418,23 @@ export async function handle(
           const epicGuaranteed = packProgress(
             Number(currentAccount.packs),
           ).nextGuaranteed;
+          const equippedIds: number[] = currentAccount.loadout || [];
+          const equipped = equippedIds.length
+            ? (
+                await c.query(
+                  "SELECT id,template_id FROM inventory WHERE owner_id=$1 AND id=ANY($2::int[]) AND vaulted=false AND trade_id IS NULL",
+                  [id, equippedIds],
+                )
+              ).rows
+            : [];
+          if (equipped.length !== equippedIds.length)
+            fail(
+              "Your loadout has an unavailable card. Update it before opening a pack.",
+              409,
+            );
           const cards = rollPack(pack, randomInt, {
             guaranteedEpic: epicGuaranteed,
+            powerups: equipped.map((row: any) => cardMap[row.template_id]),
           });
           const minted = [];
           for (const card of cards) {
@@ -431,6 +489,9 @@ export async function handle(
         if (route === "sell" && req.method === "POST") {
           const selected = ids(body.ids);
           if (!selected.length) fail("Select cards to sell.");
+          const equippedIds: number[] = (await account()).loadout || [];
+          if (selected.some((cardId) => equippedIds.includes(cardId)))
+            fail("Unequip loadout cards before selling them.", 409);
           const cards = (
             await c.query(
               "SELECT * FROM inventory WHERE owner_id=$1 AND id=ANY($2::int[]) FOR UPDATE",
@@ -464,6 +525,9 @@ export async function handle(
         }
         if (route === "vault" && req.method === "POST") {
           const card = integer(body.id);
+          const equippedIds: number[] = (await account()).loadout || [];
+          if (equippedIds.includes(card))
+            fail("Unequip this card before vaulting it.", 409);
           const r = await c.query(
             "UPDATE inventory SET vaulted=NOT vaulted WHERE owner_id=$1 AND id=$2 AND trade_id IS NULL RETURNING *",
             [id, card],
@@ -641,6 +705,12 @@ export async function handle(
           if (route === "trades/offer") {
             const selected = ids(body.ids);
             if (selected.length > 50) fail("Offer at most 50 cards.");
+            const equippedIds: number[] = (await account()).loadout || [];
+            if (selected.some((cardId) => equippedIds.includes(cardId)))
+              fail(
+                "Unequip loadout cards before offering them in a trade.",
+                409,
+              );
             await c.query(
               "UPDATE inventory SET trade_id=NULL WHERE trade_id=$1 AND owner_id=$2",
               [t.id, id],

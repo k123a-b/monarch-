@@ -10,9 +10,13 @@ import {
   cardMap,
   packProgress,
   packValueRange,
+  cardPowerup,
+  loadoutPowerup,
 } from "../shared/catalog.mjs";
 import {
   activityReward,
+  dailySpin,
+  dailySpinSegments,
   friendTablePayout,
   matchedPotBotStake,
   validFriendCode,
@@ -118,6 +122,50 @@ test("Apex replaces exactly one low card with Crown when all rolls are Epic", ()
   );
   assert.equal(pull.filter((c) => c.rarity === "Crown").length, 1);
   assert.equal(pull.filter((c) => c.rarity === "Epic").length, 4);
+});
+test("card powerups are defined and Kim guarantees every second pack card Uncommon+", () => {
+  for (const card of catalog) {
+    const powerup = cardPowerup(card);
+    assert.equal(typeof powerup.name, "string");
+    assert.ok(Number.isInteger(powerup.epicBonus));
+  }
+  const powerup = loadoutPowerup([cardMap.kim]);
+  assert.equal(powerup.everyOtherCard, true);
+  assert.equal(powerup.epicBonus, 3000000);
+  assert.ok(
+    Math.abs(
+      loadoutPowerup([cardMap.kim, cardMap.kim, cardMap.kim]).epicBonus,
+    ) <= 4000000,
+  );
+  const world = packs.find((pack) => pack.id === "world");
+  const cards = rollPack(
+    world,
+    (max) => (max === world.chaseOdds ? max - 1 : 0),
+    { powerups: [cardMap.kim] },
+  );
+  assert.equal(cards.length, world.count);
+  assert.ok(["Uncommon", "Epic", "Crown", "Alpha"].includes(cards[1].rarity));
+  assert.ok(["Uncommon", "Epic", "Crown", "Alpha"].includes(cards[3].rarity));
+});
+test("daily rewards wheel has three no-prize sectors and an exact 0.1% £45 silver prize", () => {
+  assert.equal(
+    dailySpinSegments.reduce((sum, segment) => sum + segment.weight, 0),
+    100000000,
+  );
+  assert.equal(
+    dailySpinSegments.filter((segment) => segment.reward === 0).length,
+    3,
+  );
+  assert.equal(
+    dailySpinSegments.find((segment) => segment.id === "silver").weight,
+    100000,
+  );
+  assert.equal(
+    dailySpinSegments.find((segment) => segment.id === "silver").reward,
+    4500,
+  );
+  assert.equal(dailySpin((max) => max - 1).id, "silver");
+  assert.equal(dailySpin((max) => 0).reward, 0);
 });
 test("original catalogue contains exactly 93 templates excluding world expansion", () =>
   assert.equal(catalog.filter((c) => c.set !== "world").length, 93));
