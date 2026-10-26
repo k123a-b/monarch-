@@ -233,6 +233,11 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
     Epic: 0.1,
     Crown: 0.12,
   }[rarity];
+  const lowValueFlags = {
+    Greece: 12,
+    Qatar: 18,
+    Bangladesh: 24,
+  };
   return {
     id: `world-flag-${country.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     name: `Flag of ${country}`,
@@ -240,7 +245,7 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
     role: "National flag",
     set: "world",
     rarity,
-    value: Math.round(value * valueMultiplier),
+    value: lowValueFlags[country] ?? Math.round(value * valueMultiplier * 1.13),
     page: `https://flagcdn.com/w320/${flagCode(country)}.png`,
     emoji: flags[country],
     pattern: patterns[index % patterns.length],

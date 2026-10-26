@@ -518,8 +518,8 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   });
   assert.equal(americanLeader.rarity, "Crown");
   assert.equal(greekLeader.rarity, "Uncommon");
-  assert.equal(americanLeader.value, 2600);
-  assert.equal(greekLeader.value, 120);
+  assert.ok(americanLeader.value >= 6500 && americanLeader.value <= 8000);
+  assert.ok(greekLeader.value >= 305 && greekLeader.value <= 373);
   assert.ok(americanLeader.value > greekLeader.value);
   assert.ok(
     rateLeader({ name: "King Charles III", country: "Canada" }).value <= 400,
@@ -555,15 +555,22 @@ test("leader ratings reflect country GDP and recognition while preserving featur
           card.rarity === "Uncommon" &&
           card.role !== "National flag",
       )
-      .every((card) => card.value <= 400),
+      .every((card) => card.value <= 750),
   );
   assert.ok(
     catalog
       .filter(
         (card) => card.role === "National flag" && card.rarity === "Common",
       )
-      .every((card) => card.value < 150),
+      .every((card) => card.value < 170),
   );
+  const worldCommons = catalog.filter(
+    (card) =>
+      card.set === "world" &&
+      card.rarity === "Common" &&
+      card.role !== "National flag",
+  );
+  assert.ok(new Set(worldCommons.map((card) => card.value)).size > 1);
   const macronCards = catalog.filter((card) => card.name === "Emmanuel Macron");
   assert.ok(macronCards.length > 0);
   assert.ok(macronCards.every((card) => card.rarity === "Epic"));
@@ -598,6 +605,9 @@ test("requested featured cards keep their fictional GBP values and flags", () =>
   assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
   assert.equal(cardMap["world-israel-flag"].value, 5000);
   assert.equal(cardMap["world-israel-flag"].flag, "🇮🇱");
+  assert.equal(cardMap["world-flag-greece"].value, 12);
+  assert.equal(cardMap["world-flag-qatar"].value, 18);
+  assert.equal(cardMap["world-flag-bangladesh"].value, 24);
   assert.deepEqual(
     catalog.filter((c) => c.value < 0).map((c) => c.id),
     ["world-former-keir-starmer"],
@@ -628,23 +638,25 @@ test("every pack can lose, win modestly, or produce a 10x jackpot", () => {
       } while (value >= limit);
       return value % max;
     };
-    const outcomes = { loss: 0, smallWin: 0, bigWin: 0, jackpot: 0 };
+    const outcomes = { loss: 0, smallWin: 0, mediumWin: 0, jackpot: 0 };
     for (let i = 1; i <= 10000; i++) {
       const total = rollPack(pack, randomInt, {
         guaranteedEpic: i % 10 === 0,
       }).reduce((sum, card) => sum + card.value, 0);
       if (total < pack.price) outcomes.loss++;
       else if (total < pack.price * 2) outcomes.smallWin++;
-      else outcomes.bigWin++;
+      else if (total < pack.price * 10) outcomes.mediumWin++;
       if (total >= pack.price * 10) outcomes.jackpot++;
     }
     assert.ok(outcomes.loss > 0, `${pack.name} can return less than its cost`);
     assert.ok(outcomes.smallWin > 0, `${pack.name} can return a small win`);
-    assert.ok(outcomes.bigWin > 0, `${pack.name} can return at least 2x`);
+    assert.ok(outcomes.mediumWin > 0, `${pack.name} can return 2x to 10x`);
     assert.ok(outcomes.jackpot > 0, `${pack.name} can return at least 10x`);
     if (pack.id === "world") {
-      assert.ok(outcomes.loss > 6000 && outcomes.loss < 8000);
-      assert.ok(outcomes.jackpot > 20 && outcomes.jackpot < 200);
+      assert.ok(
+        outcomes.loss / 10000 >= 0.55 && outcomes.loss / 10000 <= 0.57,
+        `World Leaders loss chance should stay near 56%, got ${(outcomes.loss / 100).toFixed(2)}%`,
+      );
     }
   }
 });

@@ -21,7 +21,7 @@ for (const pack of packs) {
   const values = [];
   let loss = 0,
     smallWin = 0,
-    bigWin = 0,
+    mediumWin = 0,
     jackpot = 0,
     special = 0,
     failedGuarantees = 0;
@@ -31,7 +31,7 @@ for (const pack of packs) {
     values.push(total);
     if (total < pack.price) loss++;
     else if (total < pack.price * 2) smallWin++;
-    else bigWin++;
+    else if (total < pack.price * 10) mediumWin++;
     if (total >= pack.price * 10) jackpot++;
     if (cards.some((c) => ["Alpha", "Chase"].includes(c.rarity))) special++;
     if (
@@ -47,8 +47,8 @@ for (const pack of packs) {
     price: money(pack.price),
     medianSellValue: money((values[samples / 2 - 1] + values[samples / 2]) / 2),
     losingPacks: `${((loss / samples) * 100).toFixed(2)}%`,
-    smallWins: `${((smallWin / samples) * 100).toFixed(2)}%`,
-    winsAtLeast2x: `${((bigWin / samples) * 100).toFixed(2)}%`,
+    smallWinsUnder2x: `${((smallWin / samples) * 100).toFixed(2)}%`,
+    mediumWins2xTo10x: `${((mediumWin / samples) * 100).toFixed(2)}%`,
     winsAtLeast10x: `${((jackpot / samples) * 100).toFixed(2)}%`,
     specialPacks: special,
     failedGuarantees,
@@ -58,4 +58,10 @@ console.log(JSON.stringify(report, null, 2));
 console.log(
   "Simulated sell values, not automatic cash credits. Rare jackpots do not establish a stable average return or guarantee profit.",
 );
-if (report.some((p) => p.failedGuarantees)) process.exitCode = 1;
+const worldLeaders = report.find((pack) => pack.pack === "World Leaders Pack");
+if (
+  report.some((pack) => pack.failedGuarantees) ||
+  Number.parseFloat(worldLeaders.losingPacks) < 55 ||
+  Number.parseFloat(worldLeaders.losingPacks) > 57
+)
+  process.exitCode = 1;
