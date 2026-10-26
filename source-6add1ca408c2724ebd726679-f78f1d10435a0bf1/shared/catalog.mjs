@@ -420,20 +420,20 @@ export function cardPowerup(card) {
   };
 }
 export function loadoutPowerup(cards) {
-  if (!Array.isArray(cards) || cards.length > 4)
-    throw Error("A loadout can contain at most four cards.");
+  if (!Array.isArray(cards) || cards.length > 5)
+    throw Error("A loadout can contain at most five cards.");
   const powerups = cards.map(cardPowerup);
   const epicBonus = Math.max(
-    -1000000,
+    -750000,
     Math.min(
-      1000000,
+      750000,
       powerups.reduce((total, powerup) => total + powerup.epicBonus, 0),
     ),
   );
   const uncommonBonus = Math.max(
-    -600000,
+    -400000,
     Math.min(
-      600000,
+      400000,
       powerups.reduce((total, powerup) => total + (powerup.uncommonBonus || 0), 0),
     ),
   );
@@ -553,6 +553,26 @@ export const packs = [
     tag: "THE WORLD IS YOUR COLLECTION",
   },
 ];
+const indexFamilies = Object.freeze({
+  brainrot: { name: "Meme Hall", subtitle: "The internet oddities collection." },
+  royal: { name: "Royal Archive", subtitle: "The full and questionable royal court." },
+  fortnite: { name: "Fortnite Field Guide", subtitle: "Every Fortnite character in the collection." },
+  world: { name: "World Stage", subtitle: "Every leader and flag in the archive." },
+  alpha: { name: "Mystery Gold", subtitle: "The one-off Alpha card." },
+});
+export const indexSets = Object.freeze(
+  Object.entries(indexFamilies).flatMap(([family, info]) => {
+    const cards = catalog.filter((card) => card.set === family);
+    return Array.from({ length: Math.ceil(cards.length / 8) }, (_, index) => ({
+      id: family + "-set-" + String(index + 1).padStart(2, "0"),
+      family,
+      name: info.name + " · Set " + String(index + 1).padStart(2, "0"),
+      subtitle: info.subtitle + " Set " + (index + 1) + " of " + Math.ceil(cards.length / 8) + ".",
+      cardIds: cards.slice(index * 8, index * 8 + 8).map((card) => card.id),
+    }));
+  }),
+);
+
 export const rarities = ["Common", "Uncommon", "Epic", "Crown", "Alpha"];
 export const starterOdds = [85000000, 12000000, 2500000, 500000, 0];
 // Immutable template pools are safe to reuse; player state always stays in the database.
@@ -567,7 +587,7 @@ for (const card of catalog) {
 export function rollPack(
   pack,
   randomInt,
-  { guaranteedEpic = false, powerups = [] } = {},
+  { guaranteedEpic = false, powerups = [], permanentEpicBonus = 0, permanentCrownBonus = 0 } = {},
 ) {
   const effect = loadoutPowerup(powerups);
   const odds = [...pack.odds];
@@ -580,21 +600,23 @@ export function rollPack(
     odds[1] -= shifted;
     odds[0] += shifted;
   }
-  if (effect.epicBonus > 0) {
-    let remaining = effect.epicBonus;
+  const epicBonus = Math.max(-750000, Math.min(1750000, effect.epicBonus + permanentEpicBonus));
+  const crownBonus = Math.max(0, Math.min(800000, effect.crownBonus + permanentCrownBonus));
+  if (epicBonus > 0) {
+    let remaining = epicBonus;
     for (const index of [0, 1]) {
       const shifted = Math.min(odds[index], remaining);
       odds[index] -= shifted;
       odds[2] += shifted;
       remaining -= shifted;
     }
-  } else if (effect.epicBonus < 0) {
-    const shifted = Math.min(odds[2], -effect.epicBonus);
+  } else if (epicBonus < 0) {
+    const shifted = Math.min(odds[2], -epicBonus);
     odds[2] -= shifted;
     odds[0] += shifted;
   }
-  if (effect.crownBonus > 0) {
-    let remaining = effect.crownBonus;
+  if (crownBonus > 0) {
+    let remaining = crownBonus;
     for (const index of [0, 1]) {
       const shifted = Math.min(odds[index], remaining);
       odds[index] -= shifted;
@@ -712,4 +734,3 @@ export function packValueRange(pack) {
     .map((c) => c.value);
   return { min: Math.min(...values), max: Math.max(...values) };
 }
-
