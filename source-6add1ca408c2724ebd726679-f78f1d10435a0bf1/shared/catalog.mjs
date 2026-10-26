@@ -146,7 +146,7 @@ const chases = [
   ["signet", "Gilded Signet", 20000, "🖋", "royal"],
   ["sovereign", "Vault Sovereign", 50000, "🏛", "royal"],
   ["apex-crown", "Apex Crown", 150000, "⚡", "royal"],
-  ["kim", "Kim Jong Un", 25000, "🌏", "world"],
+  ["kim", "Kim Jong Un", 1500000, "🌏", "world"],
 ].map(([id, name, value, emoji, set]) => ({
   id,
   name,
@@ -311,12 +311,12 @@ const rarityPowerups = Object.freeze({
     { name: "Thrifty crown", epicBonus: 0, packDiscount: 10 },
   ],
   Uncommon: [
-    { name: "Lucky charm", epicBonus: 150000 },
-    { name: "Crooked luck", epicBonus: -150000 },
+    { name: "Lucky charm", epicBonus: 50000 },
+    { name: "Crooked luck", epicBonus: -50000 },
   ],
   Epic: [
-    { name: "Court's favor", epicBonus: 750000 },
-    { name: "Court intrigue", epicBonus: -750000 },
+    { name: "Court's favor", epicBonus: 250000 },
+    { name: "Court intrigue", epicBonus: -250000 },
   ],
   Crown: [
     { name: "Royal decree", epicBonus: 1500000 },
