@@ -14,6 +14,7 @@ import {
   cardPowerup,
   loadoutPowerup,
   indexSets,
+  CHASE_BONUS_SCALE,
 } from "../shared/catalog.mjs";
 import { dailySpinSegments, playReward } from "../shared/rules.mjs";
 const $ = (s, root = document) => root.querySelector(s);
@@ -255,6 +256,9 @@ function nextPackDiscount() {
 function packPrice(pack) {
   return Math.max(0, pack.price - nextPackDiscount());
 }
+// The Crown bonus also makes each pack's chase card more likely.
+const chaseNote = (crownBonus) =>
+  `+${Math.round((crownBonus / CHASE_BONUS_SCALE) * 100)}% chase chance`;
 function powerupDescription(powerup) {
   const effects = [];
   if (powerup.everyOtherCard) effects.push("Every 2nd pack card · Uncommon+");
@@ -263,7 +267,7 @@ function powerupDescription(powerup) {
   if (powerup.epicBonus)
     effects.push(`${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`);
   if (powerup.crownBonus)
-    effects.push(`+${(powerup.crownBonus / 1000000).toFixed(2)}% Crown odds`);
+    effects.push(`+${(powerup.crownBonus / 1000000).toFixed(2)}% Crown odds`, chaseNote(powerup.crownBonus));
   if (powerup.packDiscount) effects.push("10p off every 3rd pack");
   return effects.join(" · ") || "No power-up";
 }
@@ -276,10 +280,10 @@ function packLoadoutSummary() {
   const totals = [
     effect.uncommonBonus && `${effect.uncommonBonus > 0 ? "+" : ""}${(effect.uncommonBonus / 1000000).toFixed(2)}% Uncommon odds`,
     effect.epicBonus && `${effect.epicBonus > 0 ? "+" : ""}${(effect.epicBonus / 1000000).toFixed(2)}% Epic odds`,
-    effect.crownBonus && `+${(effect.crownBonus / 1000000).toFixed(2)}% Crown odds`,
+    effect.crownBonus && `+${(effect.crownBonus / 1000000).toFixed(2)}% Crown odds · ${chaseNote(effect.crownBonus)}`,
     effect.everyOtherCard && "Every 2nd card is Uncommon+",
     state.account?.permanent_epic_bonus && `Permanent +${(Number(state.account.permanent_epic_bonus) / 1000000).toFixed(2)}% Epic odds`,
-    state.account?.permanent_crown_bonus && `Permanent +${(Number(state.account.permanent_crown_bonus) / 1000000).toFixed(2)}% Crown odds`,
+    state.account?.permanent_crown_bonus && `Permanent +${(Number(state.account.permanent_crown_bonus) / 1000000).toFixed(2)}% Crown odds · ${chaseNote(Number(state.account.permanent_crown_bonus))}`,
     effect.packDiscount && "10p off every 3rd pack",
   ].filter(Boolean);
   return `<aside class="pack-loadout-hud" aria-label="Equipped loadout effects"><span class="eyebrow">LOADOUT EFFECTS</span>${cards.length ? `<div class="pack-loadout-cards">${equipped.map((card) => `<span><strong>${esc(cardMap[card.template_id]?.name)}</strong><small>${esc(powerupDescription(cardPowerup(card)))}</small></span>`).join("")}</div>` : ""}<p>${totals.length ? totals.join(" · ") : "No odds changes active."}</p></aside>`;
@@ -459,7 +463,7 @@ function indexView() {
     return '<section class="index-set panel"><div class="index-set-heading"><div><span class="eyebrow">COLLECTION SET</span><h2>' + esc(set.name) + '</h2><p>' + esc(set.subtitle) + '</p></div><strong>' + count + ' / ' + cards.length + ' discovered</strong></div><div class="index-progress" role="progressbar" aria-label="' + esc(set.name) + ' completion" aria-valuemin="0" aria-valuemax="' + cards.length + '" aria-valuenow="' + count + '"><span style="width:' + pct + '%"></span></div>' + rewardPanel + '<div class="index-grid">' + cardTiles + '</div></section>';
   }).join("");
   const epicText = epicBonus ? "+" + (epicBonus / 1000000).toFixed(2) + "% Epic" : "No Epic set bonus";
-  const crownText = crownBonus ? "+" + (crownBonus / 1000000).toFixed(2) + "% Crown" : "No Crown set bonus";
+  const crownText = crownBonus ? "+" + (crownBonus / 1000000).toFixed(2) + "% Crown · " + chaseNote(crownBonus) : "No Crown set bonus";
   $("#main").innerHTML =
     title("THE CARD ARCHIVE", "Character index.", "Browse every card, track set progress, and see the reward before you complete a set.") +
     '<div class="index-top-actions"><span>' + indexSets.length + " sets · " + catalog.length + ' cards</span><strong>' + (indexSets.filter((set) => !rewards[set.id] && set.cardIds.every((id) => discovered.has(id))).length) + ' rewards ready to claim</strong></div>' +

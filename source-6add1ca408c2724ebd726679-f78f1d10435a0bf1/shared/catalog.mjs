@@ -472,6 +472,12 @@ const rarityPowerups = Object.freeze({
     { name: "Mystery Gold", epicBonus: 150000, uncommonBonus: 100000 },
   ],
 });
+// Odds are whole numbers out of 100,000,000, so 2% is 2,000,000.
+export const KIM_EPIC_BONUS = 2000000;
+// Every 0.1% (100,000) of Crown bonus makes the pack's chase card 25% more
+// likely, and the same bonus counts whether it comes from a loadout card or a
+// permanent set reward.
+export const CHASE_BONUS_SCALE = 400000;
 export function cardPowerup(card) {
   const template = cardMap[card?.template_id || card?.id] || card;
   if (!template?.id || !rarityPowerups[template.rarity])
@@ -489,8 +495,11 @@ export function cardPowerup(card) {
     };
   if (template.id === "kim")
     return {
-      name: "Every other card · Uncommon+",
-      epicBonus: 0,
+      name: "Every other card · Uncommon+ and +2% Epic",
+      // Kim's +2% Epic sits on top of the normal loadout cap and never stacks
+      // with a second copy of Kim.
+      epicBonus: KIM_EPIC_BONUS,
+      uncappedEpic: true,
       uncommonBonus: 0,
       crownBonus: 0,
       everyOtherCard: true,
@@ -511,13 +520,19 @@ export function loadoutPowerup(cards) {
   if (!Array.isArray(cards) || cards.length > 5)
     throw Error("A loadout can contain at most five cards.");
   const powerups = cards.map(cardPowerup);
-  const epicBonus = Math.max(
+  const cappedEpic = Math.max(
     -750000,
     Math.min(
       750000,
-      powerups.reduce((total, powerup) => total + powerup.epicBonus, 0),
+      powerups.reduce(
+        (total, powerup) => total + (powerup.uncappedEpic ? 0 : powerup.epicBonus),
+        0,
+      ),
     ),
   );
+  const epicBonus =
+    cappedEpic +
+    Math.max(0, ...powerups.map((p) => (p.uncappedEpic ? p.epicBonus : 0)));
   const uncommonBonus = Math.max(
     -400000,
     Math.min(
@@ -707,7 +722,7 @@ export function rollPack(
     odds[1] -= shifted;
     odds[0] += shifted;
   }
-  const epicBonus = Math.max(-750000, Math.min(1750000, effect.epicBonus + permanentEpicBonus));
+  const epicBonus = Math.max(-750000, Math.min(1750000 + KIM_EPIC_BONUS, effect.epicBonus + permanentEpicBonus));
   const crownBonus = Math.max(0, Math.min(800000, effect.crownBonus + permanentCrownBonus));
   if (epicBonus > 0) {
     let remaining = epicBonus;
@@ -779,7 +794,13 @@ export function rollPack(
     );
     result[lowest] = pick("Epic");
   }
-  if (randomInt(pack.chaseOdds) === 0) {
+  // The Crown bonus also lifts the chase chance. With no bonus this is exactly
+  // the original 1-in-chaseOdds roll.
+  const chaseHit =
+    crownBonus > 0
+      ? randomInt(CHASE_BONUS_SCALE * pack.chaseOdds) < CHASE_BONUS_SCALE + crownBonus
+      : randomInt(pack.chaseOdds) === 0;
+  if (chaseHit) {
     const chase = cardMap[pack.chase];
     const eligible = result
       .map((c, i) => ({ c, i }))

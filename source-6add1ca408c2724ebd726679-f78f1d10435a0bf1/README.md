@@ -84,3 +84,7 @@ The Fast Food Legends Pack costs £300 and contains five cards from 50 real rest
 2. **Google.** Create the OAuth client described above.
 3. **Vercel.** Import the repository (root directory: the folder holding `package.json`; framework preset Vite). Add environment variables: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`. Redeploy after the first set, then add your final domain to the Google redirect URIs.
 4. **Settlement.** Overdue pots and tables are also settled whenever someone loads the pot or acts, but a scheduled sweep keeps them settled when nobody is online. `GET /api/cron/settle` runs it and requires `Authorization: Bearer $CRON_SECRET`. Per-minute schedules need a Vercel Pro plan; to enable one, set `CRON_SECRET` and add `"crons": [{"path": "/api/cron/settle", "schedule": "* * * * *"}]` to `vercel.json`. On the Hobby plan crons may run at most daily, and a per-minute entry makes the deployment fail, so none is configured by default.
+
+## Loadout bonuses: Kim and the Crown bonus
+
+Kim Jong Un in a loadout adds a flat +2% Epic chance (2,000,000 of the 100,000,000 odds) on top of the normal loadout cap, alongside his guarantee that every second pack card is Uncommon or better. Extra copies of Kim do not stack. Any Crown bonus, whether from a loadout card or a permanent set reward, also raises each pack's chase-card chance: every 0.1% of Crown bonus makes the chase 25% more likely (`CHASE_BONUS_SCALE` in `shared/catalog.mjs`). With no Crown bonus the chase is the original 1-in-N roll.

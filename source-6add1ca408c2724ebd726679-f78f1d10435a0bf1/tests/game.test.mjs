@@ -219,18 +219,19 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
   assert.equal(loadoutPowerup([discountCard]).packDiscount, 10);
   const powerup = loadoutPowerup([cardMap.kim]);
   assert.equal(powerup.everyOtherCard, true);
-  assert.equal(powerup.epicBonus, 0);
+  assert.equal(powerup.epicBonus, 2000000);
   assert.equal(powerup.uncommonBonus, 0);
-  assert.ok(
-    Math.abs(
-      loadoutPowerup([cardMap.kim, cardMap.kim, cardMap.kim]).epicBonus,
-    ) <= 750000,
+  // Kim's +2% never stacks with extra copies of Kim.
+  assert.equal(
+    loadoutPowerup([cardMap.kim, cardMap.kim, cardMap.kim]).epicBonus,
+    2000000,
   );
   assert.equal(cardMap["mystery-gold"].rarity, "Alpha");
   assert.equal(rarities.includes("Alpha"), true);
   assert.throws(
     () =>
       loadoutPowerup([
+        cardMap.kim,
         cardMap.kim,
         cardMap.kim,
         cardMap.kim,
@@ -869,4 +870,33 @@ test("a heartbeat crossing UTC midnight credits only the new day’s seconds", (
     reward: 0,
     steps: 0,
   });
+});
+
+test("Kim adds exactly 2% Epic chance on top of the normal loadout cap", () => {
+  const world = packs.find((p) => p.id === "world");
+  const kim = { template_id: "kim" };
+  const [common, uncommon] = world.odds;
+  const rarity = (roll, options) => rollPack(world, rng(roll), options)[0].rarity;
+  // 2% of the odds move out of Common and into Epic.
+  assert.equal(rarity(common - 1), "Common");
+  assert.equal(rarity(common - 1, { powerups: [kim] }), "Uncommon");
+  assert.equal(rarity(common + uncommon - 1), "Uncommon");
+  assert.equal(rarity(common + uncommon - 1, { powerups: [kim] }), "Epic");
+  assert.equal(loadoutPowerup([cardMap.kim]).epicBonus, 2000000);
+});
+
+test("the Crown bonus also raises the chase chance, and does nothing without it", () => {
+  const world = packs.find((p) => p.id === "world");
+  const scale = 400000 * world.chaseOdds;
+  // Pretend the chase roll lands on 799,999: a hit only when Crown bonus is 400,000.
+  const roll = (max) =>
+    max === 100000000 ? 0 : max === scale ? 799999 : max - 1;
+  const hasKim = (cards) => cards.some((c) => c.id === "kim");
+  assert.equal(hasKim(rollPack(world, roll)), false);
+  assert.equal(hasKim(rollPack(world, roll, { permanentCrownBonus: 400000 })), true);
+  assert.equal(hasKim(rollPack(world, roll, { permanentCrownBonus: 100000 })), false);
+  // A loadout Crown bonus counts too.
+  assert.equal(hasKim(rollPack(world, roll, { powerups: [{ template_id: "fortnite-renegade-raider" }] })), true);
+  // Without a bonus the original 1-in-chaseOdds roll is unchanged.
+  assert.equal(hasKim(rollPack(world, (max) => (max === 100000000 ? 0 : 0))), true);
 });
