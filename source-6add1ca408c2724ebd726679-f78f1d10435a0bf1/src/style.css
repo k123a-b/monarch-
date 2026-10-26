@@ -5101,3 +5101,22 @@ body:has(dialog[open]) {
     transition: none;
   }
 }
+
+
+.loadout-grid .game-card[role="button"] {
+  cursor: pointer;
+}
+
+.loadout-grid .game-card[role="button"]:focus-visible {
+  outline: 3px solid var(--gold, #e1bc68);
+  outline-offset: 4px;
+}
+
+.odds-effect-detail {
+  margin: 1rem 0;
+  padding: 1rem;
+}
+
+.odds-effect-detail p {
+  margin: 0.6rem 0;
+}
