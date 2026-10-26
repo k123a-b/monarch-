@@ -28,6 +28,7 @@ export const accounts = pgTable("accounts", {
   spinDay: text("spin_day").notNull().default(""),
   spinReward: integer("spin_reward"),
   loadout: integer().array().notNull().default([]),
+  loadoutSlots: integer("loadout_slots").notNull().default(3),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

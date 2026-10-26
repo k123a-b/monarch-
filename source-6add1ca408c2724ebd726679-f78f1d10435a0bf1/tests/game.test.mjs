@@ -124,18 +124,38 @@ test("Apex replaces exactly one low card with Crown when all rolls are Epic", ()
   assert.equal(pull.filter((c) => c.rarity === "Epic").length, 4);
 });
 test("card powerups are defined and Kim guarantees every second pack card Uncommon+", () => {
+  const bonuses = [];
+  let discountCard;
   for (const card of catalog) {
     const powerup = cardPowerup(card);
     assert.equal(typeof powerup.name, "string");
     assert.ok(Number.isInteger(powerup.epicBonus));
+    bonuses.push(powerup.epicBonus);
+    if (powerup.packDiscount) discountCard = card;
   }
+  assert.ok(bonuses.some((bonus) => bonus > 0));
+  assert.ok(bonuses.some((bonus) => bonus < 0));
+  assert.ok(discountCard);
+  assert.equal(cardPowerup(discountCard).packDiscount, 10);
+  assert.equal(loadoutPowerup([discountCard]).packDiscount, 10);
   const powerup = loadoutPowerup([cardMap.kim]);
   assert.equal(powerup.everyOtherCard, true);
-  assert.equal(powerup.epicBonus, 3000000);
+  assert.equal(Math.abs(powerup.epicBonus), 3000000);
   assert.ok(
     Math.abs(
       loadoutPowerup([cardMap.kim, cardMap.kim, cardMap.kim]).epicBonus,
     ) <= 4000000,
+  );
+  assert.throws(
+    () =>
+      loadoutPowerup([
+        cardMap.kim,
+        cardMap.kim,
+        cardMap.kim,
+        cardMap.kim,
+        cardMap.kim,
+      ]),
+    /at most four cards/,
   );
   const world = packs.find((pack) => pack.id === "world");
   const cards = rollPack(

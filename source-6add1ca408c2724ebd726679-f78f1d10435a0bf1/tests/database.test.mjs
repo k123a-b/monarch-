@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { cardMap } from "../shared/catalog.mjs";
+import { cardMap, cardPowerup } from "../shared/catalog.mjs";
 
 // Uses a dedicated configured database, never a mocked SQL implementation.
 test(
@@ -172,6 +172,74 @@ test(
         },
       );
       await t.test(
+        "fourth loadout slot unlocks once and discounts every third pack by 10p",
+        async () => {
+          const discountTemplate = Object.values(cardMap).find(
+            (card) => cardPowerup(card).packDiscount === 10,
+          );
+          assert.ok(discountTemplate);
+          const discountCard = (
+            await query(
+              "INSERT INTO inventory(owner_id,template_id,value,rarity) VALUES($1,$2,$3,$4) RETURNING *",
+              [
+                a.id,
+                discountTemplate.id,
+                discountTemplate.value,
+                discountTemplate.rarity,
+              ],
+            )
+          ).rows[0];
+          const ownedIds = (
+            await query(
+              "SELECT id FROM inventory WHERE owner_id=$1 ORDER BY id",
+              [a.id],
+            )
+          ).rows.map((row) => row.id);
+          assert.equal(ownedIds.length, 5);
+          assert.equal(
+            (await request(a, "loadout", { ids: ownedIds.slice(0, 4) })).status,
+            400,
+          );
+
+          await query("UPDATE accounts SET balance=50000 WHERE id=$1", [a.id]);
+          const unlocked = await request(a, "loadout/upgrade", {});
+          assert.equal(unlocked.status, 200);
+          assert.equal(unlocked.data.account.loadout_slots, 4);
+          assert.equal(Number(unlocked.data.account.balance), 15000);
+          assert.equal((await request(a, "loadout/upgrade", {})).status, 409);
+          assert.equal(
+            Number((await request(a, "me")).data.account.balance),
+            15000,
+          );
+          assert.equal(
+            (
+              await request(a, "loadout", {
+                ids: ownedIds.slice(0, 4),
+              })
+            ).status,
+            200,
+          );
+          await query("UPDATE accounts SET packs=2 WHERE id=$1", [a.id]);
+          const undiscounted = await request(a, "open", {
+            pack: "brainrot",
+          });
+          assert.equal(undiscounted.status, 200);
+          assert.equal(undiscounted.data.discount, 0);
+          assert.equal(Number(undiscounted.data.account.balance), 14900);
+
+          assert.equal(
+            (await request(a, "loadout", { ids: [discountCard.id] })).status,
+            200,
+          );
+          await query("UPDATE accounts SET packs=2 WHERE id=$1", [a.id]);
+          const discounted = await request(a, "open", { pack: "brainrot" });
+          assert.equal(discounted.status, 200);
+          assert.equal(discounted.data.discount, 10);
+          assert.equal(Number(discounted.data.account.packs), 3);
+          assert.equal(Number(discounted.data.account.balance), 14810);
+        },
+      );
+      await t.test(
         "starter reward grants one free card once and does not count as a paid pack",
         async () => {
           const before = (await request(a, "me")).data.account;
@@ -201,7 +269,7 @@ test(
                 )
               ).rows[0].n,
             ),
-            5,
+            14,
           );
         },
       );

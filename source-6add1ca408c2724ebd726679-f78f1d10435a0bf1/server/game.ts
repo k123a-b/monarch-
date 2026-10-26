@@ -6,6 +6,7 @@ import {
   rollStarterPack,
   weightedWinner,
   packProgress,
+  loadoutPowerup,
 } from "../shared/catalog.mjs";
 import { database, pool, databaseTarget } from "../db/index.js";
 import { accounts, inventory } from "../db/schema.js";
@@ -409,8 +410,12 @@ export async function handle(
         }
         if (route === "loadout" && req.method === "POST") {
           const selected = ids(body.ids);
-          if (selected.length > 3)
-            fail("Choose up to three cards for your loadout.");
+          const currentAccount = await account();
+          const slotLimit = Number(currentAccount.loadout_slots || 3);
+          if (selected.length > slotLimit)
+            fail(
+              `Your loadout has ${slotLimit} slots. Unlock the fourth slot to equip another card.`,
+            );
           if (
             Array.isArray(body.ids) &&
             new Set(body.ids).size !== body.ids.length
@@ -429,6 +434,16 @@ export async function handle(
           await c.query("UPDATE accounts SET loadout=$2::int[] WHERE id=$1", [
             id,
             selected,
+          ]);
+          return { account: await account() };
+        }
+        if (route === "loadout/upgrade" && req.method === "POST") {
+          const currentAccount = await account();
+          if (Number(currentAccount.loadout_slots || 3) >= 4)
+            fail("Your fourth loadout slot is already unlocked.", 409);
+          await change(c, id, -35000, "Unlocked fourth loadout slot");
+          await c.query("UPDATE accounts SET loadout_slots=4 WHERE id=$1", [
+            id,
           ]);
           return { account: await account() };
         }
@@ -459,11 +474,7 @@ export async function handle(
         if (route === "open" && req.method === "POST") {
           const pack = packs.find((p) => p.id === body.pack);
           if (!pack) return fail("Unknown pack.");
-          await change(c, id, -pack.price, `${pack.name} opened`);
           const currentAccount = await account();
-          const epicGuaranteed = packProgress(
-            Number(currentAccount.packs),
-          ).nextGuaranteed;
           const equippedIds: number[] = currentAccount.loadout || [];
           const equipped = equippedIds.length
             ? (
@@ -478,6 +489,22 @@ export async function handle(
               "Your loadout has an unavailable card. Update it before opening a pack.",
               409,
             );
+          const effects = loadoutPowerup(
+            equipped.map((row: any) => cardMap[row.template_id]),
+          );
+          const discount =
+            (Number(currentAccount.packs) + 1) % 3 === 0
+              ? effects.packDiscount
+              : 0;
+          await change(
+            c,
+            id,
+            -(pack.price - discount),
+            `${pack.name} opened${discount ? " (loadout discount)" : ""}`,
+          );
+          const epicGuaranteed = packProgress(
+            Number(currentAccount.packs),
+          ).nextGuaranteed;
           const cards = rollPack(pack, randomInt, {
             guaranteedEpic: epicGuaranteed,
             powerups: equipped.map((row: any) => cardMap[row.template_id]),
@@ -511,7 +538,12 @@ export async function handle(
             "UPDATE accounts SET packs=packs+1,pulled=pulled+$2 WHERE id=$1",
             [id, cards.length],
           );
-          return { cards: result, account: await account(), epicGuaranteed };
+          return {
+            cards: result,
+            account: await account(),
+            epicGuaranteed,
+            discount,
+          };
         }
         if (route === "rewards/starter" && req.method === "POST") {
           const card = rollStarterPack(randomInt);
