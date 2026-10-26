@@ -29,6 +29,10 @@ export const accounts = pgTable("accounts", {
   spinReward: integer("spin_reward"),
   loadout: integer().array().notNull().default([]),
   fortniteCollection: text("fortnite_collection").array().notNull().default([]),
+  characterIndex: text("character_index").array().notNull().default([]),
+  setRewards: jsonb("set_rewards").notNull().default({}),
+  permanentEpicBonus: integer("permanent_epic_bonus").notNull().default(0),
+  permanentCrownBonus: integer("permanent_crown_bonus").notNull().default(0),
   loadoutSlots: integer("loadout_slots").notNull().default(3),
   packSlots: integer("pack_slots").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true })
