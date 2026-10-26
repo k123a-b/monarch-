@@ -164,17 +164,22 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
     const powerup = cardPowerup(card);
     assert.equal(typeof powerup.name, "string");
     assert.ok(Number.isInteger(powerup.epicBonus));
+    assert.ok(Number.isInteger(powerup.uncommonBonus));
     if (card.rarity === "Common") {
       commonCards++;
       if (
         powerup.epicBonus === 0 &&
+        powerup.uncommonBonus === 0 &&
         !powerup.packDiscount &&
         !powerup.everyOtherCard
       )
         commonCardsWithoutPowerup++;
     } else {
       assert.ok(
-        powerup.epicBonus !== 0 || powerup.everyOtherCard,
+        powerup.epicBonus !== 0 ||
+          powerup.uncommonBonus !== 0 ||
+          powerup.crownBonus !== 0 ||
+          powerup.everyOtherCard,
         `${card.id} has an active power-up`,
       );
     }
@@ -192,12 +197,15 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
   assert.equal(loadoutPowerup([discountCard]).packDiscount, 10);
   const powerup = loadoutPowerup([cardMap.kim]);
   assert.equal(powerup.everyOtherCard, true);
-  assert.equal(Math.abs(powerup.epicBonus), 3000000);
+  assert.equal(powerup.epicBonus, 0);
+  assert.equal(powerup.uncommonBonus, 0);
   assert.ok(
     Math.abs(
       loadoutPowerup([cardMap.kim, cardMap.kim, cardMap.kim]).epicBonus,
-    ) <= 4000000,
+    ) <= 1000000,
   );
+  assert.equal(cardMap["mystery-gold"].rarity, "Alpha");
+  assert.equal(rarities.includes("Alpha"), true);
   assert.throws(
     () =>
       loadoutPowerup([
