@@ -122,7 +122,7 @@ export const dailyQuests = Object.freeze([
     text: "Open 1 pack today.",
     metric: "packs",
     target: 1,
-    reward: 25,
+    reward: 100,
   },
   {
     id: "open-3",
@@ -130,7 +130,7 @@ export const dailyQuests = Object.freeze([
     text: "Open 3 packs today.",
     metric: "packs",
     target: 3,
-    reward: 75,
+    reward: 150,
   },
   {
     id: "epic-hunt",
@@ -138,7 +138,7 @@ export const dailyQuests = Object.freeze([
     text: "Pull an Epic or better card today.",
     metric: "epic",
     target: 1,
-    reward: 40,
+    reward: 100,
   },
   {
     id: "sell-3",
@@ -146,7 +146,7 @@ export const dailyQuests = Object.freeze([
     text: "Sell 3 cards today.",
     metric: "sold",
     target: 3,
-    reward: 40,
+    reward: 75,
   },
 ]);
 const questMetrics = new Set(dailyQuests.map((quest) => quest.metric));

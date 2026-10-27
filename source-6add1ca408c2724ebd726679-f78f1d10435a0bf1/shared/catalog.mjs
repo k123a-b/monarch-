@@ -633,8 +633,8 @@ const rarityPowerups = Object.freeze({
     },
   ],
   Chase: [
-    { name: "Chase energy", epicBonus: 1500000 },
-    { name: "Chase insight", epicBonus: 0, uncommonBonus: 200000, crownBonus: 500000 },
+    { name: "Chase energy", epicBonus: 1000000 },
+    { name: "Chase insight", epicBonus: 0, uncommonBonus: 150000, crownBonus: 250000 },
     { name: "Chase misstep", epicBonus: -500000 },
   ],
   Mythic: [
