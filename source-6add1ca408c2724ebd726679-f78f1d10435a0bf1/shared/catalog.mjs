@@ -867,10 +867,10 @@ export const leaderSource = {
   retrieved: leaderData.retrieved,
   note: leaderData.note,
 };
-// Odds are integers out of 100,000,000. Each pack carries a small payout lift
-// over its original bands: a slice of cheap weight sits in Epic and Crown so
-// wins land slightly more often and sell for slightly more, without removing
-// losing packs.
+// Odds are integers out of 100,000,000. Each pack carries a deliberate
+// win-rate lift over its original bands: a slice of the cheap tier sits in Epic
+// and Crown so wins land more often and sell for more. The largest payouts stay
+// in the separate Crown, chase and Mythic rolls.
 export const packs = [
   {
     id: "brainrot",
@@ -880,7 +880,7 @@ export const packs = [
     price: 200,
     count: 4,
     set: "brainrot",
-    odds: [63890000, 26000000, 10080000, 30000, 0],
+    odds: [63780000, 26000000, 10180000, 40000, 0],
     chase: "crocodilo",
     chaseOdds: 800,
     secret: "secret-brainrot",
@@ -898,7 +898,7 @@ export const packs = [
     price: 600,
     count: 4,
     set: "royal",
-    odds: [69930000, 22000000, 8000000, 70000, 0],
+    odds: [68940000, 22000000, 8900000, 160000, 0],
     chase: "signet",
     chaseOdds: 1000,
     secret: "secret-royal",
@@ -916,7 +916,7 @@ export const packs = [
     price: 2500,
     count: 5,
     set: "royal",
-    odds: [0, 49948000, 48500000, 1550000, 2000],
+    odds: [0, 47968000, 50300000, 1730000, 2000],
     chase: "sovereign",
     chaseOdds: 1000,
     secret: "secret-vault",
@@ -934,7 +934,7 @@ export const packs = [
     price: 10000,
     count: 5,
     set: "royal",
-    odds: [0, 0, 48595000, 51400000, 5000],
+    odds: [0, 0, 45795000, 54200000, 5000],
     chase: "apex-crown",
     chaseOdds: 2000,
     secret: "secret-apex",
@@ -953,7 +953,7 @@ export const packs = [
     price: 12500,
     count: 4,
     set: "fortnite",
-    odds: [54899000, 43998990, 1100000, 2000, 10],
+    odds: [53499000, 43998990, 2500000, 2000, 10],
     chase: "fortnite-renegade-raider",
     chaseOdds: 40000,
     secret: "secret-fortnite",
@@ -971,7 +971,7 @@ export const packs = [
     price: 1000,
     count: 4,
     set: "world",
-    odds: [75840000, 22000000, 2100000, 60000, 0],
+    odds: [75180000, 22000000, 2700000, 120000, 0],
     chase: "kim",
     chaseOdds: 45000,
     secret: "secret-world",
@@ -989,7 +989,7 @@ export const packs = [
     price: 30000,
     count: 5,
     set: "fastfood",
-    odds: [75798000, 23900000, 299000, 3000, 0],
+    odds: [74998000, 23900000, 1099000, 3000, 0],
     chase: "food-mcdonalds",
     chaseOdds: 50000,
     secret: "secret-fastfood",

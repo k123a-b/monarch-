@@ -60,7 +60,7 @@ const rng =
           : max - 1;
 test("Brainrot Pack: Common is the majority tier and rarer tiers stay rarer", () => {
   const p = packs.find((p) => p.id === "brainrot");
-  assert.equal(p.odds[0], 63890000);
+  assert.equal(p.odds[0], 63780000);
   assert.equal(p.price, 200);
   for (let index = 1; index < p.odds.length; index++)
     assert.ok(
@@ -68,8 +68,8 @@ test("Brainrot Pack: Common is the majority tier and rarer tiers stay rarer", ()
       `${rarities[index]} must be rarer than ${rarities[index - 1]}`,
     );
   // Roll just inside and just outside the Common band.
-  assert.equal(rollPack(p, rng(63889999))[0].rarity, "Common");
-  assert.equal(rollPack(p, rng(63890000))[0].rarity, "Uncommon");
+  assert.equal(rollPack(p, rng(63779999))[0].rarity, "Common");
+  assert.equal(rollPack(p, rng(63780000))[0].rarity, "Uncommon");
   assert.equal(rollPack(p, rng(ODDS_TOTAL - 1))[0].rarity, "Crown");
 });
 for (const p of packs) {
@@ -160,7 +160,7 @@ for (const p of packs) {
 }
 test("Fortnite Drop Pack keeps its own high-loss odds while making Epic characters much rarer", () => {
   const pack = packs.find((entry) => entry.id === "fortnite");
-  assert.deepEqual(pack.odds, [54899000, 43998990, 1100000, 2000, 10]);
+  assert.deepEqual(pack.odds, [53499000, 43998990, 2500000, 2000, 10]);
   assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
   assert.deepEqual(
     [
@@ -713,7 +713,7 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
 });
 test("World Leaders uses its own deliberately unprofitable rarity bands", () => {
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [75840000, 22000000, 2100000, 60000, 0]);
+  assert.deepEqual(world.odds, [75180000, 22000000, 2700000, 120000, 0]);
   assert.equal(
     world.odds.reduce((sum, odds) => sum + odds, 0),
     ODDS_TOTAL,
