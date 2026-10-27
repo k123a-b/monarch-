@@ -527,6 +527,38 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
       "A national flag card. Its fictional value reflects a broad game-power tier.",
   };
 });
+// World Leaders packs compare each four-card pull with a £10 price, so the
+// ordinary Epics sit in a tight, still-unique band just below and above it.
+// That keeps the loss rate honest instead of concentrating almost all value in
+// rare Epics. The three headline Epics keep their full authored values.
+const featuredWorldEpics = new Set([
+  "Andy Burnham",
+  "King Charles III",
+  "Flag of Israel",
+]);
+const ordinaryWorldEpics = [
+  ...leaderData.cards.map(rateLeader),
+  ...nationFlagCards,
+]
+  .filter(
+    (card) =>
+      card.set === "world" &&
+      card.rarity === "Epic" &&
+      !featuredWorldEpics.has(card.name),
+  )
+  .sort((a, b) => a.value - b.value || a.id.localeCompare(b.id));
+const worldEpicBand = new Map(
+  ordinaryWorldEpics.map((card, index) => [
+    card.id,
+    950 +
+      Math.round((index * 200) / Math.max(1, ordinaryWorldEpics.length - 1)),
+  ]),
+);
+function worldEpicValue(card) {
+  return (
+    worldEpicBand.get(card.id) ?? Math.round(Math.abs(card.value) * 0.73)
+  );
+}
 export const catalog = [
   ...cards,
   ...fortniteCards,
@@ -549,7 +581,9 @@ export const catalog = [
         ? 50000
         : c.set === "fastfood"
           ? c.value
-          : Math.sign(c.value) * Math.round(Math.abs(c.value) * (c.set === "fortnite" && c.rarity === "Epic" ? 0.45 : 0.73)),
+          : c.set === "world" && c.rarity === "Epic"
+            ? worldEpicValue(c)
+            : Math.sign(c.value) * Math.round(Math.abs(c.value) * (c.set === "fortnite" && c.rarity === "Epic" ? 0.45 : 0.73)),
   flag: flags[c.country],
   page:
     c.role === "National flag"
@@ -916,7 +950,7 @@ export const packs = [
     price: 2500,
     count: 5,
     set: "royal",
-    odds: [0, 47968000, 50300000, 1730000, 2000],
+    odds: [0, 37169000, 61500000, 1330000, 1000],
     chase: "sovereign",
     chaseOdds: 1000,
     secret: "secret-vault",
@@ -971,7 +1005,7 @@ export const packs = [
     price: 1000,
     count: 4,
     set: "world",
-    odds: [75180000, 22000000, 2700000, 120000, 0],
+    odds: [69880000, 22000000, 8000000, 120000, 0],
     chase: "kim",
     chaseOdds: 45000,
     secret: "secret-world",
@@ -989,7 +1023,7 @@ export const packs = [
     price: 30000,
     count: 5,
     set: "fastfood",
-    odds: [74998000, 23900000, 1099000, 3000, 0],
+    odds: [74998000, 21249000, 3750000, 3000, 0],
     chase: "food-mcdonalds",
     chaseOdds: 50000,
     secret: "secret-fastfood",

@@ -191,8 +191,8 @@ for (const [index, pack] of report.entries()) {
   const rtp = Number.parseFloat(pack.returnToPlayer);
   if (pack.failedGuarantees)
     problems.push(`${pack.pack}: ${pack.failedGuarantees} failed guarantees`);
-  if (lossRate < 50 || lossRate > 90)
-    problems.push(`${pack.pack}: loss rate ${pack.losingPacks} is outside 50–90%`);
+  if (lossRate < 50 || lossRate > 65)
+    problems.push(`${pack.pack}: loss rate ${pack.losingPacks} is outside 50–65%`);
   if (Number.parseFloat(pack.winningPacks) <= 0)
     problems.push(`${pack.pack}: simulation produced no profitable packs`);
   if (rtp >= 100)

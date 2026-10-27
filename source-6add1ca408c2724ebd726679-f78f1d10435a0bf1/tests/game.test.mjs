@@ -38,6 +38,9 @@ import {
   completeDailyQuest,
   claimableQuests,
   friendTablePayout,
+  giftLimits,
+  giftQuotaLeft,
+  validGiftAmount,
   matchedPotBotStake,
   validFriendCode,
   validTradeCards,
@@ -512,6 +515,17 @@ test("friend table winner receives twice the stake while an unjoined table is re
   assert.throws(() => friendTablePayout(0, true));
   assert.throws(() => friendTablePayout(Number.MAX_SAFE_INTEGER, true));
 });
+test("friend gifts are bounded whole-pence transfers with a daily quota", () => {
+  for (const amount of [1, 500, 10000]) assert.ok(validGiftAmount(amount));
+  for (const amount of [0, -5, 10001, 1.5, 500.25, "500", null])
+    assert.ok(!validGiftAmount(amount));
+  assert.equal(giftLimits.dailyCount, 10);
+  assert.equal(giftQuotaLeft(0), 10);
+  assert.equal(giftQuotaLeft(9), 1);
+  assert.equal(giftQuotaLeft(10), 0);
+  assert.equal(giftQuotaLeft(25), 0);
+  assert.equal(giftQuotaLeft(undefined), 10);
+});
 test("usernames are case-friendly public names with strict length and character bounds", () => {
   for (const name of ["Monarch 7", "Lady_Gold", "A-B"])
     assert.ok(validUsername(name));
@@ -713,7 +727,7 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
 });
 test("World Leaders uses its own deliberately unprofitable rarity bands", () => {
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [75180000, 22000000, 2700000, 120000, 0]);
+  assert.deepEqual(world.odds, [69880000, 22000000, 8000000, 120000, 0]);
   assert.equal(
     world.odds.reduce((sum, odds) => sum + odds, 0),
     ODDS_TOTAL,
@@ -767,7 +781,16 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   );
   const nonUkCharles = catalog.filter((card) => card.name === "Charles III");
   assert.equal(nonUkCharles.length, 14);
-  assert.ok(nonUkCharles.every((card) => card.value <= 400));
+  assert.ok(
+    nonUkCharles
+      .filter((card) => card.rarity !== "Epic")
+      .every((card) => card.value <= 400),
+  );
+  assert.ok(
+    nonUkCharles
+      .filter((card) => card.rarity === "Epic")
+      .every((card) => card.value >= 950 && card.value <= 1150),
+  );
   assert.ok(
     catalog
       .filter(
@@ -843,6 +866,33 @@ test("requested featured cards keep their fictional GBP values and flags", () =>
   );
   assert.equal(cardMap["world-former-keir-starmer"].value, -183);
 });
+test("ordinary World Leaders Epics sit in a tight band around the pack price", () => {
+  const featured = new Set([
+    "Andy Burnham",
+    "King Charles III",
+    "Flag of Israel",
+  ]);
+  const epics = catalog.filter(
+    (card) => card.set === "world" && card.rarity === "Epic",
+  );
+  const ordinary = epics.filter((card) => !featured.has(card.name));
+  assert.ok(ordinary.length > 30);
+  assert.ok(
+    ordinary.every((card) => card.value >= 950 && card.value <= 1150),
+    "ordinary World Epics stay in the £9.50–£11.50 band",
+  );
+  assert.equal(
+    new Set(ordinary.map((card) => card.value)).size,
+    ordinary.length,
+    "ordinary World Epics keep distinct sell values",
+  );
+  for (const name of featured) {
+    assert.ok(
+      epics.find((card) => card.name === name).value > 3500,
+      `${name} keeps its headline value`,
+    );
+  }
+});
 test("world packs can return less or more than their purchase price", () => {
   const p = packs.find((p) => p.id === "world");
   const low = rollPack(p, rng(0)).reduce((sum, c) => sum + c.value, 0);
@@ -883,8 +933,8 @@ test("every pack loses more often than it wins across a large sample", () => {
     }
     const lossRate = loss / samples;
     assert.ok(
-      lossRate > 0.5 && lossRate < 0.9,
-      `${pack.name} should lose often but not almost always; got ${(lossRate * 100).toFixed(1)}%`,
+      lossRate > 0.5 && lossRate <= 0.65,
+      `${pack.name} should lose often but no more than 65% of the time; got ${(lossRate * 100).toFixed(1)}%`,
     );
     assert.ok(smallWin > 0, `${pack.name} can return a small win`);
     assert.ok(mediumWin > 0, `${pack.name} can return 2x or more`);
