@@ -615,19 +615,21 @@ const rarityPowerups = Object.freeze({
     { name: "Small setback", epicBonus: -35000 },
   ],
   Crown: [
-    { name: "Royal decree", epicBonus: 1200000, crownBonus: 200000 },
+    { name: "Royal decree", epicBonus: 1000000, crownBonus: 100000 },
     {
       name: "Crown's favor",
-      epicBonus: 1000000,
+      epicBonus: 850000,
       uncommonBonus: 100000,
-      crownBonus: 250000,
+      crownBonus: 150000,
     },
-    { name: "Golden momentum", epicBonus: 900000, crownBonus: 300000 },
+    // One Crown card stays Crown-focused; the rest trade Crown odds for Epic
+    // or Uncommon so a loadout is a choice rather than four copies of the same bet.
+    { name: "Golden momentum", epicBonus: 650000, crownBonus: 300000 },
     {
       name: "Sovereign chance",
-      epicBonus: 800000,
-      uncommonBonus: 150000,
-      crownBonus: 350000,
+      epicBonus: 450000,
+      uncommonBonus: 200000,
+      crownBonus: 50000,
     },
   ],
   Chase: [

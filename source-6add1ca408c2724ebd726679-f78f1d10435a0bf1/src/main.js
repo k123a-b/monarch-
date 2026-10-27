@@ -233,14 +233,16 @@ function hasClaimableReward() {
   const day = todayKey();
   if (!a.starter_claimed) return true;
   if (a.spin_day !== day) return true;
-  if (claimableQuests(a.quest_state, day).length) return true;
+  return claimableQuests(a.quest_state, day).length > 0;
+}
+function hasClaimableIndexReward() {
+  const a = state.account;
+  if (!state.user || !a) return false;
   const discovered = new Set([
     ...(a.character_index || []),
     ...(a.fortnite_collection || []),
   ]);
   const rewards = a.set_rewards || {};
-  // A completed set always has a claim available: an odds bonus while one is
-  // under its cap, otherwise cash or the set badge.
   return indexSets.some(
     (set) =>
       !rewards[set.id] &&
@@ -248,7 +250,7 @@ function hasClaimableReward() {
   );
 }
 function shell() {
-  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${n === "index" ? "index-nav-item" : ""} ${state.view === n ? "active" : ""}">${icon(n === "codex" || n === "index" ? "globe" : n === "upgrades" ? "spark" : n)}<span>${n === "pot" ? "The Pot" : n === "codex" ? "Leaders" : n === "index" ? "Card Index" : n[0].toUpperCase() + n.slice(1)}</span>${n === "rewards" && hasClaimableReward() ? '<i class="claim-dot" aria-label="Claimable reward"></i>' : ""}</a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="button ghost small settings-button" data-action="settings">${icon("settings")} Settings</button><button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
+  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${n === "index" ? "index-nav-item" : ""} ${state.view === n ? "active" : ""}">${icon(n === "codex" || n === "index" ? "globe" : n === "upgrades" ? "spark" : n)}<span>${n === "pot" ? "The Pot" : n === "codex" ? "Leaders" : n === "index" ? "Card Index" : n[0].toUpperCase() + n.slice(1)}</span>${(n === "rewards" && hasClaimableReward()) || (n === "index" && hasClaimableIndexReward()) ? '<i class="claim-dot" aria-label="Claimable reward"></i>' : ""}</a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="button ghost small settings-button" data-action="settings">${icon("settings")} Settings</button><button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
 }
 function title(eyebrow, heading, text) {
   return `<div class="page-heading"><span class="eyebrow">${eyebrow}</span><h1>${heading}</h1><p>${text}</p></div>`;
@@ -1837,7 +1839,9 @@ document.addEventListener("click", async (e) => {
         state.account = result.account;
         state.inventory.unshift(result.card);
         updateWallet();
-        rewardsView();
+        // Rebuild the shell too so the Rewards dot clears as soon as the
+        // starter pack is claimed.
+        render();
         showModal(
           `<span class="eyebrow">YOUR FREE STARTER PACK</span><h2>Tap to reveal your card.</h2><div class="starter-flip-scene"><button class="starter-flip-card" data-action="reveal-starter-card" aria-label="Flip and reveal your starter card"><span class="starter-flip-inner"><span class="starter-flip-front">${icon("crown")}<strong>STARTER</strong><small>TAP TO REVEAL</small></span><span class="starter-flip-back">${gameCard(result.card, { owned: true })}</span></span></button></div><button class="button starter-reveal-done" data-action="close" hidden>To your rewards ${icon("arrow")}</button>`,
           "reveal-modal",

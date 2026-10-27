@@ -218,9 +218,26 @@ test("character index sets use existing cards and keep earned bonuses bounded", 
       (id) => cardMap[id],
     ),
   );
-  assert.equal(fourCrowns.epicBonus, 3900000);
-  assert.equal(fourCrowns.uncommonBonus, 250000);
-  assert.equal(fourCrowns.crownBonus, 1100000);
+  assert.equal(fourCrowns.epicBonus, 2950000);
+  assert.equal(fourCrowns.uncommonBonus, 300000);
+  assert.equal(fourCrowns.crownBonus, 600000);
+  const crownProfiles = new Set(
+    catalog
+      .filter(
+        (card) =>
+          card.rarity === "Crown" &&
+          card.id !== "fortnite-renegade-raider",
+      )
+      .map((card) => {
+        const powerup = cardPowerup(card);
+        return [
+          powerup.epicBonus,
+          powerup.uncommonBonus,
+          powerup.crownBonus,
+        ].join(":");
+      }),
+  );
+  assert.equal(crownProfiles.size, 4, "Crown power-ups should vary");
   assert.equal(SET_EPIC_CAP, 4 * SET_EPIC_REWARD);
   assert.equal(SET_CROWN_CAP, 4 * SET_CROWN_REWARD);
   assert.ok(SET_EPIC_CAP >= 2000000);
@@ -229,14 +246,14 @@ test("character index sets use existing cards and keep earned bonuses bounded", 
 test("five equipped Crown cards can reach the +5% Epic and +2% Crown loadout caps", () => {
   const crownCards = catalog.filter((card) => card.rarity === "Crown");
   const epicFive = crownCards
-    .filter((card) => cardPowerup(card).epicBonus === 1200000)
+    .filter((card) => cardPowerup(card).epicBonus === 1000000)
     .slice(0, 5);
   assert.equal(epicFive.length, 5);
   assert.equal(loadoutPowerup(epicFive).epicBonus, EPIC_SHIFT_CAP);
   const crownFive = [
     cardMap["fortnite-renegade-raider"],
     ...crownCards
-      .filter((card) => cardPowerup(card).crownBonus >= 350000)
+      .filter((card) => cardPowerup(card).crownBonus >= 300000)
       .slice(0, 4),
   ];
   assert.equal(crownFive.length, 5);
