@@ -163,7 +163,7 @@ for (const p of packs) {
 }
 test("Fortnite Drop Pack keeps its own high-loss odds while making Epic characters much rarer", () => {
   const pack = packs.find((entry) => entry.id === "fortnite");
-  assert.deepEqual(pack.odds, [53499000, 43998990, 2500000, 2000, 10]);
+  assert.deepEqual(pack.odds, [51699000, 43998990, 4300000, 2000, 10]);
   assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
   assert.deepEqual(
     [
@@ -270,11 +270,11 @@ test("permanent character-index rewards shift Epic and Crown odds by their state
     max === ODDS_TOTAL ? value : Math.max(0, max - 1);
   const brainrot = packs.find((pack) => pack.id === "brainrot");
   assert.equal(
-    rollPack(brainrot, deterministic(89700000))[0].rarity,
+    rollPack(brainrot, deterministic(87300000))[0].rarity,
     "Uncommon",
   );
   assert.equal(
-    rollPack(brainrot, deterministic(89700000), {
+    rollPack(brainrot, deterministic(87300000), {
       permanentEpicBonus: SET_EPIC_REWARD,
     })[0].rarity,
     "Epic",

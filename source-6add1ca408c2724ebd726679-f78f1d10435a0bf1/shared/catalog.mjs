@@ -559,6 +559,38 @@ function worldEpicValue(card) {
     worldEpicBand.get(card.id) ?? Math.round(Math.abs(card.value) * 0.73)
   );
 }
+// Every pack lifts its win chance by moving a slice of the cheap tier into Epic
+// and keeping the top ordinary payouts in a tight band. Rare pulls are trimmed
+// so the higher hit rate still returns less than the pack price on average.
+const liftedValues = new Map([
+  ["crocodilo", 1825],
+  ["signet", 2190],
+  ["apex-crown", 32800],
+  ["mythic-brainrot", 12500],
+  ["mythic-royal", 100000],
+  ["mythic-apex", 2400000],
+  ["mythic-fortnite", 1600000],
+  ["mystery-gold", 36500],
+]);
+const fortniteFixedEpics = new Set([
+  "fortnite-fishstick",
+  "fortnite-agent-peely",
+  "fortnite-midas",
+]);
+function liftValue(card, value) {
+  if (liftedValues.has(card.id)) return liftedValues.get(card.id);
+  if (card.set === "brainrot" && card.rarity === "Crown")
+    return Math.max(500, 1000 + Math.round((value - 1000) * 0.4));
+  if (card.set === "brainrot" && card.rarity === "Epic")
+    return Math.min(value, 240);
+  if (
+    card.set === "fortnite" &&
+    card.rarity === "Epic" &&
+    !fortniteFixedEpics.has(card.id)
+  )
+    return Math.round(value * 0.9);
+  return value;
+}
 export const catalog = [
   ...cards,
   ...fortniteCards,
@@ -614,7 +646,7 @@ export const catalog = [
       !portraits[c.id] &&
       !c.image),
   ),
-}));
+})).map((c) => ({ ...c, value: liftValue(c, c.value) }));
 export const cardMap = Object.fromEntries(catalog.map((c) => [c.id, c]));
 const rarityPowerups = Object.freeze({
   // Cheap cards may nudge Uncommon odds or offer a discount, but they never
@@ -914,7 +946,7 @@ export const packs = [
     price: 200,
     count: 4,
     set: "brainrot",
-    odds: [63780000, 26000000, 10180000, 40000, 0],
+    odds: [63780000, 23800000, 12380000, 40000, 0],
     chase: "crocodilo",
     chaseOdds: 800,
     secret: "secret-brainrot",
@@ -932,7 +964,7 @@ export const packs = [
     price: 600,
     count: 4,
     set: "royal",
-    odds: [68940000, 22000000, 8900000, 160000, 0],
+    odds: [68940000, 20400000, 10500000, 160000, 0],
     chase: "signet",
     chaseOdds: 1000,
     secret: "secret-royal",
@@ -968,7 +1000,7 @@ export const packs = [
     price: 10000,
     count: 5,
     set: "royal",
-    odds: [0, 0, 45795000, 54200000, 5000],
+    odds: [0, 0, 42995000, 57000000, 5000],
     chase: "apex-crown",
     chaseOdds: 2000,
     secret: "secret-apex",
@@ -987,7 +1019,7 @@ export const packs = [
     price: 12500,
     count: 4,
     set: "fortnite",
-    odds: [53499000, 43998990, 2500000, 2000, 10],
+    odds: [51699000, 43998990, 4300000, 2000, 10],
     chase: "fortnite-renegade-raider",
     chaseOdds: 40000,
     secret: "secret-fortnite",
