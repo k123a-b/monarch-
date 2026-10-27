@@ -1166,13 +1166,17 @@ test("daily quests track progress, pay once and reset on a new UTC day", () => {
   const day = "2026-10-27";
   assert.equal(dailyQuests.length, 4);
   assert.ok(dailyQuests.every((quest) => quest.reward > 0));
+  assert.ok(
+    dailyQuests.reduce((total, quest) => total + quest.reward, 0) >= 400,
+    "the day's quests should pay at least £4.00",
+  );
   let state = normalizeQuestState({}, day);
   assert.deepEqual(state.progress, { packs: 0, epic: 0, sold: 0 });
   assert.equal(claimableQuests(state, day).length, 0);
   state = addQuestProgress(state, day, "packs", 1);
   assert.equal(claimableQuests(state, day).length, 1);
   const first = completeDailyQuest(state, day, "open-1");
-  assert.equal(first.quest.reward, 25);
+  assert.equal(first.quest.reward, 100);
   assert.deepEqual(first.state.claimed, ["open-1"]);
   assert.equal(claimableQuests(first.state, day).length, 0);
   assert.throws(() => completeDailyQuest(first.state, day, "open-1"), /already/);

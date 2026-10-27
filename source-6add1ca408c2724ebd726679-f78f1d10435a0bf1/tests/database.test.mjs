@@ -219,8 +219,8 @@ test(
           ]);
           const first = await request(questUser, "quests/claim", { quest: "open-1" });
           assert.equal(first.status, 200);
-          assert.equal(Number(first.data.reward), 25);
-          assert.equal(Number(first.data.account.balance), 525);
+          assert.equal(Number(first.data.reward), 100);
+          assert.equal(Number(first.data.account.balance), 600);
           assert.equal(
             (await request(questUser, "quests/claim", { quest: "open-1" })).status,
             409,
@@ -231,7 +231,7 @@ test(
               200,
             );
           }
-          assert.equal(Number((await request(questUser, "me")).data.account.balance), 680);
+          assert.equal(Number((await request(questUser, "me")).data.account.balance), 925);
           assert.equal(
             Number(
               (
