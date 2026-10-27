@@ -15,8 +15,25 @@ import {
   loadoutPowerup,
   indexSets,
   CHASE_BONUS_SCALE,
+  EPIC_SHIFT_CAP,
+  CROWN_SHIFT_CAP,
+  SET_EPIC_REWARD,
+  SET_CROWN_REWARD,
+  SET_EPIC_CAP,
+  SET_CROWN_CAP,
+  SECRET_CHANCE_CAP,
+  SECRET_CROWN_BONUS,
+  dailyDiscountPack,
+  secretPackDiscount,
 } from "../shared/catalog.mjs";
-import { dailySpinSegments, playReward } from "../shared/rules.mjs";
+import {
+  dailySpinSegments,
+  playReward,
+  dailyQuests,
+  normalizeQuestState,
+  claimableQuests,
+} from "../shared/rules.mjs";
+const collectionRarities = [...rarities, "Mythic", "Chase", "Secret"];
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) =>
   String(s ?? "").replace(
@@ -209,19 +226,29 @@ const tabs = [
   "rewards",
   "leaderboards",
 ];
+const todayKey = () => new Date().toISOString().slice(0, 10);
 function hasClaimableReward() {
   const a = state.account;
   if (!state.user || !a) return false;
+  const day = todayKey();
   if (!a.starter_claimed) return true;
-  if (a.spin_day !== new Date().toISOString().slice(0, 10)) return true;
-  const discovered = new Set([...(a.character_index || []), ...(a.fortnite_collection || [])]);
+  if (a.spin_day !== day) return true;
+  if (claimableQuests(a.quest_state, day).length) return true;
+  const discovered = new Set([
+    ...(a.character_index || []),
+    ...(a.fortnite_collection || []),
+  ]);
   const rewards = a.set_rewards || {};
-  const epic = Number(a.permanent_epic_bonus || 0);
-  const crown = Number(a.permanent_crown_bonus || 0);
-  return indexSets.some((set) => !rewards[set.id] && set.cardIds.every((id) => discovered.has(id)) && (epic + 500000 <= 1000000 || crown + 100000 <= 100000 || (epic + 500000 > 1000000 && crown + 100000 > 100000)));
+  // A completed set always has a claim available: an odds bonus while one is
+  // under its cap, otherwise cash or the set badge.
+  return indexSets.some(
+    (set) =>
+      !rewards[set.id] &&
+      set.cardIds.every((id) => discovered.has(id)),
+  );
 }
 function shell() {
-  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><a class="header-index-cta" href="#index">${icon("globe")}<span>Card Index</span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${n === "index" ? "index-nav-item" : ""} ${state.view === n ? "active" : ""}">${icon(n === "codex" || n === "index" ? "globe" : n === "upgrades" ? "spark" : n)}<span>${n === "pot" ? "The Pot" : n === "codex" ? "Leaders" : n === "index" ? "Card Index" : n[0].toUpperCase() + n.slice(1)}</span>${n === "rewards" && hasClaimableReward() ? '<i class="claim-dot" aria-label="Claimable reward"></i>' : ""}</a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="button ghost small settings-button" data-action="settings">${icon("settings")} Settings</button><button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
+  app.innerHTML = `<header class="header"><a class="brand" href="#packs" aria-label="Card Monarchs home"><span class="brand-mark">${icon("crown")}</span><span>CARD<span class="brand-secondary">MONARCHS</span></span></a><nav aria-label="Main navigation">${tabs.map((n) => `<a href="#${n}" class="nav-item ${n === "index" ? "index-nav-item" : ""} ${state.view === n ? "active" : ""}">${icon(n === "codex" || n === "index" ? "globe" : n === "upgrades" ? "spark" : n)}<span>${n === "pot" ? "The Pot" : n === "codex" ? "Leaders" : n === "index" ? "Card Index" : n[0].toUpperCase() + n.slice(1)}</span>${n === "rewards" && hasClaimableReward() ? '<i class="claim-dot" aria-label="Claimable reward"></i>' : ""}</a>`).join("")}</nav><div class="header-actions"><div class="wallet">${icon("wallet")}<span id="wallet-value">${money(state.account?.balance || 0)}</span><span class="virtual-chip">VIRTUAL</span></div>${state.user ? `<button class="button ghost small settings-button" data-action="settings">${icon("settings")} Settings</button><button class="avatar" data-action="profile" aria-label="Open profile">${esc((state.account?.username || state.user.name || "M").slice(0, 1))}</button>` : `<button class="button small" data-action="auth">Join the court ${icon("arrow")}</button>`}</div></header><main id="main"></main><footer><a href="#packs" class="footer-brand">${icon("crown")} CARD MONARCHS</a><span>A very unserious game. A seriously good collection.</span><div><button class="text-button" data-action="how">How to play</button><button class="icon-button" data-action="mute" aria-label="${state.muted ? "Unmute" : "Mute"} sound">${icon("sound")}<span>${state.muted ? "Off" : "On"}</span></button></div><p>All GBP is fictional. No deposits, withdrawals, or real-world value. Nothing here is financial advice. Obviously.</p></footer>`;
 }
 function title(eyebrow, heading, text) {
   return `<div class="page-heading"><span class="eyebrow">${eyebrow}</span><h1>${heading}</h1><p>${text}</p></div>`;
@@ -243,18 +270,30 @@ function guaranteeProgress() {
   );
   return `<aside class="epic-progress ${nextGuaranteed ? "guarantee-ready" : ""}" data-pack-progress><div>${icon("spark")}<span class="eyebrow">THE TENTH-PACK PROMISE</span><strong>${state.user ? (nextGuaranteed ? "Next pack: Epic or better" : `${remaining} packs to your guaranteed Epic`) : "An Epic or better every 10 packs"}</strong></div><progress max="10" value="${progress}" aria-label="Packs toward your next guaranteed Epic">${progress} / 10</progress><p>${state.user ? `${progress} / 10 packs · ` : "Sign in to track your progress. "}All pack types count. Every tenth successful purchase contains an Epic or better. Earlier lucky pulls never reset this promise. Rarity does not guarantee profit.</p></aside>`;
 }
-function nextPackDiscount() {
-  const nextPack = Number(state.account?.packs || 0) + 1;
-  if (!state.user || nextPack % 3 !== 0) return 0;
+function loadoutEffects() {
   const equippedCards = (state.account?.loadout || [])
     .map((id) => state.inventory.find((card) => Number(card.id) === Number(id)))
     .filter(Boolean)
     .map((card) => cardMap[card.template_id])
     .filter(Boolean);
-  return loadoutPowerup(equippedCards).packDiscount;
+  return loadoutPowerup(equippedCards);
+}
+function nextPackDiscount() {
+  const nextPack = Number(state.account?.packs || 0) + 1;
+  if (!state.user || nextPack % 3 !== 0) return 0;
+  return loadoutEffects().packDiscount;
+}
+function secretDiscountFor(pack) {
+  if (!state.user || !state.account) return 0;
+  return secretPackDiscount(
+    pack,
+    state.account.id,
+    todayKey(),
+    loadoutEffects(),
+  );
 }
 function packPrice(pack) {
-  return Math.max(0, pack.price - nextPackDiscount());
+  return Math.max(0, pack.price - nextPackDiscount() - secretDiscountFor(pack));
 }
 // The Crown bonus also makes each pack's chase card more likely.
 const chaseNote = (crownBonus) =>
@@ -268,7 +307,11 @@ function powerupDescription(powerup) {
     effects.push(`${powerup.epicBonus > 0 ? "+" : ""}${(powerup.epicBonus / 1000000).toFixed(2)}% Epic odds`);
   if (powerup.crownBonus)
     effects.push(`+${(powerup.crownBonus / 1000000).toFixed(2)}% Crown odds`, chaseNote(powerup.crownBonus));
-  if (powerup.packDiscount) effects.push("10p off every 3rd pack");
+  if (powerup.secretBonus)
+    effects.push(`+${(powerup.secretBonus / 10000).toFixed(2)}% daily Secret chance`);
+  if (powerup.packDiscount) effects.push(`${powerup.packDiscount}p off every 3rd pack`);
+  if (powerup.randomPackDiscount)
+    effects.push(`${powerup.randomPackDiscount}% off one random pack type each day`);
   return effects.join(" · ") || "No power-up";
 }
 function packLoadoutSummary() {
@@ -277,6 +320,9 @@ function packLoadoutSummary() {
     .filter(Boolean);
   const cards = equipped.map((card) => cardMap[card.template_id]).filter(Boolean);
   const effect = loadoutPowerup(cards);
+  const discountedPack = packs.find(
+    (pack) => pack.id === dailyDiscountPack(state.account?.id || "", todayKey()),
+  );
   const totals = [
     effect.uncommonBonus && `${effect.uncommonBonus > 0 ? "+" : ""}${(effect.uncommonBonus / 1000000).toFixed(2)}% Uncommon odds`,
     effect.epicBonus && `${effect.epicBonus > 0 ? "+" : ""}${(effect.epicBonus / 1000000).toFixed(2)}% Epic odds`,
@@ -284,7 +330,13 @@ function packLoadoutSummary() {
     effect.everyOtherCard && "Every 2nd card is Uncommon+",
     state.account?.permanent_epic_bonus && `Permanent +${(Number(state.account.permanent_epic_bonus) / 1000000).toFixed(2)}% Epic odds`,
     state.account?.permanent_crown_bonus && `Permanent +${(Number(state.account.permanent_crown_bonus) / 1000000).toFixed(2)}% Crown odds · ${chaseNote(Number(state.account.permanent_crown_bonus))}`,
-    effect.packDiscount && "10p off every 3rd pack",
+    effect.packDiscount && `${effect.packDiscount}p off every 3rd pack`,
+    effect.secretChance &&
+      `+${(effect.secretChance / 10000).toFixed(2)}% Secret chance once a day` +
+        (effect.crownCards ? ` · ${effect.crownCards} Crown card${effect.crownCards === 1 ? "" : "s"}` : ""),
+    effect.randomPackDiscount &&
+      `${effect.randomPackDiscount}% off ${discountedPack?.name || "a random pack"} today`,
+    state.account?.secret_day === todayKey() && "Secret window used today",
   ].filter(Boolean);
   return `<aside class="pack-loadout-hud" aria-label="Equipped loadout effects"><span class="eyebrow">LOADOUT EFFECTS</span>${cards.length ? `<div class="pack-loadout-cards">${equipped.map((card) => `<span><strong>${esc(cardMap[card.template_id]?.name)}</strong><small>${esc(powerupDescription(cardPowerup(card)))}</small></span>`).join("")}</div>` : ""}<p>${totals.length ? totals.join(" · ") : "No odds changes active."}</p></aside>`;
 }
@@ -293,7 +345,7 @@ function shop() {
     state.filter === "all" ? true : p.set === state.filter,
   );
   $("#main").innerHTML =
-    `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="tiny-crown">${icon("crown")}</span> WELCOME TO YOUR KINGDOM</div><h1>Chaos is<br><span>collectible.</span></h1><p>Ridiculous cards. Royal-level pulls.<br>Open packs, trade with your court, and play for the pot.</p><div class="hero-buttons"><a href="#shop" class="button" data-action="scroll-shop">Explore packs ${icon("arrow")}</a><button class="button ghost" data-action="how">How it works ${icon("info")}</button></div><div class="hero-note"><span class="green-dot"></span> Real fun. Fictional money. <span>Always.</span></div></div><div class="hero-stage" aria-label="Featured collectible cards"><div class="orbital"></div><span class="stage-star s1">✦</span><span class="stage-star s2">✧</span><div class="hero-card back-left"><div class="ornate-corner"></div><img src="${image("/img/royal.png")}" alt="Royal crown"><span>THE ROYAL COURT</span><strong>Crown of Eternity</strong><b>CROWN • ${money(4500)}</b></div><div class="hero-card back-right"><img src="${image("/img/apex.png")}" alt="Mystery Gold crown"><span>THE ONE. THE ONLY.</span><strong>Mystery Gold</strong><b>ALPHA • SERIAL № 001</b></div><div class="hero-card front"><div class="hero-card-top">${icon("crown")} THE BRAINROT COLLECTION <span>001</span></div><img src="${image("/img/brainrot.png", 650)}" alt="Tralalero Tralala, a crowned shark wearing blue sneakers"><div class="hero-card-bottom"><span>COMMON</span><strong>Tralalero<br>Tralala</strong><small>All hail the king of absolutely nothing.</small><div><span>SELL VALUE</span><b>£0.21</b></div></div></div><div class="floating-label">${icon("spark")} Your next legendary pull?</div></div></section><section class="trust-strip"><div>${icon("rewards")}<span><strong>£5 on the house</strong><small>Your welcome bonus awaits.</small></span></div><div>${icon("collection")}<span><strong>Collect. Trade. Reign.</strong><small>Build a collection fit for a monarch.</small></span></div><div>${icon("coin")}<span><strong>Growing play rewards</strong><small>Earn more the longer you play.</small></span></div><span class="play-label">100% VIRTUAL<br><strong>0% REAL MONEY</strong></span></section><section id="shop" class="shop-section"><div class="section-heading"><div><span class="eyebrow">THE ROYAL PACK SHOP</span><h2>Pick your poison.<span> Or your crown.</span></h2></div><button class="text-button odds-link" data-action="all-odds">${icon("info")} Transparent odds. Always.</button></div>${guaranteeProgress()}<div class="shop-filters" role="group" aria-label="Pack collection"><div>${[
+    `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="tiny-crown">${icon("crown")}</span> WELCOME TO YOUR KINGDOM</div><h1>Chaos is<br><span>collectible.</span></h1><p>Ridiculous cards. Royal-level pulls.<br>Open packs, trade with your court, and play for the pot.</p><div class="hero-buttons"><a href="#shop" class="button" data-action="scroll-shop">Explore packs ${icon("arrow")}</a><button class="button ghost" data-action="how">How it works ${icon("info")}</button></div><div class="hero-note"><span class="green-dot"></span> Real fun. Fictional money. <span>Always.</span></div></div><div class="hero-stage" aria-label="Featured collectible cards"><div class="orbital"></div><span class="stage-star s1">✦</span><span class="stage-star s2">✧</span><div class="hero-card back-left"><div class="ornate-corner"></div><img src="${image("/img/royal.png")}" alt="Royal crown"><span>THE ROYAL COURT</span><strong>Crown of Eternity</strong><b>CROWN • ${money(4500)}</b></div><div class="hero-card back-right"><img src="${image("/img/apex.png")}" alt="Mystery Gold crown"><span>THE ONE. THE ONLY.</span><strong>Mystery Gold</strong><b>ALPHA • SERIAL № 001</b></div><div class="hero-card front"><div class="hero-card-top">${icon("crown")} THE BRAINROT COLLECTION <span>001</span></div><img src="${image("/img/brainrot.png", 650)}" alt="Tralalero Tralala, a crowned shark wearing blue sneakers"><div class="hero-card-bottom"><span>COMMON</span><strong>Tralalero<br>Tralala</strong><small>All hail the king of absolutely nothing.</small><div><span>SELL VALUE</span><b>${money(cardMap["brainrot-common-0"].value)}</b></div></div></div><div class="floating-label">${icon("spark")} Your next legendary pull?</div></div></section><section class="trust-strip"><div>${icon("rewards")}<span><strong>£5 on the house</strong><small>Your welcome bonus awaits.</small></span></div><div>${icon("collection")}<span><strong>Collect. Trade. Reign.</strong><small>Build a collection fit for a monarch.</small></span></div><div>${icon("coin")}<span><strong>Growing play rewards</strong><small>Earn more the longer you play.</small></span></div><span class="play-label">100% VIRTUAL<br><strong>0% REAL MONEY</strong></span></section><section id="shop" class="shop-section"><div class="section-heading"><div><span class="eyebrow">THE ROYAL PACK SHOP</span><h2>Pick your poison.<span> Or your crown.</span></h2></div><button class="text-button odds-link" data-action="all-odds">${icon("info")} Transparent odds. Always.</button></div>${guaranteeProgress()}<div class="shop-filters" role="group" aria-label="Pack collection"><div>${[
       ["all", "All packs"],
       ["brainrot", "Brainrot collection"],
       ["royal", "The royal court"],
@@ -307,7 +359,7 @@ function shop() {
       )
       .join(
         "",
-      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product ${state.lastOpenedPackId === p.id ? "last-opened" : ""}" data-pack-id="${p.id}" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : p.set === "fortnite" ? "FORTNITE" : p.set === "fastfood" ? "FAST FOOD" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase and Alpha values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>${state.lastOpenedPackId === p.id ? "Open this pack again" : "Open pack"} ${icon("arrow")}</span><b>${money(packPrice(p))}</b></button>${nextPackDiscount() ? '<small class="discount-hint">Loadout boost · 10p off this pack</small>' : ""}${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack" : `Chase pull · 1 in ${p.chaseOdds.toLocaleString()}`}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£15,000</strong><small>Mystery leader · virtual sell value</small><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("collection", "large-icon")}</a></div></section>`;
+      )}</div><span class="shop-hint">Every pack. A new possibility.</span></div><div class="packs-grid ${visible.length === 1 ? "single" : ""}">${visible.map((p, i) => `<article class="pack-product ${state.lastOpenedPackId === p.id ? "last-opened" : ""}" data-pack-id="${p.id}" style="--pack-color:${p.color};--i:${i}"><div class="product-visual"><span class="product-tag">${p.tag}</span>${packArt(p)}<div class="pack-aura"></div><button class="odds-button" data-action="odds" data-id="${p.id}" aria-label="View ${p.name} odds">${icon("info")}</button></div><div class="product-info"><div class="product-meta"><span>${p.count} CARDS PER PACK</span><span>${p.set === "brainrot" ? "BRAINROT" : p.set === "world" ? "WORLD LEADERS" : p.set === "fortnite" ? "FORTNITE" : p.set === "fastfood" ? "FAST FOOD" : "ROYAL COURT"}</span></div><h3>${p.name}</h3><p>${p.subtitle}</p><p class="pack-values">Regular card values: ${money(packValueRange(p).min)} – ${money(packValueRange(p).max)}. Chase, Alpha and Mythic jackpot values are higher.</p><button class="button buy-button" data-action="buy" data-id="${p.id}"><span>${state.lastOpenedPackId === p.id ? "Open this pack again" : "Open pack"} ${icon("arrow")}</span><b>${money(packPrice(p))}</b></button>${nextPackDiscount() ? '<small class="discount-hint">Loadout boost · 10p off this pack</small>' : ""}${secretDiscountFor(p) ? `<small class="discount-hint secret-discount-hint">Secret power-up · ${money(secretDiscountFor(p))} off today</small>` : ""}${p.set === "world" ? '<button class="text-button roster-link" data-action="codex">Browse every leader ' + icon("globe") + "</button>" : ""}<div class="chase-note">${icon("spark")} ${p.guarantee ? "Crown or better in every pack · " : ""}Chase 1 in ${p.chaseOdds.toLocaleString()} · Mythic 1 in ${p.jackpotOdds.toLocaleString()}</div></div></article>`).join("")}</div>${state.filter === "all" ? `<article class="world-banner"><div class="world-banner-art">${icon("globe")}<img src="/img/mystery-leader.svg" alt="Locked mystery leader"></div><div><span class="eyebrow">NEW COLLECTION · WORLD LEADERS</span><h2>World domination.<br>In your pocket.</h2><p>Heads of state. Heads of government. One secret chase identity.</p></div><div class="world-banner-action"><span>THE 1 IN 45,000 CHASE</span><strong>£15,000</strong><small>Mystery leader · virtual sell value</small><span class="mythic-banner-line">MYTHIC · 1 IN 200,000 · £5,000</span><button class="button ghost" data-action="world">Discover the pack ${icon("arrow")}</button><button class="text-button roster-link" data-action="codex">Browse all leaders ${icon("globe")}</button></div></article>` : ""}</section><section class="bottom-panels"><div class="pot-promo"><span class="eyebrow">A SEAT AT THE TABLE</span><h2>The crown is anyone’s.</h2><p>One global pot. Ten minutes. One lucky monarch.</p><a href="#pot" class="text-button">Enter the pot ${icon("arrow")}</a>${icon("pot", "large-icon")}</div><div class="collection-promo"><span class="eyebrow">BUILT FOR YOUR INNER HOARDER</span><h2>Some cards just hit different.</h2><p>Keep the legends. Sell the rest. Trade with your friends.</p><a href="#collection" class="text-button">Your collection ${icon("collection", "large-icon")}</a></div></section>`;
 }
 function gameCard(
   row,
@@ -371,7 +423,9 @@ function gameCard(
     powerup.epicBonus === 0 &&
     !powerup.uncommonBonus &&
     !powerup.crownBonus &&
+    !powerup.secretBonus &&
     !powerup.packDiscount &&
+    !powerup.randomPackDiscount &&
     !powerup.everyOtherCard;
   const powerupText = powerupDescription(powerup);
   const loadoutIds = state.account?.loadout || [];
@@ -380,7 +434,11 @@ function gameCard(
   const loadoutFull = loadoutIds.length >= slotLimit && !equipped;
   const boostTone = noPowerup
     ? "boost-none"
-    : powerup.epicBonus > 0 || powerup.uncommonBonus > 0 || powerup.crownBonus > 0
+    : powerup.epicBonus > 0 ||
+        powerup.uncommonBonus > 0 ||
+        powerup.crownBonus > 0 ||
+        powerup.secretBonus > 0 ||
+        powerup.randomPackDiscount > 0
       ? "boost-positive"
       : powerup.epicBonus < 0
         ? "boost-negative"
@@ -388,7 +446,9 @@ function gameCard(
   return `<article class="game-card rarity-${rarity} pattern-${t.pattern || "grid"} ${state.selected.has(row.id) ? "selected" : ""}" style="--card-a:${t.colors?.[0] || "#26303e"};--card-b:${t.colors?.[1] || "#bca270"}" ${loadoutAction ? `data-action="loadout-preview" data-id="${row.id}" tabindex="0" role="button" aria-label="View odds effect for ${esc(t.name)}"` : selectable ? `data-action="select-card" data-id="${row.id}" tabindex="0" role="button" aria-pressed="${state.selected.has(row.id)}"` : ""}><div class="card-top"><span>${esc(t.rarity)}</span><span>${row.serial ? "№ " + String(row.serial).padStart(3, "0") : owned && state.inventory.filter((c) => c.template_id === row.template_id).length > 1 ? "×" + state.inventory.filter((c) => c.template_id === row.template_id).length : t.set === "world" ? icon("globe") : icon("crown")}</span></div>${portrait}<div class="card-caption"><small>${t.flag ? `<span class="country-flag" role="img" aria-label="${esc(t.country)} flag">${t.flag}</span> ` : ""}${esc(t.country || t.set?.toUpperCase())}</small><h3>${esc(t.name)}</h3>${t.set === "world" && t.role ? `<small class="leader-role">${esc(t.role)}</small>` : ""}<p>${esc(t.flavor || "The court approves. Probably.")}</p><small class="card-powerup ${boostTone}">${icon("spark")} ${esc(powerupText)}</small><div class="card-value"><span>${row.vaulted ? icon("lock") + " VAULTED" : row.trade_id ? "RESERVED" : "SELL VALUE"}</span><strong>${money(val)}</strong></div></div>${sources}${actions ? `<div class="card-actions"><button class="text-button" data-action="vault" data-id="${row.id}" ${row.trade_id || equipped ? "disabled" : ""}>${icon("lock")} ${row.vaulted ? "Unvault" : "Vault"}</button><button class="text-button" data-action="sell-one" data-id="${row.id}" ${row.vaulted || row.trade_id || equipped ? "disabled" : ""}>${val < 0 ? "Pay penalty & discard" : "Sell"} ${icon("arrow")}</button></div>` : ""}${loadoutAction ? `<div class="card-actions loadout-card-actions"><button class="button ${equipped ? "ghost" : "small"}" data-action="loadout-toggle" data-id="${row.id}" ${row.vaulted || row.trade_id || loadoutFull ? "disabled" : ""}>${equipped ? "Unequip" : loadoutFull ? "Loadout full" : "Equip power"}</button></div>` : ""}</article>`;
 }
 function fortniteCollectionAlbum() {
-  const cards = catalog.filter((card) => card.set === "fortnite");
+  const cards = catalog.filter(
+    (card) => card.set === "fortnite" && card.rarity !== "Mythic",
+  );
   const discovered = new Set([
     ...(Array.isArray(state.account?.fortnite_collection)
       ? state.account.fortnite_collection
@@ -440,18 +500,24 @@ function indexView() {
     const pct = cards.length ? Math.round(count / cards.length * 100) : 0;
     let rewardPanel;
     if (claimed) {
-      const text = claimed === "epic" ? "Permanent +0.5% Epic chance claimed" : claimed === "crown" ? "Permanent +0.1% Crown chance claimed" : "Set badge claimed";
+      const text = claimed === "epic" ? "Permanent +" + (SET_EPIC_REWARD / 1000000).toFixed(2) + "% Epic chance claimed" : claimed === "crown" ? "Permanent +" + (SET_CROWN_REWARD / 1000000).toFixed(2) + "% Crown chance claimed" : claimed === "cash" ? money(set.cashReward) + " completion cash claimed" : "Set badge claimed";
       rewardPanel = '<div class="index-reward-panel claimed"><div><span class="eyebrow">SET REWARD CLAIMED</span><strong>' + text + '</strong></div><span class="claim-status">COMPLETE</span></div>';
     } else {
       const locked = !complete || !state.user;
-      const epicDisabled = locked || epicBonus + 500000 > 1000000;
-      const crownDisabled = locked || crownBonus + 100000 > 100000;
-      const canBadge = epicBonus + 500000 > 1000000 && crownBonus + 100000 > 100000;
-      const buttons = canBadge
-        ? '<button class="button small" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="badge" ' + (locked ? "disabled" : "") + '>Claim set badge</button>'
-        : '<button class="button small" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="epic" ' + (epicDisabled ? "disabled" : "") + '>Claim +0.5% Epic</button><button class="button small ghost" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="crown" ' + (crownDisabled ? "disabled" : "") + '>Claim +0.1% Crown</button>';
+      const epicDisabled = locked || epicBonus + SET_EPIC_REWARD > SET_EPIC_CAP;
+      const crownDisabled =
+        locked || crownBonus + SET_CROWN_REWARD > SET_CROWN_CAP;
+      const capsFull =
+        epicBonus + SET_EPIC_REWARD > SET_EPIC_CAP &&
+        crownBonus + SET_CROWN_REWARD > SET_CROWN_CAP;
+      const buttons = capsFull
+        ? '<button class="button small" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="cash" ' + (locked ? "disabled" : "") + '>Claim ' + money(set.cashReward) + '</button><button class="button small ghost" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="badge" ' + (locked ? "disabled" : "") + '>Claim set badge</button>'
+        : '<button class="button small" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="epic" ' + (epicDisabled ? "disabled" : "") + '>Claim +' + (SET_EPIC_REWARD / 1000000).toFixed(2) + '% Epic</button><button class="button small ghost" data-action="claim-index-reward" data-set="' + set.id + '" data-reward="crown" ' + (crownDisabled ? "disabled" : "") + '>Claim +' + (SET_CROWN_REWARD / 1000000).toFixed(2) + '% Crown</button>';
       const prompt = !state.user ? "Sign in to claim this set reward." : complete ? "Set complete — choose one reward." : "Complete the set to unlock these rewards.";
-      rewardPanel = '<div class="index-reward-panel ' + (complete ? "ready" : "locked") + '"><div class="index-reward-copy"><span class="eyebrow">' + (complete ? "REWARD READY" : "SET REWARD") + '</span><strong>' + prompt + '</strong><small>Choose a permanent +0.5% Epic chance or +0.1% Crown chance. Account-wide caps apply.</small></div><div class="index-reward-actions">' + buttons + '</div></div>';
+      const copy = capsFull
+        ? "Both permanent set caps are full, so this set offers " + money(set.cashReward) + " virtual cash or the set badge. Claiming either completes the set."
+        : "Choose a permanent +" + (SET_EPIC_REWARD / 1000000).toFixed(2) + "% Epic chance or +" + (SET_CROWN_REWARD / 1000000).toFixed(2) + "% Crown chance. Four of each can be claimed account-wide.";
+      rewardPanel = '<div class="index-reward-panel ' + (complete ? "ready" : "locked") + '"><div class="index-reward-copy"><span class="eyebrow">' + (complete ? "REWARD READY" : "SET REWARD") + '</span><strong>' + prompt + '</strong><small>' + copy + '</small></div><div class="index-reward-actions">' + buttons + '</div></div>';
     }
     const cardTiles = cards.map((card, i) => {
       const found = discovered.has(card.id);
@@ -466,8 +532,8 @@ function indexView() {
   const crownText = crownBonus ? "+" + (crownBonus / 1000000).toFixed(2) + "% Crown · " + chaseNote(crownBonus) : "No Crown set bonus";
   $("#main").innerHTML =
     title("THE CARD ARCHIVE", "Character index.", "Browse every card, track set progress, and see the reward before you complete a set.") +
-    '<div class="index-top-actions"><span>' + indexSets.length + " sets · " + catalog.length + ' cards</span><strong>' + (indexSets.filter((set) => !rewards[set.id] && set.cardIds.every((id) => discovered.has(id))).length) + ' rewards ready to claim</strong></div>' +
-    '<div class="index-bonus-summary panel"><span class="eyebrow">YOUR PERMANENT SET BONUSES</span><strong>' + epicText + ' chance · ' + crownText + ' chance</strong><small>Caps: +1.00% Epic and +0.10% Crown. Choose one reward for each completed set.</small></div>' +
+    '<div class="index-top-actions"><span>' + indexSets.length + " sets · " + catalog.filter((card) => card.rarity !== "Secret" && card.rarity !== "Mythic").length + ' cards</span><strong>' + (indexSets.filter((set) => !rewards[set.id] && set.cardIds.every((id) => discovered.has(id))).length) + ' rewards ready to claim</strong></div>' +
+    '<div class="index-bonus-summary panel"><span class="eyebrow">YOUR PERMANENT SET BONUSES</span><strong>' + epicText + ' chance · ' + crownText + ' chance</strong><small>Caps: +' + (SET_EPIC_CAP / 1000000).toFixed(2) + '% Epic and +' + (SET_CROWN_CAP / 1000000).toFixed(2) + '% Crown — four claims of each. Once both caps are full, a completed set offers virtual cash or the set badge instead. Secret cards stay outside the index.</small></div>' +
     '<nav class="index-filters" aria-label="Filter card index sets">' + familyButtons + '</nav>' +
     (sections || '<div class="panel index-empty"><h2>No sets in this group yet.</h2><p>Choose another collection filter.</p></div>');
 }
@@ -491,12 +557,13 @@ function collection() {
       "Your collection.",
       "A kingdom is only as good as its questionable possessions.",
     ) +
-    `<div class="stats-row"><div><span>CARDS COLLECTED</span><strong>${mine.length}</strong></div><div><span>COLLECTION VALUE</span><strong>${money(mine.reduce((s, c) => s + Number(c.value), 0))}</strong></div><div><span>UNIQUE TEMPLATES</span><strong>${new Set(mine.map((c) => c.template_id)).size}</strong></div><div><span>SAFELY VAULTED</span><strong>${mine.filter((c) => c.vaulted).length}</strong></div></div><div class="toolbar"><input id="card-search" aria-label="Search cards" placeholder="Search your collection…" value="${esc(state.search)}"><select id="rarity-filter" aria-label="Filter rarity"><option value="all">All rarities</option>${[...rarities, "Chase"].map((r) => `<option ${state.rarity === r ? "selected" : ""}>${r}</option>`).join("")}</select><select id="set-filter" aria-label="Filter collection">${[
+    `<div class="stats-row"><div><span>CARDS COLLECTED</span><strong>${mine.length}</strong></div><div><span>COLLECTION VALUE</span><strong>${money(mine.reduce((s, c) => s + Number(c.value), 0))}</strong></div><div><span>UNIQUE TEMPLATES</span><strong>${new Set(mine.map((c) => c.template_id)).size}</strong></div><div><span>SAFELY VAULTED</span><strong>${mine.filter((c) => c.vaulted).length}</strong></div></div><div class="toolbar"><input id="card-search" aria-label="Search cards" placeholder="Search your collection…" value="${esc(state.search)}"><select id="rarity-filter" aria-label="Filter rarity"><option value="all">All rarities</option>${collectionRarities.map((r) => `<option ${state.rarity === r ? "selected" : ""}>${r}</option>`).join("")}</select><select id="set-filter" aria-label="Filter collection">${[
       ["all", "All collections"],
       ["brainrot", "Brainrot"],
       ["royal", "Royal court"],
       ["world", "World leaders"],
       ["fortnite", "Fortnite"],
+      ["fastfood", "Fast Food"],
       ["alpha", "Mystery Gold"],
     ]
       .map(
@@ -539,8 +606,14 @@ function loadoutEffectModal(cardId) {
   const crownChange = previewAtCapacity
     ? powerup.crownBonus || 0
     : after.crownBonus - before.crownBonus;
+  const secretChange = previewAtCapacity
+    ? (powerup.rarity === "Crown" ? SECRET_CROWN_BONUS : 0) +
+      (powerup.secretBonus || 0)
+    : after.secretChance - before.secretChance;
   const points = (value) =>
     `${value > 0 ? "+" : ""}${(value / 1000000).toFixed(2)} percentage points`;
+  const secretPoints = (value) =>
+    `${value > 0 ? "+" : ""}${(value / 10000).toFixed(2)} percentage points`;
   const effects = [];
   if (epicChange)
     effects.push(
@@ -561,19 +634,37 @@ function loadoutEffectModal(cardId) {
         ? `This card would increase Crown odds by ${points(crownChange)} if equipped.`
         : `Crown odds increase by ${points(crownChange)}.`,
     );
+  if (secretChange)
+    effects.push(
+      previewAtCapacity
+        ? `This card would add ${secretPoints(secretChange)} to the once-a-day Secret roll if equipped.`
+        : `The once-a-day Secret roll gains ${secretPoints(secretChange)}.`,
+    );
   if (powerup.everyOtherCard)
     effects.push("Every second card in a pack is guaranteed Uncommon or better.");
   if (powerup.packDiscount)
     effects.push(`Every third pack costs ${powerup.packDiscount}p less.`);
-  if (!epicChange && !uncommonChange && !crownChange && !powerup.everyOtherCard && !powerup.packDiscount)
+  if (powerup.randomPackDiscount)
+    effects.push(`One random pack each day costs ${powerup.randomPackDiscount}% less.`);
+  if (
+    !epicChange &&
+    !uncommonChange &&
+    !crownChange &&
+    !secretChange &&
+    !powerup.everyOtherCard &&
+    !powerup.packDiscount &&
+    !powerup.randomPackDiscount
+  )
     effects.push("This card has no active odds or price effect.");
   const combined = [
     after.uncommonBonus && `Uncommon odds ${points(after.uncommonBonus)}`,
     after.epicBonus && `Epic odds ${points(after.epicBonus)}`,
     after.crownBonus && `Crown odds ${points(after.crownBonus)}`,
+    after.secretChance && `Secret chance ${secretPoints(after.secretChance)}`,
+    after.randomPackDiscount && `${after.randomPackDiscount}% off one random pack daily`,
   ].filter(Boolean).join(" · ") || "No net rarity odds adjustment.";
   showModal(
-    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Uncommon adjustments shift odds between Common and Uncommon. Positive Epic adjustments shift odds from Common, then Uncommon, into Epic; negative Epic adjustments return odds to Common. Renegade Raider shifts odds into Crown by up to 0.70 percentage points. Loadout adjustments are capped at ±0.40 percentage points for Uncommon and ±0.75 for Epic.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
+    `<span class="eyebrow">${isEquipped ? "ACTIVE CARD EFFECT" : "CARD EFFECT PREVIEW"}</span><h2>${esc(template.name)}</h2><p>${esc(powerup.name)} · ${esc(template.rarity)}</p><div class="panel odds-effect-detail"><strong>${effects.map(esc).join(" ")}</strong><p>${esc(combined)}</p><small>Uncommon adjustments shift odds between Common and Uncommon. Positive Epic adjustments shift odds from Common, then Uncommon, into Epic; negative Epic adjustments return odds to Common. Renegade Raider shifts odds into Crown by up to 1.00 percentage point. Loadout adjustments are capped at ±0.40 percentage points for Uncommon, +${(EPIC_SHIFT_CAP / 1000000).toFixed(2)} for Epic and +${(CROWN_SHIFT_CAP / 1000000).toFixed(2)} for Crown. Every equipped Crown card adds +0.08% to the once-a-day Secret roll, capped at +${(SECRET_CHANCE_CAP / 10000).toFixed(2)}%. Kim Jong Un's +2.00% Epic sits outside the cap.</small></div>${previewAtCapacity ? '<p class="muted">Your loadout is full. Unequip a card before adding this one.</p>' : !isEquipped ? '<p class="muted">This preview shows the change if you equip this card.</p>' : ""}`,
     "odds-effect-modal",
   );
 }
@@ -605,7 +696,7 @@ function loadoutView() {
       "Build your card loadout.",
       "Mix boosts and trade-offs to shape your pack odds. Equipped cards stay yours, but must be unequipped before selling, vaulting, or trading.",
     ) +
-    `<div class="loadout-summary panel"><div><span class="eyebrow">ACTIVE POWER</span><h2>${equipped.length} / ${slotLimit} cards equipped</h2><p>Loadout odds shifts are capped at ±0.75 percentage points for Epic and ±0.40 for Uncommon. Index rewards are permanent but capped account-wide. Frugal cards can reduce every third pack by 10p.</p></div>${slotLimit < 5 ? `<aside class="slot-upgrade"><span class="eyebrow">EXPAND YOUR STRATEGY</span><strong>Unlock slot ${slotLimit + 1}</strong><small>One-time purchase · ${money(slotLimit === 3 ? 40000 : 50000)} virtual cash</small><button class="button small" data-action="loadout-upgrade" ${Number(state.account?.balance || 0) < (slotLimit === 3 ? 40000 : 50000) ? "disabled" : ""}>${Number(state.account?.balance || 0) < (slotLimit === 3 ? 40000 : 50000) ? "Need more virtual cash" : `Unlock slot · ${money(slotLimit === 3 ? 40000 : 50000)}`}</button></aside>` : '<span class="slot-unlocked">FIVE SLOTS UNLOCKED</span>'}${equipped
+    `<div class="loadout-summary panel"><div><span class="eyebrow">ACTIVE POWER</span><h2>${equipped.length} / ${slotLimit} cards equipped</h2><p>Loadout odds shifts are capped at +${(EPIC_SHIFT_CAP / 1000000).toFixed(2)}% Epic, +${(CROWN_SHIFT_CAP / 1000000).toFixed(2)}% Crown and ±0.40% Uncommon. Kim's +2.00% Epic sits outside the cap. Index rewards are permanent and capped at +${(SET_EPIC_CAP / 1000000).toFixed(2)}% Epic / +${(SET_CROWN_CAP / 1000000).toFixed(2)}% Crown. Every equipped Crown card adds +${(SECRET_CROWN_BONUS / 10000).toFixed(2)}% to the once-a-day Secret roll, capped at +${(SECRET_CHANCE_CAP / 10000).toFixed(2)}%. Secret power-ups can also take 20% off one random pack each day, and frugal cards reduce every third pack by up to 50p.</p></div>${slotLimit < 5 ? `<aside class="slot-upgrade"><span class="eyebrow">EXPAND YOUR STRATEGY</span><strong>Unlock slot ${slotLimit + 1}</strong><small>One-time purchase · ${money(slotLimit === 3 ? 40000 : 50000)} virtual cash</small><button class="button small" data-action="loadout-upgrade" ${Number(state.account?.balance || 0) < (slotLimit === 3 ? 40000 : 50000) ? "disabled" : ""}>${Number(state.account?.balance || 0) < (slotLimit === 3 ? 40000 : 50000) ? "Need more virtual cash" : `Unlock slot · ${money(slotLimit === 3 ? 40000 : 50000)}`}</button></aside>` : '<span class="slot-unlocked">FIVE SLOTS UNLOCKED</span>'}${equipped
       .map((id) =>
         state.inventory.find((card) => Number(card.id) === Number(id)),
       )
@@ -706,6 +797,30 @@ function rewardsView() {
   const starterButton = $('[data-action="claim-starter"]');
   if (starterButton)
     starterButton.innerHTML = `Open Starter Pack ${icon("arrow")}`;
+  const day = todayKey();
+  const questState = normalizeQuestState(a?.quest_state, day);
+  const readyQuests = claimableQuests(a?.quest_state, day);
+  const questRows = dailyQuests
+    .map((quest) => {
+      const progress = Math.min(
+        quest.target,
+        questState.progress[quest.metric] || 0,
+      );
+      const complete = progress >= quest.target;
+      const claimed = questState.claimed.includes(quest.id);
+      const percent = Math.min(100, (progress / quest.target) * 100);
+      return `<li class="quest-row ${complete ? "complete" : ""} ${claimed ? "claimed" : ""}"><div class="quest-copy"><strong>${esc(quest.title)}</strong><span>${esc(quest.text)}</span><div class="quest-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${quest.target}" aria-valuenow="${progress}" aria-label="${esc(quest.title)} progress"><span style="width:${percent}%"></span></div><small>${progress} / ${quest.target}</small></div><div class="quest-reward">${
+        claimed
+          ? `<span class="quest-status">${icon("check")} Claimed</span>`
+          : complete && state.user
+            ? `<button class="button small" data-action="claim-quest" data-quest="${quest.id}">Claim ${money(quest.reward)}</button>`
+            : complete
+              ? '<button class="button small ghost" data-action="auth">Sign in to claim</button>'
+              : `<span class="quest-amount">${money(quest.reward)}</span>`
+      }</div></li>`;
+    })
+    .join("");
+  const questMarkup = `<section class="panel daily-quests"><div class="spin-heading"><div><span class="eyebrow">DAILY DECREES</span><h2>Quests for today</h2><p>Four small tasks. Claim each reward before midnight UTC.</p></div><span class="spin-daily-badge">${icon("spark")} ${state.user ? `${readyQuests.length} READY` : "SIGN IN TO TRACK"}</span></div><ul class="quest-list">${questRows}</ul><p class="fine-print">Virtual cash rewards. Quest progress resets each UTC day; unclaimed rewards do not carry over.</p></section>`;
   const spunToday = a?.spin_day === new Date().toISOString().slice(0, 10);
   const spinPrizeRows = [
     {
@@ -720,7 +835,7 @@ function rewardsView() {
   ];
   $(".rewards-layout").insertAdjacentHTML(
     "beforeend",
-    `<section class="panel daily-spin"><div class="spin-heading"><div><span class="eyebrow">A LITTLE DAILY LUCK</span><h2>Your daily spin</h2><p>One free spin each day. Give the wheel a turn and see what the treasury has in store.</p></div><span class="spin-daily-badge">${icon("spark")} ONCE A DAY</span></div><div class="spin-content"><div class="spin-wheel-column">${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p></div><div class="spin-prize-panel"><div class="spin-jackpot"><span>THE SILVER JACKPOT</span><strong>£45</strong><small>1 in 1,000 spins · virtual cash</small></div><div class="spin-prizes">${spinPrizeRows.map((segment) => `<div class="spin-prize-row ${segment.id === "no-prize" ? "no-prize" : ""} ${segment.id === "silver" ? "silver-prize" : ""}"><i aria-hidden="true"></i><span>${esc(segment.label)}</span><b>${segment.reward ? money(segment.reward) : "Try again"}</b><small>${(segment.weight / 1000000).toFixed(segment.weight % 1000000 ? 1 : 0)}%</small></div>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin ' + icon("arrow") + "</button>" : spunToday ? `<button class="button ghost full" disabled>Come back tomorrow</button><p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></div></div></section>`,
+    `${questMarkup}<section class="panel daily-spin"><div class="spin-heading"><div><span class="eyebrow">A LITTLE DAILY LUCK</span><h2>Your daily spin</h2><p>One free spin each day. Give the wheel a turn and see what the treasury has in store.</p></div><span class="spin-daily-badge">${icon("spark")} ONCE A DAY</span></div><div class="spin-content"><div class="spin-wheel-column">${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p></div><div class="spin-prize-panel"><div class="spin-jackpot"><span>THE SILVER JACKPOT</span><strong>£45</strong><small>1 in 1,000 spins · virtual cash</small></div><div class="spin-prizes">${spinPrizeRows.map((segment) => `<div class="spin-prize-row ${segment.id === "no-prize" ? "no-prize" : ""} ${segment.id === "silver" ? "silver-prize" : ""}"><i aria-hidden="true"></i><span>${esc(segment.label)}</span><b>${segment.reward ? money(segment.reward) : "Try again"}</b><small>${(segment.weight / 1000000).toFixed(segment.weight % 1000000 ? 1 : 0)}%</small></div>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin ' + icon("arrow") + "</button>" : spunToday ? `<button class="button ghost full" disabled>Come back tomorrow</button><p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></div></div></section>`,
   );
 }
 function dailySpinWheel() {
@@ -955,26 +1070,30 @@ function settingsModal() {
     return;
   }
   showModal(
-    `<span class="eyebrow">YOUR COURT, YOUR CALL</span><h2>Account settings</h2><p>Choose the username other players see. It must be unique.</p><form id="username-form"><label for="username-input">Username</label><input id="username-input" name="username" value="${esc(state.account.username)}" minlength="3" maxlength="24" pattern="[A-Za-z0-9_ -]+" autocomplete="nickname" required><p class="form-error" role="alert"></p><button class="button full">Save username ${icon("arrow")}</button></form><div class="settings-divider"></div><section class="panel patch-notes"><span class="eyebrow">LATEST UPDATE · 26 OCTOBER 2026</span><h3>Game balance & collection update</h3><ul><li>Index sets now cover every catalog card; completing a set grants a capped permanent Epic or Crown bonus.</li><li>Loadout capacity upgrades to four cards for £400, then five for £500.</li><li>At balances of £20,000 or more, each pack takes a 5% tax on positive pulled card value.</li><li>Pack opening upgrades must be bought in order; Fortnite odds and card values are tuned for a fairer chase.</li></ul></section><button class="button ghost full" data-action="change-user">Switch Google account</button><button class="text-button full" data-action="logout">Log out</button>`,
+    `<span class="eyebrow">YOUR COURT, YOUR CALL</span><h2>Account settings</h2><p>Choose the username other players see. It must be unique.</p><form id="username-form"><label for="username-input">Username</label><input id="username-input" name="username" value="${esc(state.account.username)}" minlength="3" maxlength="24" pattern="[A-Za-z0-9_ -]+" autocomplete="nickname" required><p class="form-error" role="alert"></p><button class="button full">Save username ${icon("arrow")}</button></form><div class="settings-divider"></div><section class="panel patch-notes"><span class="eyebrow">LATEST UPDATE · 27 OCTOBER 2026</span><h3>Secrets, quests & royal rewards</h3><ul><li>Seven Secret cards are hidden across the packs. Equipped Crown cards add +0.08% each to a once-a-day Secret roll, capped at +0.40%.</li><li>Secret cards carry new power-ups: up to 20% off one random pack each day, bonus Secret chance, Epic/Crown shifts and a 50p recurring pack discount.</li><li>Daily quests now pay virtual cash for opening packs, pulling Epic or better, and selling cards. Claim them from Rewards.</li><li>Completed Card Index sets pay £10–£50 cash once both permanent odds caps are full, so every completed set still has a reward.</li><li>Multi-pack openings now play every special animation side by side, including a full-length Andy Burnham sequence and new Secret reveals.</li><li>The rewards dot only appears when there is something to claim. Loadout caps remain +5.00% Epic / +2.00% Crown; index caps remain +2.00% Epic / +0.40% Crown.</li></ul></section><button class="button ghost full" data-action="change-user">Switch Google account</button><button class="text-button full" data-action="logout">Log out</button>`,
     "settings-modal",
   );
 }
 function oddsModal(id) {
   const list = id ? packs.filter((p) => p.id === id) : packs;
   showModal(
-    `<span class="eyebrow">NOTHING UP OUR ROYAL SLEEVES</span><h2>Know your odds.</h2><p>These are the base odds per card. Every tenth successful pack purchase across all types contains an Epic or better; a low card is upgraded if needed. Apex also keeps its Crown guarantee. These guarantees improve the final outcome beyond the base odds. A pack’s sell value can be lower or higher than its price.</p>${list
-      .map(
-        (p) =>
-          `<div class="odds-section"><h3>${p.name} <span>${money(p.price)} · ${p.count} cards</span></h3>${rarities.map((r, i) => `<div class="odds-row"><span class="rarity-dot rarity-${r.toLowerCase()}"></span><span>${r === "Alpha" ? "Mystery Gold (Alpha)" : r}</span><b>${p.odds[i] / 1000000}%</b></div>`).join("")}<p>${esc(
+    `<span class="eyebrow">NOTHING UP OUR ROYAL SLEEVES</span><h2>Know your odds.</h2><p>These are the base odds per card. Every tenth successful pack purchase across all types contains an Epic or better; a low card is upgraded if needed. Apex also keeps its Crown guarantee. The chase and Mythic jackpot are separate per-pack rolls, so their odds are listed per pack. Crown-chance bonuses from loadout or Card Index rewards raise both your Crown odds and the chase chance for that pack. Equipped Crown cards also add +${(SECRET_CROWN_BONUS / 10000).toFixed(2)}% each to the once-a-day Secret roll, capped at +${(SECRET_CHANCE_CAP / 10000).toFixed(2)}%; only the first successful purchase each UTC day rolls it. Guarantees improve the final outcome beyond the base odds. A pack’s sell value can be lower or higher than its price.</p>${list
+      .map((p) => {
+        const mythic = cardMap[p.jackpot];
+        const mythicPct = (100 / p.jackpotOdds).toFixed(4);
+        const secretKnown = state.inventory.some(
+          (card) => card.template_id === p.secret,
+        );
+        return `<div class="odds-section"><h3>${p.name} <span>${money(p.price)} · ${p.count} cards</span></h3>${rarities.map((r, i) => `<div class="odds-row"><span class="rarity-dot rarity-${r.toLowerCase()}"></span><span>${r === "Alpha" ? "Mystery Gold (Alpha)" : r}</span><b>${p.odds[i] / 1000000}%</b></div>`).join("")}<div class="odds-row mythic-odds-row"><span class="rarity-dot rarity-mythic"></span><span>${esc(mythic.name)} (Mythic jackpot)</span><b>${mythicPct}% <small>per pack · 1 in ${p.jackpotOdds.toLocaleString()}</small></b></div><div class="odds-row secret-odds-row"><span class="rarity-dot rarity-secret"></span><span>Secret card${secretKnown ? ` · ${esc(cardMap[p.secret]?.name || "")}` : " · identity undiscovered"}</span><b>+${(SECRET_CROWN_BONUS / 10000).toFixed(2)}% per Crown card <small>once per UTC day · cap ${(SECRET_CHANCE_CAP / 10000).toFixed(2)}% · ${money(cardMap[p.secret]?.value || 0)}</small></b></div><p>${esc(
             presentedCard(
               cardMap[p.chase],
               state.inventory.some((c) => c.template_id === p.chase),
             ).name,
-          )} · 1 in ${p.chaseOdds.toLocaleString()} packs · ${money(cardMap[p.chase].value)}</p>${p.guarantee ? "<small>Crown or better guaranteed: the lowest card is replaced if needed.</small>" : ""}</div>`,
-      )
+          )} · 1 in ${p.chaseOdds.toLocaleString()} packs · ${money(cardMap[p.chase].value)}</p>${p.guarantee ? "<small>Crown or better guaranteed: the lowest card is replaced if needed.</small>" : ""}</div>`;
+      })
       .join(
         "",
-      )}<p class="fine-print">Chase rolls are separate and replace the lowest-value eligible card. Alpha cards are never replaced. No duplicate template unless its rarity pool is exhausted. Mystery Gold: £7,500 base value, globally numbered. All values are fictional.</p>`,
+      )}<p class="fine-print">Chase, Mythic and Secret rolls are separate and replace the lowest-value eligible card. Alpha, Chase, Mythic and Secret cards are never replaced by another special roll. The Secret window opens on your first successful pack purchase each UTC day and is consumed even if the roll misses. Secret cards are hidden from the Card Index. Mystery Gold: ${money(cardMap["mystery-gold"].value)} base value, globally numbered. All values are fictional.</p>`,
     "odds-modal",
   );
 }
@@ -987,7 +1106,9 @@ function sound(rarity) {
     o.type = "sine";
     o.frequency.setValueAtTime(260, ctx.currentTime);
     o.frequency.exponentialRampToValueAtTime(
-      ["Alpha", "Chase", "Crown"].includes(rarity) ? 1040 : 520,
+      ["Alpha", "Chase", "Crown", "Mythic", "Secret"].includes(rarity)
+        ? 1040
+        : 520,
       ctx.currentTime + 0.25,
     );
     g.gain.setValueAtTime(0.065, ctx.currentTime);
@@ -1011,12 +1132,14 @@ async function buyPack(id) {
   })();
   const buttons = Array.from({length: limit}, (_, index) => index + 1).map((quantity) => {
     const milestones = Math.floor((opened + quantity) / 3) - Math.floor(opened / 3);
-    const discount = Math.min(p.price * quantity, discountPerMilestone * milestones);
+    const secretDiscount = secretDiscountFor(p) * quantity;
+    const discount = Math.min(p.price * quantity, discountPerMilestone * milestones + secretDiscount);
     const price = p.price * quantity - discount;
     return '<button class="button full" data-action="confirm-buy" data-id="' + p.id + '" data-quantity="' + quantity + '" ' + (Number(state.account?.balance || 0) < price ? 'disabled' : '') + '>Open ' + quantity + ' pack' + (quantity === 1 ? '' : 's') + ' for ' + money(price) + (discount ? ' · saves ' + money(discount) : '') + ' ' + icon('arrow') + '</button>';
   }).join('');
-  const taxNotice = Number(state.account?.balance || 0) >= 2000000 ? ' A 5% tax applies to positive card value pulled from each pack while your balance is at least £20,000.' : ' Reach £20,000 and a 5% tax will apply to positive pulled card value.';
-  showModal('<span class="eyebrow">YOUR NEXT ROYAL MISTAKE</span><h2>Open ' + p.name + '?</h2><p>' + p.count + ' cards per pack. Select how many identical packs to open. One-time limit: ' + limit + '.</p>' + guaranteeProgress() + '<div class="purchase-preview">' + packArt(p) + '</div><p class="fine-print">' + taxNotice + ' You might pull less than you spend, or something worth much more. Chase odds: 1 in ' + p.chaseOdds.toLocaleString() + '.' + (p.id === 'world' ? ' Includes former leaders and a satirical −£25 Keir Starmer card. Negative cards reduce collection value; discarding one charges its penalty. No automatic penalty debit on opening.' : '') + '</p><div class="purchase-quantities">' + buttons + '</div>', 'purchase-modal');
+  const secretDiscount = secretDiscountFor(p);
+  const mythic = cardMap[p.jackpot];
+  showModal('<span class="eyebrow">YOUR NEXT ROYAL MISTAKE</span><h2>Open ' + p.name + '?</h2><p>' + p.count + ' cards per pack. Select how many identical packs to open. One-time limit: ' + limit + '.</p>' + guaranteeProgress() + '<div class="purchase-preview">' + packArt(p) + '</div><p class="fine-print">You might pull less than you spend, or something worth much more. Chase odds: 1 in ' + p.chaseOdds.toLocaleString() + '. Mythic jackpot: ' + esc(mythic.name) + ', 1 in ' + p.jackpotOdds.toLocaleString() + ' packs, ' + money(mythic.value) + '.' + (secretDiscount ? ' Secret power-up: ' + money(secretDiscount) + ' off each pack today.' : '') + (p.id === 'world' ? ' Includes former leaders and a satirical −£1.83 Keir Starmer card. Negative cards reduce collection value; discarding one charges its penalty. No automatic penalty debit on opening.' : '') + '</p><div class="purchase-quantities">' + buttons + '</div>', 'purchase-modal');
 }
 async function openPack(id, quantity = 1) {
   if (state.busy) return;
@@ -1039,23 +1162,38 @@ async function openPack(id, quantity = 1) {
     let revealed = 0;
     const cards = result.cards;
     const total = cards.reduce((s, c) => s + Number(c.value), 0);
-    const totalSpend = Number(result.pricePaid || 0) + Number(result.tax || 0);
+    const totalSpend = Number(result.pricePaid || 0);
     function revealMarkup() {
       showModal(
-        `${packLoadoutSummary()}<span class="eyebrow">${esc(p.name.toUpperCase())} · ${quantity} PACK${quantity === 1 ? "" : "S"} · ${revealed} / ${cards.length} CARDS REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}${result.discount ? `<p class="guarantee-earned" role="status">Loadout discount · ${money(Number(result.discount))} off this opening</p>` : ""}${result.tax ? `<p class="guarantee-earned" role="status">High-balance pack tax · ${money(Number(result.tax))}</p>` : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= totalSpend ? "positive" : "negative"}">${total >= totalSpend ? "+" : ""}${money(total - totalSpend)} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : ""}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "Open another pack" : "Reveal all cards"} ${icon("arrow")}</button>`,
+        `${packLoadoutSummary()}<span class="eyebrow">${esc(p.name.toUpperCase())} · ${quantity} PACK${quantity === 1 ? "" : "S"} · ${revealed} / ${cards.length} CARDS REVEALED</span><h2>${revealed === cards.length ? "The court has spoken." : "Let’s see your hand."}</h2>${result.epicGuaranteed ? '<p class="guarantee-earned" role="status">Tenth-pack promise · Epic or better guaranteed</p>' : ""}${result.discount ? `<p class="guarantee-earned" role="status">Discounts applied · ${money(Number(result.discount))} off this opening${Number(result.secretDiscount) ? ` · Secret pays ${money(Number(result.secretDiscount))}` : ""}</p>` : ""}${result.secretWindow ? `<p class="secret-window-line" role="status">Secret window opened · ${(Number(result.secretChance) / 10000).toFixed(2)}% chance per pack today</p>` : ""}<div class="reveal-cards">${cards.map((c, i) => (i < revealed ? `<div class="revealed">${gameCard(c)}<button class="button ghost small" data-action="sell-one" data-id="${c.id}">${Number(c.value) < 0 ? "Pay penalty & discard" : "Sell now · " + money(Number(c.value))}</button></div>` : `<button class="card-back" data-action="reveal-card" data-index="${i}" aria-label="Reveal card ${i + 1}">${icon("crown")}<span>CARD<br>MONARCHS</span><small>CLICK TO REVEAL</small></button>`)).join("")}</div><div class="reveal-summary">${revealed === cards.length ? `<span>Pack value <strong>${money(total)}</strong></span><span class="${total >= totalSpend ? "positive" : "negative"}">${total >= totalSpend ? "+" : ""}${money(total - totalSpend)} vs pack price</span>` : "<span>Click each card to reveal your pull.</span>"}</div>${revealed === cards.length ? `<button class="button ghost" data-action="sell-pack">${total < 0 ? "Sell all cards · pay " + money(Math.abs(total)) : "Sell all cards · receive " + money(total)}</button>` : '<button class="button ghost" data-action="skip-reveal">Skip animation</button>'}<button class="button" data-action="${revealed === cards.length ? "reveal-done" : "reveal-all"}">${revealed === cards.length ? "Open another pack" : "Reveal all cards"} ${icon("arrow")}</button>`,
         "reveal-modal",
       );
     }
-    function addCenteredRevealStage(index, stageClass, cardClass, decoration) {
-      const target = $(".reveal-cards", modal).children[index];
-      const card = $(".game-card", target);
+    let stageLayer = null;
+    function addCenteredRevealStage(
+      index,
+      stageClass,
+      cardClass,
+      decoration,
+      { multi = false, secondary = false, shift = 0 } = {},
+    ) {
+      const target = $(".reveal-cards", modal)?.children[index];
+      const card = target && $(".game-card", target);
+      if (!card) return;
+      if (!stageLayer) {
+        stageLayer = document.createElement("div");
+        stageLayer.className = "reveal-stage-layer";
+        stageLayer.setAttribute("aria-hidden", "true");
+        modal.append(stageLayer);
+      }
       const rect = card.getBoundingClientRect();
       const stage = document.createElement("div");
-      stage.className = stageClass;
+      stage.className = `reveal-stage ${stageClass}${multi ? " stage-multi" : ""}${secondary ? " stage-secondary" : ""}`;
       stage.setAttribute("aria-hidden", "true");
+      stage.style.setProperty("--stage-shift", `${shift}px`);
       stage.style.setProperty(
         "--start-x",
-        `${rect.left + rect.width / 2 - window.innerWidth / 2}px`,
+        `${rect.left + rect.width / 2 - window.innerWidth / 2 - shift}px`,
       );
       stage.style.setProperty(
         "--start-y",
@@ -1065,16 +1203,29 @@ async function openPack(id, quantity = 1) {
       clone.classList.add(cardClass);
       stage.append(clone);
       if (decoration) stage.insertAdjacentHTML("beforeend", decoration);
-      modal.append(stage);
+      stageLayer.append(stage);
+    }
+    function secretStageDecoration(entry) {
+      const template = entry.template || cardMap[entry.card.template_id] || {};
+      return `<div class="secret-scanlines" aria-hidden="true"></div><div class="secret-classified" aria-hidden="true"><b>CLASSIFIED</b><small>SECRET PULL</small></div><strong class="secret-caption">${esc(template.secretCaption || "This card does not exist.")}</strong><div class="secret-glitch" aria-hidden="true"><span>NO RECORD</span><i>${esc(template.name || "SECRET")}</i><span>REDACTED</span></div>`;
     }
     revealMarkup();
     let animationTimer;
     let releaseEffects = () => {};
     let animating = false;
     const handler = (e) => {
-      if (animating) return;
       const b = e.target.closest("[data-action]");
       if (!b) return;
+      if (b.dataset.action === "skip-reveal") {
+        releaseEffects();
+        revealed = cards.length;
+        revealMarkup();
+        modal
+          .querySelectorAll(".revealed")
+          .forEach((node) => node.classList.add("new-reveal"));
+        return;
+      }
+      if (animating) return;
       if (["reveal-card", "reveal-all"].includes(b.dataset.action)) {
         if (
           b.dataset.action === "reveal-card" &&
@@ -1087,7 +1238,16 @@ async function openPack(id, quantity = 1) {
         revealed =
           b.dataset.action === "reveal-all" ? cards.length : revealed + 1;
         const newCards = cards.slice(start, revealed);
-        const ranks = ["Common", "Uncommon", "Epic", "Crown", "Chase", "Alpha"];
+        const ranks = [
+          "Common",
+          "Uncommon",
+          "Epic",
+          "Crown",
+          "Chase",
+          "Alpha",
+          "Mythic",
+          "Secret",
+        ];
         sound(
           newCards.reduce(
             (best, c) =>
@@ -1098,114 +1258,215 @@ async function openPack(id, quantity = 1) {
         releaseEffects();
         revealMarkup();
         const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-        newCards.forEach((c) => {
-          const target = $(".reveal-cards", modal).children[cards.indexOf(c)];
+        const entries = newCards.map((card, offset) => ({
+          card,
+          template: cardMap[card.template_id] || card,
+          index: start + offset,
+        }));
+        const isSecret = (entry) =>
+          entry.card.rarity === "Secret" || entry.template?.rarity === "Secret";
+        entries.forEach((entry) => {
+          const target = $(".reveal-cards", modal)?.children[entry.index];
+          if (!target) return;
           target.classList.add("new-reveal");
-          if (c.rarity === "Epic") target.classList.add("epic-reveal");
+          if (entry.card.rarity === "Epic") target.classList.add("epic-reveal");
+          if (entry.card.rarity === "Mythic")
+            target.classList.add("mythic-reveal");
+          if (
+            entry.card.rarity === "Crown" &&
+            entry.template?.name !== "King Charles III"
+          )
+            target.classList.add("crown-reveal");
+          if (isSecret(entry)) target.classList.add("secret-reveal");
         });
-        const trumpIndex = cards.findIndex(
-          (c) =>
-            newCards.includes(c) &&
-            cardMap[c.template_id]?.name === "Donald Trump",
+        const secretEntries = entries.filter(isSecret);
+        const kimEntries = entries.filter(
+          (entry) => entry.card.template_id === "kim",
         );
-        const netanyahuIndex = cards.findIndex(
-          (c) =>
-            newCards.includes(c) &&
-            cardMap[c.template_id]?.name === "Benjamin Netanyahu",
+        const charlesEntries = entries.filter(
+          (entry) => entry.template?.name === "King Charles III",
         );
-        const charlesIndex = cards.findIndex(
-          (c) =>
-            newCards.includes(c) &&
-            cardMap[c.template_id]?.name === "King Charles III",
-        );
-        const andyIndex = cards.findIndex(
-          (c) =>
-            newCards.includes(c) &&
-            cardMap[c.template_id]?.name === "Andy Burnham",
-        );
-        const israelIndex = cards.findIndex(
-          (c) => newCards.includes(c) && c.template_id === "world-israel-flag",
-        );
-        if (trumpIndex >= 0 && !reduced) {
-          addCenteredRevealStage(
-            trumpIndex,
-            "american-stage",
-            "american-card",
-            '<div class="american-fireworks"><span>★</span><span>★</span><span>★</span><b>🇺🇸</b><i>★</i><i>★</i><i>★</i></div>',
-          );
-        }
-        if (andyIndex >= 0 && !reduced) {
-          addCenteredRevealStage(
-            andyIndex,
-            "andy-stage",
-            "andy-card",
-            '<div class="andy-northern-lights"><span>✦</span><span>✧</span><i>✦</i></div><strong class="andy-normal-bloke">Just a normal bloke</strong>',
-          );
-        }
-        if (netanyahuIndex >= 0 && !reduced) {
-          addCenteredRevealStage(
-            netanyahuIndex,
-            "netanyahu-stage",
-            "netanyahu-card",
-            '<div class="netanyahu-glints" aria-hidden="true"><span>✦</span><i>✧</i><i>✦</i></div>',
-          );
-        }
-        if (israelIndex >= 0 && !reduced) {
-          addCenteredRevealStage(
-            israelIndex,
-            "israel-stage",
-            "israel-card",
-            '<div class="israel-star-glow"><span>✡</span><i>✦</i><i>✦</i></div>',
-          );
-        }
-        if (charlesIndex >= 0 && !reduced) {
-          const target = $(".reveal-cards", modal).children[charlesIndex];
+        charlesEntries.forEach((entry) => {
+          const target = $(".reveal-cards", modal)?.children[entry.index];
+          if (!target) return;
           target.classList.add("trumpet-reveal");
           target.insertAdjacentHTML(
             "beforeend",
             '<div class="trumpet-fanfare" aria-hidden="true"><span>🎺</span><i>♪</i><i>♫</i><i>♬</i></div>',
           );
-        }
-        if (newCards.some((c) => ["Alpha", "Chase"].includes(c.rarity))) {
+        });
+        kimEntries.forEach((entry) => {
+          const target = $(".reveal-cards", modal)?.children[entry.index];
+          if (!target) return;
+          target.classList.add("supreme-reveal");
+          target.insertAdjacentHTML(
+            "beforeend",
+            '<div class="supreme-stars" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span><span>✧</span></div>',
+          );
+        });
+        const hasKim = kimEntries.length > 0;
+        if (
+          !hasKim &&
+          entries.some((entry) =>
+            ["Alpha", "Chase", "Crown", "Mythic", "Secret"].includes(
+              entry.card.rarity,
+            ),
+          )
+        )
+          modal.classList.add("legendary-flash");
+        entries
+          .filter((entry) => entry.card.rarity === "Mythic")
+          .forEach((entry) => {
+            const target = $(".reveal-cards", modal)?.children[entry.index];
+            target?.insertAdjacentHTML(
+              "beforeend",
+              '<div class="mythic-burst" aria-hidden="true"><span>✦</span><i>✧</i><i>✦</i><i>✧</i><b>JACKPOT</b></div>',
+            );
+          });
+        entries
+          .filter(
+            (entry) =>
+              entry.card.rarity === "Crown" &&
+              entry.template?.name !== "King Charles III",
+          )
+          .forEach((entry) => {
+            const target = $(".reveal-cards", modal)?.children[entry.index];
+            target?.insertAdjacentHTML(
+              "beforeend",
+              '<div class="crown-burst" aria-hidden="true"><span>♛</span><i>✦</i><i>✦</i><i>✦</i><b>CROWN</b></div>',
+            );
+          });
+        if (
+          entries.some((entry) =>
+            ["Alpha", "Chase", "Mythic", "Secret"].includes(
+              entry.card.rarity,
+            ),
+          )
+        ) {
           modal.insertAdjacentHTML(
             "beforeend",
             `<div class="celebration" aria-hidden="true">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i};--x:${((i % 6) - 2.5) * 80}px;--y:${Math.floor(i / 6) % 2 ? -240 : 200}px"></i>`).join("")}</div>`,
           );
         }
-        if (newCards.some((c) => c.id === "kim" || c.template_id === "kim")) {
-          const kimIndex = cards.findIndex(
-            (c) => newCards.includes(c) && c.template_id === "kim",
+        const stageSpecials = [];
+        entries.forEach((entry) => {
+          if (isSecret(entry))
+            stageSpecials.push({ kind: "secret", entry, priority: 100 });
+          else if (entry.template?.name === "Andy Burnham")
+            stageSpecials.push({ kind: "andy", entry, priority: 90 });
+          else if (entry.template?.name === "Donald Trump")
+            stageSpecials.push({ kind: "trump", entry, priority: 80 });
+          else if (entry.template?.name === "Benjamin Netanyahu")
+            stageSpecials.push({ kind: "netanyahu", entry, priority: 70 });
+          else if (entry.card.template_id === "world-israel-flag")
+            stageSpecials.push({ kind: "israel", entry, priority: 60 });
+        });
+        const maxStages = reduced ? 0 : window.innerWidth < 720 ? 1 : 3;
+        const chosen = stageSpecials
+          .slice()
+          .sort((a, b) => b.priority - a.priority)
+          .slice(0, maxStages)
+          .sort((a, b) => a.entry.index - b.entry.index);
+        const chosenEntries = new Set(
+          chosen.map((special) => special.entry),
+        );
+        const stageCardWidth =
+          chosen.length === 3
+            ? Math.min(238, window.innerWidth * 0.25)
+            : Math.min(300, window.innerWidth * 0.33);
+        const gap =
+          chosen.length === 3
+            ? Math.max(Math.min(205, window.innerWidth * 0.19), stageCardWidth + 16)
+            : Math.min(180, window.innerWidth * 0.18);
+        const shifts =
+          chosen.length === 3
+            ? [-gap, 0, gap]
+            : chosen.length === 2
+              ? [-gap, gap]
+              : [0];
+        const stageClasses = {
+          secret: ["secret-stage", "secret-card"],
+          andy: ["andy-stage", "andy-card"],
+          trump: ["american-stage", "american-card"],
+          netanyahu: ["netanyahu-stage", "netanyahu-card"],
+          israel: ["israel-stage", "israel-card"],
+        };
+        const stageDecorations = {
+          andy: '<div class="andy-northern-lights"><span>✦</span><span>✧</span><i>✦</i></div><strong class="andy-normal-bloke">Just a normal bloke</strong>',
+          trump:
+            '<div class="american-fireworks"><span>★</span><span>★</span><span>★</span><b>🇺🇸</b><i>★</i><i>★</i><i>★</i></div>',
+          netanyahu:
+            '<div class="netanyahu-glints" aria-hidden="true"><span>✦</span><i>✧</i><i>✦</i></div>',
+          israel:
+            '<div class="israel-star-glow"><span>✡</span><i>✦</i><i>✦</i></div>',
+        };
+        chosen.forEach((special, position) => {
+          const [stageClass, cardClass] = stageClasses[special.kind];
+          addCenteredRevealStage(
+            special.entry.index,
+            stageClass,
+            cardClass,
+            special.kind === "secret"
+              ? secretStageDecoration(special.entry)
+              : stageDecorations[special.kind],
+            {
+              multi: chosen.length > 1,
+              secondary: chosen.length > 1 && position > 0,
+              shift: shifts[position],
+            },
           );
-          if (kimIndex >= 0) {
-            const target = $(".reveal-cards", modal).children[kimIndex];
-            target.classList.add("supreme-reveal");
-            target.insertAdjacentHTML(
+        });
+        if (chosen.length > 1 && stageLayer)
+          stageLayer.classList.add(`stage-count-${chosen.length}`);
+        secretEntries
+          .filter((entry) => !chosenEntries.has(entry))
+          .forEach((entry) => {
+            const target = $(".reveal-cards", modal)?.children[entry.index];
+            target?.insertAdjacentHTML(
               "beforeend",
-              '<div class="supreme-stars" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span><span>✧</span></div>',
+              `<div class="secret-dossier" aria-hidden="true"><b>CLASSIFIED</b><span>${esc(entry.template?.secretCaption || "This card does not exist.")}</span></div>`,
             );
-          }
-        } else if (
-          newCards.some((c) => ["Alpha", "Chase", "Crown"].includes(c.rarity))
-        ) {
-          modal.classList.add("legendary-flash");
-        }
-        const hasKim = newCards.some((c) => c.template_id === "kim");
-        const hasCharles = charlesIndex >= 0;
+          });
+        stageSpecials
+          .filter((special) => !chosenEntries.has(special.entry))
+          .forEach((special) => {
+            const target =
+              $(".reveal-cards", modal)?.children[special.entry.index];
+            target?.classList.add("special-inline");
+          });
+        const hasMythic = entries.some(
+          (entry) => entry.card.rarity === "Mythic",
+        );
+        const hasSecret = secretEntries.length > 0;
+        const hasCharles = charlesEntries.length > 0;
         const duration = reduced
           ? 0
-          : andyIndex >= 0
-            ? 3200
-            : israelIndex >= 0
-              ? 2800
-              : trumpIndex >= 0 || hasCharles
-                ? 2500
-                : hasKim
-                  ? 1800
-                  : newCards.some((c) =>
-                        ["Epic", "Crown", "Chase", "Alpha"].includes(c.rarity),
-                      )
-                    ? 1800
-                    : 550;
+          : Math.max(
+              stageSpecials.some((special) => special.kind === "andy")
+                ? 5400
+                : 0,
+              hasSecret ? 4400 : 0,
+              hasMythic ? 3800 : 0,
+              stageSpecials.some((special) => special.kind === "netanyahu")
+                ? 3600
+                : 0,
+              stageSpecials.some((special) => special.kind === "israel")
+                ? 3000
+                : 0,
+              stageSpecials.some((special) => special.kind === "trump") ||
+              hasCharles
+                ? 2700
+                : 0,
+              hasKim ? 1900 : 0,
+              entries.some((entry) =>
+                ["Epic", "Crown", "Chase", "Alpha"].includes(
+                  entry.card.rarity,
+                ),
+              )
+                ? 1900
+                : 0,
+              550,
+            );
         const controls = [...modal.querySelectorAll("button")].map((button) => [
           button,
           button.disabled,
@@ -1217,11 +1478,31 @@ async function openPack(id, quantity = 1) {
             button.disabled = disabled;
           });
           modal.classList.remove("legendary-flash");
+          stageLayer?.remove();
+          stageLayer = null;
           modal
             .querySelectorAll(
-              ".celebration,.supreme-stars,.presidential-sparkle,.trumpet-fanfare,.american-stage,.andy-stage,.israel-stage",
+              ".celebration,.mythic-burst,.crown-burst,.supreme-stars,.presidential-sparkle,.trumpet-fanfare,.secret-dossier,.secret-glitch,.reveal-stage-layer",
             )
             .forEach((node) => node.remove());
+          modal
+            .querySelectorAll(".special-inline")
+            .forEach((node) => node.classList.remove("special-inline"));
+        };
+        const announce = () => {
+          if (!modal.open) return;
+          const secret = secretEntries[0]?.card;
+          const mythic = newCards.find((c) => c.rarity === "Mythic");
+          if (secret)
+            toast(
+              `SECRET PULL · ${secret.name} · ${money(secret.value)} VIRTUAL`,
+            );
+          else if (mythic)
+            toast(
+              `MYTHIC JACKPOT · ${mythic.name} · ${money(mythic.value)} VIRTUAL`,
+            );
+          else if (hasKim)
+            toast("SUPREME PULL · KIM JONG UN · £15,000 VIRTUAL");
         };
         if (duration) {
           animating = true;
@@ -1230,12 +1511,11 @@ async function openPack(id, quantity = 1) {
           });
           animationTimer = setTimeout(() => {
             releaseEffects();
-            if (hasKim && modal.open)
-              toast("SUPREME PULL · KIM JONG UN · £15,000 VIRTUAL");
+            announce();
           }, duration);
         } else {
           releaseEffects();
-          if (hasKim) toast("SUPREME PULL · KIM JONG UN · £15,000 VIRTUAL");
+          announce();
         }
       }
       if (b.dataset.action === "reveal-done") {
@@ -1380,7 +1660,25 @@ document.addEventListener("click", async (e) => {
         state.account = result.account;
         updateWallet();
         render();
-        toast("Character set reward claimed.");
+        toast(
+          result.cash
+            ? `${money(Number(result.cash))} index completion cash claimed.`
+            : result.reward === "badge"
+              ? "Set badge claimed. Your collection is complete."
+              : "Character set reward claimed.",
+        );
+      } catch (e) { target.disabled = false; throw e; }
+      return;
+    }
+    if (action === "claim-quest") {
+      if (!requireUser()) return;
+      target.disabled = true;
+      try {
+        const result = await api("quests/claim", { quest: target.dataset.quest });
+        state.account = result.account;
+        updateWallet();
+        render();
+        toast(`Quest reward claimed · ${money(Number(result.reward))} virtual cash.`);
       } catch (e) { target.disabled = false; throw e; }
       return;
     }
@@ -1897,7 +2195,7 @@ function codexView() {
       "A world of questionable power.",
       `${all.length - 40} leader cards and 40 standalone national flag cards. Browse the flags separately or explore the full collection.`,
     ) +
-    `<div class="codex-intro panel"><div><h2>Leaders and 40 standalone national flags</h2><p>The £10 World Leaders Pack contains four independently rolled cards. The mystery chase leader is isolated from normal pools: a separate 1-in-45,000 pack roll, with a £15,000 virtual sell value and a special unlock animation. Its identity stays hidden until you reveal the card. King Charles III is an Epic worth £56.25; Donald Trump is an Epic worth £172.50; and Israel’s flag is an Epic worth £37.50. Flag rarity and value are fictional game assignments based on a broad power-tier estimate, not real-world financial values.</p></div><button class="button" data-action="buy" data-id="world">Open for £10 ${icon("arrow")}</button></div><div class="toolbar"><input id="roster-search" aria-label="Search leaders or countries" placeholder="Search leaders, flags, countries, or roles…" value="${esc(state.rosterSearch)}"><div class="roster-filters" role="group" aria-label="Filter the World Leaders collection">${filters.map(([filter, label]) => `<button class="button ghost small ${state.rosterKind === filter ? "active" : ""}" data-action="roster-filter" data-filter="${filter}" aria-pressed="${state.rosterKind === filter}">${label}</button>`).join("")}</div><button class="button ghost small" data-action="odds" data-id="world">Pack odds ${icon("info")}</button></div><p class="source-note">Roster snapshot: ${esc(leaderSource.retrieved)}. <a href="${esc(leaderSource.source)}" target="_blank" rel="noopener noreferrer">Current heads of state and government ↗</a>. Flag values are fictional game ratings informed by a broad power-tier estimate; they do not represent real-world value. Portrait links on leader cards provide individual sources.</p><p class="muted">${matched.length} matching cards · Showing ${Math.min(matched.length, state.rosterLimit)}</p><div class="collection-grid">${matched
+    `<div class="codex-intro panel"><div><h2>Leaders and 40 standalone national flags</h2><p>The £10 World Leaders Pack contains four independently rolled cards. The mystery chase leader is isolated from normal pools: a separate 1-in-45,000 pack roll, with a £15,000 virtual sell value and a special unlock animation. Its identity stays hidden until you reveal the card. Crown-chance bonuses from your loadout or Card Index also nudge that roll upward: every +0.10% Crown adds about 25% to the chase chance. The pack also carries The Last Superpower Mythic jackpot on a separate 1-in-200,000 roll, worth £5,000. King Charles III is an Epic worth ${money(cardMap["world-38b1a8656815ee75"].value)}; Donald Trump is a Crown worth ${money(cardMap["world-c6af8a1c1faf4aae"].value)}; and Israel’s flag is an Epic worth ${money(cardMap["world-israel-flag"].value)}. Flag rarity and value are fictional game assignments based on a broad power-tier estimate, not real-world financial values.</p></div><button class="button" data-action="buy" data-id="world">Open for £10 ${icon("arrow")}</button></div><div class="toolbar"><input id="roster-search" aria-label="Search leaders or countries" placeholder="Search leaders, flags, countries, or roles…" value="${esc(state.rosterSearch)}"><div class="roster-filters" role="group" aria-label="Filter the World Leaders collection">${filters.map(([filter, label]) => `<button class="button ghost small ${state.rosterKind === filter ? "active" : ""}" data-action="roster-filter" data-filter="${filter}" aria-pressed="${state.rosterKind === filter}">${label}</button>`).join("")}</div><button class="button ghost small" data-action="odds" data-id="world">Pack odds ${icon("info")}</button></div><p class="source-note">Roster snapshot: ${esc(leaderSource.retrieved)}. <a href="${esc(leaderSource.source)}" target="_blank" rel="noopener noreferrer">Current heads of state and government ↗</a>. Flag values are fictional game ratings informed by a broad power-tier estimate; they do not represent real-world value. Portrait links on leader cards provide individual sources.</p><p class="muted">${matched.length} matching cards · Showing ${Math.min(matched.length, state.rosterLimit)}</p><div class="collection-grid">${matched
       .slice(0, state.rosterLimit)
       .map((c) => gameCard(c))
       .join(

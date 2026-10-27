@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800" role="img" aria-label="Mythic jackpot sigil">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#ffe6a6"/>
+      <stop offset=".42" stop-color="#e0a94a"/>
+      <stop offset=".72" stop-color="#4a2d63"/>
+      <stop offset="1" stop-color="#160f24"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff4c9"/>
+      <stop offset=".45" stop-color="#e8bd63"/>
+      <stop offset="1" stop-color="#8d5d1f"/>
+    </linearGradient>
+    <pattern id="stars" width="80" height="80" patternUnits="userSpaceOnUse">
+      <circle cx="14" cy="18" r="1.6" fill="#ffeec2" opacity=".8"/>
+      <circle cx="62" cy="54" r="1.1" fill="#ffeec2" opacity=".55"/>
+      <circle cx="38" cy="70" r=".9" fill="#ffeec2" opacity=".45"/>
+    </pattern>
+  </defs>
+  <rect width="640" height="800" fill="url(#glow)"/>
+  <rect width="640" height="800" fill="url(#stars)"/>
+  <g fill="none" stroke="url(#gold)" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="320" cy="360" r="196" stroke-width="3" opacity=".65"/>
+    <circle cx="320" cy="360" r="224" stroke-width="1" opacity=".3"/>
+    <path d="M180 448 208 250l112 92 112-92 28 198Z" stroke-width="9" fill="#2b1b41"/>
+    <path d="M208 448h224" stroke-width="9"/>
+    <circle cx="208" cy="238" r="15" fill="#ffe08a"/>
+    <circle cx="320" cy="330" r="15" fill="#ffe08a"/>
+    <circle cx="432" cy="238" r="15" fill="#ffe08a"/>
+    <path d="M252 512c28 42 108 42 136 0" stroke-width="6"/>
+    <path d="M320 552v52M292 604h56" stroke-width="6"/>
+    <path d="M96 360h44m360 0h44M320 96v52m0 424v52" stroke-width="2" opacity=".7"/>
+  </g>
+  <text x="320" y="676" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="30" letter-spacing="10" fill="#ffe9b0">MYTHIC</text>
+  <text x="320" y="714" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="15" letter-spacing="6" fill="#d8b877" opacity=".8">JACKPOT PULL</text>
+</svg>

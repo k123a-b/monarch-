@@ -26,7 +26,13 @@ test("all bundled catalogue images and both fallback assets exist", () => {
         existsSync(new URL("../public" + source, import.meta.url)),
         card.id,
       );
-    else assert.equal(new URL(source).hostname, "upload.wikimedia.org");
+    else
+      assert.ok(
+        ["upload.wikimedia.org", "fortnite-api.com"].includes(
+          new URL(source).hostname,
+        ),
+        card.id,
+      );
   }
   assert.ok(
     existsSync(new URL("../public/img/mystery-leader.svg", import.meta.url)),

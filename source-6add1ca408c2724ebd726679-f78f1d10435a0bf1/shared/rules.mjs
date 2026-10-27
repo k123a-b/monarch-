@@ -115,3 +115,90 @@ export function randomBelow(max, bytes) {
   } while (n >= limit);
   return Number(n % bound);
 }
+export const dailyQuests = Object.freeze([
+  {
+    id: "open-1",
+    title: "First opening",
+    text: "Open 1 pack today.",
+    metric: "packs",
+    target: 1,
+    reward: 25,
+  },
+  {
+    id: "open-3",
+    title: "Triple threat",
+    text: "Open 3 packs today.",
+    metric: "packs",
+    target: 3,
+    reward: 75,
+  },
+  {
+    id: "epic-hunt",
+    title: "Court favourite",
+    text: "Pull an Epic or better card today.",
+    metric: "epic",
+    target: 1,
+    reward: 40,
+  },
+  {
+    id: "sell-3",
+    title: "Clear the shelves",
+    text: "Sell 3 cards today.",
+    metric: "sold",
+    target: 3,
+    reward: 40,
+  },
+]);
+const questMetrics = new Set(dailyQuests.map((quest) => quest.metric));
+export function normalizeQuestState(state, day) {
+  const source =
+    state && typeof state === "object" && !Array.isArray(state) ? state : {};
+  const sameDay = source.day === day;
+  const progress =
+    sameDay && source.progress && typeof source.progress === "object"
+      ? source.progress
+      : {};
+  return {
+    day,
+    progress: Object.fromEntries(
+      [...questMetrics].map((metric) => [
+        metric,
+        sameDay ? Math.max(0, Math.floor(Number(progress[metric]) || 0)) : 0,
+      ]),
+    ),
+    claimed:
+      sameDay && Array.isArray(source.claimed)
+        ? source.claimed.filter((id) =>
+            dailyQuests.some((quest) => quest.id === id),
+          )
+        : [],
+  };
+}
+export function addQuestProgress(state, day, metric, amount = 1) {
+  if (!questMetrics.has(metric))
+    throw Error("Quest progress requires a known metric.");
+  if (!Number.isSafeInteger(amount) || amount < 0)
+    throw Error("Quest progress must be a non-negative whole number.");
+  const next = normalizeQuestState(state, day);
+  next.progress[metric] += amount;
+  return next;
+}
+export function completeDailyQuest(state, day, questId) {
+  const quest = dailyQuests.find((entry) => entry.id === questId);
+  if (!quest) throw Error("Unknown quest.");
+  const next = normalizeQuestState(state, day);
+  if (next.claimed.includes(quest.id))
+    throw Error("That quest reward has already been claimed.");
+  if (next.progress[quest.metric] < quest.target)
+    throw Error("That quest is not complete yet.");
+  next.claimed.push(quest.id);
+  return { state: next, quest };
+}
+export function claimableQuests(state, day) {
+  const current = normalizeQuestState(state, day);
+  return dailyQuests.filter(
+    (quest) =>
+      !current.claimed.includes(quest.id) &&
+      current.progress[quest.metric] >= quest.target,
+  );
+}

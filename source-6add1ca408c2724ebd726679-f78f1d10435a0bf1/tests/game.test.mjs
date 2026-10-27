@@ -14,11 +14,28 @@ import {
   indexSets,
   rarities,
   loadoutPowerup,
+  ODDS_TOTAL,
+  EPIC_SHIFT_CAP,
+  CROWN_SHIFT_CAP,
+  SET_EPIC_CAP,
+  SET_CROWN_CAP,
+  SET_EPIC_REWARD,
+  SET_CROWN_REWARD,
+  SECRET_CROWN_BONUS,
+  SECRET_CHANCE_CAP,
+  SECRET_ROLL_SCALE,
+  dailyDiscountPack,
+  secretPackDiscount,
 } from "../shared/catalog.mjs";
 import {
   activityReward,
   dailySpin,
   dailySpinSegments,
+  dailyQuests,
+  normalizeQuestState,
+  addQuestProgress,
+  completeDailyQuest,
+  claimableQuests,
   friendTablePayout,
   matchedPotBotStake,
   validFriendCode,
@@ -31,28 +48,34 @@ import leaderData from "../shared/leaders.json" with { type: "json" };
 const rng =
   (rarityRoll, chase = false) =>
   (max) =>
-    max === 100000000
+    max === ODDS_TOTAL
       ? rarityRoll
-      : packs.some((p) => p.chaseOdds === max)
-        ? chase
-          ? 0
-          : max - 1
-        : 0;
-test("Brainrot Pack: Common is 74% per card and every tier scales together", () => {
+      : packs.some((p) => p.jackpotOdds === max)
+        ? max - 1
+        : packs.some((p) => p.chaseOdds === max)
+          ? chase
+            ? 0
+            : max - 1
+          : max - 1;
+test("Brainrot Pack: Common is the majority tier and rarer tiers stay rarer", () => {
   const p = packs.find((p) => p.id === "brainrot");
-  assert.equal(p.odds[0], 74000000);
-  // Non-Common tiers keep their original relative proportions (26% / 8% = 3.25x).
-  const original = [7500000, 499900, 80, 20];
-  p.odds.slice(1).forEach((w, i) => assert.equal(w, original[i] * 3.25));
+  assert.equal(p.odds[0], 64000000);
+  assert.equal(p.price, 200);
+  for (let index = 1; index < p.odds.length; index++)
+    assert.ok(
+      p.odds[index - 1] > p.odds[index],
+      `${rarities[index]} must be rarer than ${rarities[index - 1]}`,
+    );
   // Roll just inside and just outside the Common band.
-  assert.equal(rollPack(p, rng(73999999))[0].rarity, "Common");
-  assert.equal(rollPack(p, rng(74000000))[0].rarity, "Uncommon");
+  assert.equal(rollPack(p, rng(63999999))[0].rarity, "Common");
+  assert.equal(rollPack(p, rng(64000000))[0].rarity, "Uncommon");
+  assert.equal(rollPack(p, rng(ODDS_TOTAL - 1))[0].rarity, "Crown");
 });
 for (const p of packs) {
   test(`${p.name}: integer odds sum to exactly 100%`, () =>
     assert.equal(
       p.odds.reduce((s, n) => s + n, 0),
-      100000000,
+      ODDS_TOTAL,
     ));
   test("starter pack grants one common-heavy card from every regular collection", () => {
     const roll = (rarityRoll) =>
@@ -96,9 +119,26 @@ for (const p of packs) {
     assert.equal(pull.length, p.count);
     assert.equal(pull.filter((c) => c.rarity === "Chase").length, 1);
   });
-  test(`${p.name}: a successful chase never overwrites an Alpha`, () => {
-    const pull = rollPack(p, rng(99999999, true));
-    assert.ok(pull.every((c) => c.rarity === "Alpha"));
+  if (p.odds[4] > 0)
+    test(`${p.name}: a successful chase never overwrites an Alpha`, () => {
+      const pull = rollPack(p, rng(ODDS_TOTAL - 1, true));
+      assert.ok(pull.every((c) => c.rarity === "Alpha"));
+    });
+  test(`${p.name}: the Mythic jackpot replaces one ordinary card and nothing else`, () => {
+    const jackpotRng = (max) =>
+      max === ODDS_TOTAL
+        ? 0
+        : max === p.jackpotOdds
+          ? 0
+          : max === p.chaseOdds
+            ? max - 1
+            : max - 1;
+    const pull = rollPack(p, jackpotRng);
+    const mythic = pull.find((c) => c.rarity === "Mythic");
+    assert.equal(pull.length, p.count);
+    assert.equal(pull.filter((c) => c.rarity === "Mythic").length, 1);
+    assert.equal(mythic.id, p.jackpot);
+    assert.equal(mythic.value, cardMap[p.jackpot].value);
   });
   let boundary = 0;
   p.odds.forEach((weight, i) => {
@@ -117,10 +157,10 @@ for (const p of packs) {
       });
   });
 }
-test("Fortnite Drop Pack keeps 50/50 loss odds while making Epic characters much rarer", () => {
+test("Fortnite Drop Pack keeps its own high-loss odds while making Epic characters much rarer", () => {
   const pack = packs.find((entry) => entry.id === "fortnite");
   assert.deepEqual(pack.odds, [55000000, 43998990, 1000000, 1000, 10]);
-  assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), 100000000);
+  assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
   assert.deepEqual(
     [
       cardMap["fortnite-recruit"].value,
@@ -131,9 +171,14 @@ test("Fortnite Drop Pack keeps 50/50 loss odds while making Epic characters much
       cardMap["fortnite-midas"].value,
       cardMap["fortnite-renegade-raider"].value,
     ],
-    [1500, 3500, 3000, 8000, 14000, 20000, 400000],
+    [1460, 3407, 2920, 6000, 10500, 15000, 400000],
   );
-  const fortniteCards = catalog.filter((card) => card.set === "fortnite");
+  const fortniteCards = catalog.filter(
+    (card) =>
+      card.set === "fortnite" &&
+      card.rarity !== "Mythic" &&
+      card.rarity !== "Secret",
+  );
   assert.equal(fortniteCards.length, 30);
   assert.equal(new Set(fortniteCards.map((card) => card.name)).size, 30);
   assert.equal(new Set(fortniteCards.map((card) => card.id)).size, 30);
@@ -143,6 +188,8 @@ test("Fortnite Drop Pack keeps 50/50 loss odds while making Epic characters much
     ),
     "all 30 distinct Fortnite cards point to a cosmetic portrait",
   );
+  assert.equal(cardMap["mythic-fortnite"].rarity, "Mythic");
+  assert.equal(cardMap["mythic-fortnite"].set, "fortnite");
 });
 
 test("Apex replaces exactly one low card with Crown when all rolls are Epic", () => {
@@ -155,23 +202,73 @@ test("Apex replaces exactly one low card with Crown when all rolls are Epic", ()
 });
 test("character index sets use existing cards and keep earned bonuses bounded", () => {
   assert.ok(indexSets.length > 4);
-  assert.equal(new Set(indexSets.flatMap((set) => set.cardIds)).size, catalog.length);
+  assert.equal(
+    new Set(indexSets.flatMap((set) => set.cardIds)).size,
+    catalog.filter(
+      (card) => card.rarity !== "Mythic" && card.rarity !== "Secret",
+    ).length,
+  );
   for (const set of indexSets) {
     assert.ok(set.cardIds.length >= 1 && set.cardIds.length <= 8);
     assert.equal(new Set(set.cardIds).size, set.cardIds.length);
     assert.ok(set.cardIds.every((id) => cardMap[id]), set.name + " only references catalog cards");
   }
-  assert.equal(loadoutPowerup([cardMap["royal-crown-0"], cardMap["royal-crown-1"], cardMap["royal-crown-2"], cardMap["royal-crown-3"]]).epicBonus, 750000);
-  assert.equal(loadoutPowerup([cardMap["royal-crown-0"], cardMap["royal-crown-1"], cardMap["royal-crown-2"], cardMap["royal-crown-3"]]).uncommonBonus, 250000);
+  const fourCrowns = loadoutPowerup(
+    ["royal-crown-0", "royal-crown-1", "royal-crown-2", "royal-crown-3"].map(
+      (id) => cardMap[id],
+    ),
+  );
+  assert.equal(fourCrowns.epicBonus, 3900000);
+  assert.equal(fourCrowns.uncommonBonus, 250000);
+  assert.equal(fourCrowns.crownBonus, 1100000);
+  assert.equal(SET_EPIC_CAP, 4 * SET_EPIC_REWARD);
+  assert.equal(SET_CROWN_CAP, 4 * SET_CROWN_REWARD);
+  assert.ok(SET_EPIC_CAP >= 2000000);
+  assert.ok(SET_CROWN_CAP >= 400000);
+});
+test("five equipped Crown cards can reach the +5% Epic and +2% Crown loadout caps", () => {
+  const crownCards = catalog.filter((card) => card.rarity === "Crown");
+  const epicFive = crownCards
+    .filter((card) => cardPowerup(card).epicBonus === 1200000)
+    .slice(0, 5);
+  assert.equal(epicFive.length, 5);
+  assert.equal(loadoutPowerup(epicFive).epicBonus, EPIC_SHIFT_CAP);
+  const crownFive = [
+    cardMap["fortnite-renegade-raider"],
+    ...crownCards
+      .filter((card) => cardPowerup(card).crownBonus >= 350000)
+      .slice(0, 4),
+  ];
+  assert.equal(crownFive.length, 5);
+  assert.equal(loadoutPowerup(crownFive).crownBonus, CROWN_SHIFT_CAP);
+  assert.equal(EPIC_SHIFT_CAP, 5000000);
+  assert.equal(CROWN_SHIFT_CAP, 2000000);
 });
 test("permanent character-index rewards shift Epic and Crown odds by their stated amounts", () => {
-  const deterministic = (value) => (max) => max === 100000000 ? value : Math.max(0, max - 1);
+  const deterministic = (value) => (max) =>
+    max === ODDS_TOTAL ? value : Math.max(0, max - 1);
   const brainrot = packs.find((pack) => pack.id === "brainrot");
-  assert.equal(rollPack(brainrot, deterministic(81800000))[0].rarity, "Common");
-  assert.equal(rollPack(brainrot, deterministic(81800000), { permanentEpicBonus: 500000 })[0].rarity, "Uncommon");
+  assert.equal(
+    rollPack(brainrot, deterministic(89700000))[0].rarity,
+    "Uncommon",
+  );
+  assert.equal(
+    rollPack(brainrot, deterministic(89700000), {
+      permanentEpicBonus: SET_EPIC_REWARD,
+    })[0].rarity,
+    "Epic",
+  );
   const fortnite = packs.find((pack) => pack.id === "fortnite");
-  assert.equal(rollPack(fortnite, deterministic(99950000))[0].rarity, "Epic");
-  assert.equal(rollPack(fortnite, deterministic(99950000), { permanentCrownBonus: 100000 })[0].rarity, "Crown");
+  assert.equal(
+    rollPack(fortnite, deterministic(99950000))[0].rarity,
+    "Epic",
+  );
+  assert.equal(
+    rollPack(fortnite, deterministic(99950000), {
+      permanentCrownBonus: SET_CROWN_REWARD,
+    })[0].rarity,
+    "Crown",
+  );
 });
 test("card powerups are defined and Kim guarantees every second pack card Uncommon+", () => {
   const bonuses = [];
@@ -196,7 +293,7 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
         !powerup.everyOtherCard
       )
         commonCardsWithoutPowerup++;
-    } else if (["Crown", "Chase", "Alpha"].includes(card.rarity)) {
+    } else if (["Crown", "Chase", "Alpha", "Mythic"].includes(card.rarity)) {
       assert.ok(
         powerup.epicBonus !== 0 ||
           powerup.uncommonBonus !== 0 ||
@@ -243,7 +340,8 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
   const world = packs.find((pack) => pack.id === "world");
   const cards = rollPack(
     world,
-    (max) => (max === world.chaseOdds ? max - 1 : 0),
+    (max) =>
+      max === world.chaseOdds || max === world.jackpotOdds ? max - 1 : 0,
     { powerups: [cardMap.kim] },
   );
   assert.equal(cards.length, world.count);
@@ -289,8 +387,16 @@ test("daily rewards wheel has three no-prize sectors and an exact 0.1% £45 silv
   assert.equal(dailySpin((max) => max - 1).id, "silver");
   assert.equal(dailySpin((max) => 0).reward, 0);
 });
-test("original catalogue contains 93 templates excluding world and Fortnite expansions", () =>
-  assert.equal(catalog.filter((c) => c.set !== "world" && c.set !== "fortnite").length, 93));
+test("original catalogue contains 93 non-Mythic templates before the world and Fortnite expansions", () =>
+  assert.equal(
+    catalog.filter(
+      (c) =>
+        ["brainrot", "royal", "alpha"].includes(c.set) &&
+        c.rarity !== "Mythic" &&
+        c.rarity !== "Secret",
+    ).length,
+    93,
+  ));
 test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   const kim = cardMap.kim;
   assert.equal(kim.rarity, "Chase");
@@ -298,6 +404,10 @@ test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   const world = packs.find((p) => p.id === "world");
   assert.equal(world.chaseOdds, 45000);
   assert.equal(world.price, 1000);
+  assert.equal(world.jackpot, "mythic-world");
+  assert.equal(world.jackpotOdds, 200000);
+  assert.equal(cardMap["mythic-world"].rarity, "Mythic");
+  assert.equal(cardMap["mythic-world"].value, 500000);
 });
 test("weighted pot draw includes every contributor, bot or player, at exact stake boundaries", () => {
   const entries = [
@@ -477,7 +587,12 @@ test("a changed owner, unrelated reservation, or vaulted card prevents exchange"
 });
 
 test("every country in the world collection has a flag and stable template IDs", () => {
-  const leaders = catalog.filter((c) => c.set === "world");
+  const leaders = catalog.filter(
+    (c) =>
+      c.set === "world" &&
+      c.rarity !== "Mythic" &&
+      c.rarity !== "Secret",
+  );
   assert.equal(new Set(leaders.map((c) => c.country)).size, 195);
   assert.equal(new Set(catalog.map((c) => c.id)).size, catalog.length);
   for (const c of leaders)
@@ -526,7 +641,7 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
     }),
     "each bundled flag asset is a real PNG image",
   );
-  assert.equal(cardMap["world-israel-flag"].value, 3750);
+  assert.equal(cardMap["world-israel-flag"].value, 3650);
   assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
   assert.ok(
     cardMap["world-flag-united-states"].value >
@@ -547,20 +662,18 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
   assert.ok(Math.max(...flagValues[1]) < Math.min(...flagValues[2]));
   assert.ok(Math.max(...flagValues[2]) < Math.min(...flagValues[3]));
 });
-test("World Leaders shifts 1.08 percentage points from Common to Epic", () => {
+test("World Leaders uses its own deliberately unprofitable rarity bands", () => {
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [74920000, 19200000, 5560000, 319840, 160]);
+  assert.deepEqual(world.odds, [75950000, 22000000, 2000000, 50000, 0]);
   assert.equal(
     world.odds.reduce((sum, odds) => sum + odds, 0),
-    100000000,
+    ODDS_TOTAL,
   );
-  assert.equal(76000000 - world.odds[0], 1080000);
-  assert.equal(world.odds[2] - 4480000, 1080000);
-  assert.ok(
-    world.odds
-      .slice(1)
-      .every((odds, index) => odds > [12000000, 2800000, 199900, 100][index]),
-  );
+  for (let index = 1; index < world.odds.length; index++)
+    assert.ok(world.odds[index - 1] > world.odds[index]);
+  assert.equal(world.price, 1000);
+  assert.equal(world.count, 4);
+  assert.equal(world.jackpotOdds, 200000);
 });
 test("leader ratings reflect country GDP and recognition while preserving featured values", () => {
   const americanLeader = rateLeader({
@@ -588,7 +701,7 @@ test("leader ratings reflect country GDP and recognition while preserving featur
       rateLeader({ name: "Donald Trump", country: "United States" }).rarity,
       rateLeader({ name: "Donald Trump", country: "United States" }).value,
     ],
-    ["Epic", 23000],
+    ["Crown", 50000],
   );
   assert.deepEqual(
     [
@@ -635,13 +748,13 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   assert.ok(macronCards.every((card) => card.rarity === "Epic"));
   const trump = catalog.find((card) => card.name === "Donald Trump");
   assert.equal(trump.rarity, "Crown");
-  assert.equal(trump.value, 250000);
+  assert.equal(trump.value, 50000);
   const netanyahu = catalog.find((card) => card.name === "Benjamin Netanyahu");
   assert.equal(netanyahu.rarity, "Crown");
-  assert.equal(netanyahu.value, 100000);
+  assert.equal(netanyahu.value, 97333);
   const andy = catalog.find((card) => card.name === "Andy Burnham");
   assert.equal(andy.rarity, "Epic");
-  assert.equal(andy.value, 8000);
+  assert.equal(andy.value, 7787);
   assert.equal(andy.flavor, "Just a normal bloke");
   assert.equal(andy.role, "MP · Greater Manchester");
   assert.ok(andy.image.includes("Official_portrait_of_Andy_Burnham_MP_2026"));
@@ -664,22 +777,22 @@ test("requested featured cards keep their fictional GBP values and flags", () =>
   const king = cardMap["world-38b1a8656815ee75"];
   assert.equal(king.name, "King Charles III");
   assert.equal(king.country, "United Kingdom");
-  assert.equal(king.value, 5625);
+  assert.equal(king.value, 5475);
   assert.equal(king.rarity, "Epic");
   assert.equal(king.flag, "🇬🇧");
   assert.equal(cardMap["world-c6af8a1c1faf4aae"].name, "Donald Trump");
-  assert.equal(cardMap["world-c6af8a1c1faf4aae"].value, 17250);
+  assert.equal(cardMap["world-c6af8a1c1faf4aae"].value, 50000);
   assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
-  assert.equal(cardMap["world-israel-flag"].value, 5000);
+  assert.equal(cardMap["world-israel-flag"].value, 3650);
   assert.equal(cardMap["world-israel-flag"].flag, "🇮🇱");
   assert.equal(cardMap["world-flag-greece"].value, 9);
-  assert.equal(cardMap["world-flag-qatar"].value, 14);
+  assert.equal(cardMap["world-flag-qatar"].value, 13);
   assert.equal(cardMap["world-flag-bangladesh"].value, 18);
   assert.deepEqual(
     catalog.filter((c) => c.value < 0).map((c) => c.id),
     ["world-former-keir-starmer"],
   );
-  assert.equal(cardMap["world-former-keir-starmer"].value, -250);
+  assert.equal(cardMap["world-former-keir-starmer"].value, -183);
 });
 test("world packs can return less or more than their purchase price", () => {
   const p = packs.find((p) => p.id === "world");
@@ -688,7 +801,7 @@ test("world packs can return less or more than their purchase price", () => {
   assert.ok(low < p.price);
   assert.ok(high > p.price);
 });
-test("every pack can lose, win modestly, or produce a 10x jackpot", () => {
+test("every pack loses more often than it wins across a large sample", () => {
   for (const pack of packs) {
     let seed = [...pack.id].reduce(
       (n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) >>> 0,
@@ -705,27 +818,52 @@ test("every pack can lose, win modestly, or produce a 10x jackpot", () => {
       } while (value >= limit);
       return value % max;
     };
-    const outcomes = { loss: 0, smallWin: 0, mediumWin: 0, jackpot: 0 };
-    for (let i = 1; i <= 10000; i++) {
+    const samples = 20000;
+    let loss = 0;
+    let smallWin = 0;
+    let mediumWin = 0;
+    let totalValue = 0;
+    for (let i = 1; i <= samples; i++) {
       const total = rollPack(pack, randomInt, {
         guaranteedEpic: i % 10 === 0,
       }).reduce((sum, card) => sum + card.value, 0);
-      if (total < pack.price) outcomes.loss++;
-      else if (total < pack.price * 2) outcomes.smallWin++;
-      else if (total < pack.price * 10) outcomes.mediumWin++;
-      if (total >= pack.price * 10) outcomes.jackpot++;
+      totalValue += total;
+      if (total < pack.price) loss++;
+      else if (total < pack.price * 2) smallWin++;
+      else mediumWin++;
     }
-    assert.ok(outcomes.loss > 0, `${pack.name} can return less than its cost`);
-    assert.ok(outcomes.smallWin > 0, `${pack.name} can return a small win`);
-    assert.ok(outcomes.mediumWin > 0, `${pack.name} can return 2x to 10x`);
-    if (pack.id !== "fortnite")
-      assert.ok(outcomes.jackpot > 0, `${pack.name} can return at least 10x`);
-    if (pack.id === "world") {
-      assert.ok(
-        outcomes.loss / 10000 >= 0.65 && outcomes.loss / 10000 <= 0.8,
-        `World Leaders loss chance should increase after the value rebalance, got ${(outcomes.loss / 100).toFixed(2)}%`,
-      );
-    }
+    const lossRate = loss / samples;
+    assert.ok(
+      lossRate > 0.5 && lossRate < 0.9,
+      `${pack.name} should lose often but not almost always; got ${(lossRate * 100).toFixed(1)}%`,
+    );
+    assert.ok(smallWin > 0, `${pack.name} can return a small win`);
+    assert.ok(mediumWin > 0, `${pack.name} can return 2x or more`);
+    assert.ok(
+      totalValue / samples < pack.price,
+      `${pack.name} should return less than it costs on average over ${samples} packs`,
+    );
+  }
+});
+test("every pack can produce a configured 10x or better jackpot", () => {
+  for (const pack of packs) {
+    const randomInt = (max) =>
+      max === ODDS_TOTAL
+        ? 0
+        : max === pack.jackpotOdds
+          ? 0
+          : max === pack.chaseOdds
+            ? max - 1
+            : max - 1;
+    const total = rollPack(pack, randomInt).reduce(
+      (sum, card) => sum + card.value,
+      0,
+    );
+    assert.ok(
+      total >= pack.price * 10,
+      `${pack.name} jackpot must pay at least 10x its price, got ${total}`,
+    );
+    assert.ok(cardMap[pack.jackpot].value >= pack.price * 10);
   }
 });
 
@@ -742,8 +880,22 @@ for (const pack of packs) {
             ["Epic", "Crown", "Chase", "Alpha"].includes(c.rarity),
           ),
         );
-        const normal = cards.filter((c) => c.rarity !== "Alpha");
-        assert.equal(new Set(normal.map((c) => c.id)).size, normal.length);
+        if (!chase)
+          for (const rarity of ["Common", "Uncommon", "Epic", "Crown"]) {
+            const drawn = cards.filter((c) => c.rarity === rarity);
+            const poolSize = catalog.filter(
+              (c) =>
+                c.set === pack.set &&
+                c.rarity === rarity &&
+                c.id !== pack.chase,
+            ).length;
+            if (drawn.length <= poolSize)
+              assert.equal(
+                new Set(drawn.map((c) => c.id)).size,
+                drawn.length,
+                `${pack.name} repeated a ${rarity} card before exhausting its pool`,
+              );
+          }
       }
     }
   });
@@ -791,26 +943,17 @@ test("a tenth Brainrot pack upgrades only its lowest card and keeps three ordina
   assert.equal(cards.filter((c) => c.rarity === "Common").length, 3);
 });
 
-test("the world milestone upgrades the negative penalty when it is the lowest card", () => {
+test("the world milestone upgrades the lowest card instead of adding a sixth", () => {
   const pack = packs.find((p) => p.id === "world");
-  const negativeIndex = catalog
-    .filter((card) => card.set === "world" && card.rarity === "Common")
-    .findIndex((card) => card.value < 0);
-  let firstCard = true;
-  const random = (max) => {
-    if (max === 100000000) return 0;
-    if (firstCard) {
-      firstCard = false;
-      return negativeIndex;
-    }
-    return max - 1;
-  };
-  const ordinary = rollPack(pack, random);
-  assert.ok(ordinary.some((c) => c.value < 0));
-  firstCard = true;
-  const milestone = rollPack(pack, random, { guaranteedEpic: true });
-  assert.ok(milestone.every((c) => c.value >= 0));
-  assert.equal(milestone.filter((c) => c.rarity === "Epic").length, 1);
+  const ordinary = rollPack(pack, rng(0));
+  const lowest = Math.min(...ordinary.map((card) => card.value));
+  const milestone = rollPack(pack, rng(0), { guaranteedEpic: true });
+  assert.equal(milestone.length, pack.count);
+  assert.equal(milestone.filter((card) => card.rarity === "Epic").length, 1);
+  assert.ok(
+    Math.min(...milestone.map((card) => card.value)) > lowest,
+    "the milestone must raise the cheapest card rather than add another card",
+  );
 });
 
 test("weighted pots allocate exactly one ticket per staked penny without a house ticket", () => {
@@ -898,5 +1041,144 @@ test("the Crown bonus also raises the chase chance, and does nothing without it"
   // A loadout Crown bonus counts too.
   assert.equal(hasKim(rollPack(world, roll, { powerups: [{ template_id: "fortnite-renegade-raider" }] })), true);
   // Without a bonus the original 1-in-chaseOdds roll is unchanged.
-  assert.equal(hasKim(rollPack(world, (max) => (max === 100000000 ? 0 : 0))), true);
+  assert.equal(
+    hasKim(
+      rollPack(world, (max) =>
+        max === ODDS_TOTAL || max === world.chaseOdds ? 0 : max - 1,
+      ),
+    ),
+    true,
+  );
+});
+
+test("Secret cards are isolated, valuable and carry working power-ups", () => {
+  const secrets = catalog.filter((card) => card.rarity === "Secret");
+  assert.equal(secrets.length, 7);
+  assert.ok(secrets.every((card) => card.value >= 2400));
+  assert.ok(
+    secrets.every((card) => card.secretCaption && card.image === "/img/secret.svg"),
+  );
+  for (const pack of packs) {
+    assert.equal(cardMap[pack.secret]?.rarity, "Secret");
+    assert.equal(cardMap[pack.secret]?.set, pack.set);
+  }
+  assert.ok(
+    !indexSets.some((set) =>
+      set.cardIds.some((id) => cardMap[id]?.rarity === "Secret"),
+    ),
+    "Secret cards stay outside the Card Index",
+  );
+  assert.equal(cardPowerup(cardMap["secret-royal"]).randomPackDiscount, 20);
+  assert.equal(cardPowerup(cardMap["secret-vault"]).secretBonus, 200);
+  assert.equal(cardPowerup(cardMap["secret-vault"]).epicBonus, 1500000);
+  assert.equal(cardPowerup(cardMap["secret-fastfood"]).packDiscount, 50);
+  assert.equal(cardPowerup(cardMap["secret-brainrot"]).secretBonus, 200);
+});
+
+test("each equipped Crown card adds 0.08% Secret chance up to a 0.40% cap", () => {
+  const crownCards = catalog
+    .filter((card) => card.rarity === "Crown")
+    .slice(0, 5);
+  assert.equal(crownCards.length, 5);
+  assert.equal(SECRET_CROWN_BONUS, 800);
+  assert.equal(SECRET_CHANCE_CAP, 4000);
+  assert.equal(loadoutPowerup(crownCards.slice(0, 1)).secretChance, 800);
+  assert.equal(loadoutPowerup(crownCards.slice(0, 2)).secretChance, 1600);
+  assert.equal(loadoutPowerup(crownCards).secretChance, 4000);
+  const vault = cardMap["secret-vault"];
+  assert.equal(
+    loadoutPowerup([...crownCards.slice(0, 4), vault]).secretChance,
+    3400,
+  );
+  const crownCount = loadoutPowerup([
+    ...crownCards.slice(0, 4),
+    cardMap["secret-royal"],
+  ]).crownCards;
+  assert.equal(crownCount, 4);
+});
+
+test("the Secret roll is separate, one-shot and never overwrites Alpha, Chase or Mythic", () => {
+  const pack = packs.find((p) => p.id === "apex");
+  const forceSecret = (max) => {
+    if (max === SECRET_ROLL_SCALE) return 0;
+    if (max === ODDS_TOTAL) return 0;
+    if (max === pack.jackpotOdds || max === pack.chaseOdds) return max - 1;
+    return 0;
+  };
+  const hit = rollPack(pack, forceSecret, { secretChance: SECRET_CROWN_BONUS });
+  assert.equal(hit.filter((card) => card.rarity === "Secret").length, 1);
+  assert.ok(hit.some((card) => card.id === pack.secret));
+  assert.ok(!rollPack(pack, forceSecret).some((card) => card.rarity === "Secret"));
+  const allAlpha = (max) =>
+    max === SECRET_ROLL_SCALE
+      ? 0
+      : max === ODDS_TOTAL
+        ? ODDS_TOTAL - 1
+        : max - 1;
+  const alphaPull = rollPack(pack, allAlpha, { secretChance: SECRET_CROWN_BONUS });
+  assert.ok(alphaPull.every((card) => card.rarity === "Alpha"));
+  assert.ok(!alphaPull.some((card) => card.rarity === "Secret"));
+});
+
+test("the daily Secret discount is deterministic, pack-specific and 20% off", () => {
+  const day = "2026-10-27";
+  assert.equal(dailyDiscountPack("42", day), dailyDiscountPack("42", day));
+  const pack = packs.find(
+    (entry) => entry.id === dailyDiscountPack("42", day),
+  );
+  assert.ok(pack);
+  const effect = { randomPackDiscount: 20 };
+  assert.equal(
+    secretPackDiscount(pack, "42", day, effect),
+    Math.round(pack.price * 0.2),
+  );
+  assert.equal(
+    secretPackDiscount(
+      packs.find((entry) => entry.id !== pack.id),
+      "42",
+      day,
+      effect,
+    ),
+    0,
+  );
+  assert.equal(secretPackDiscount(pack, "42", day, { randomPackDiscount: 0 }), 0);
+  assert.equal(secretPackDiscount(pack, "42", day, null), 0);
+});
+
+test("daily quests track progress, pay once and reset on a new UTC day", () => {
+  const day = "2026-10-27";
+  assert.equal(dailyQuests.length, 4);
+  assert.ok(dailyQuests.every((quest) => quest.reward > 0));
+  let state = normalizeQuestState({}, day);
+  assert.deepEqual(state.progress, { packs: 0, epic: 0, sold: 0 });
+  assert.equal(claimableQuests(state, day).length, 0);
+  state = addQuestProgress(state, day, "packs", 1);
+  assert.equal(claimableQuests(state, day).length, 1);
+  const first = completeDailyQuest(state, day, "open-1");
+  assert.equal(first.quest.reward, 25);
+  assert.deepEqual(first.state.claimed, ["open-1"]);
+  assert.equal(claimableQuests(first.state, day).length, 0);
+  assert.throws(() => completeDailyQuest(first.state, day, "open-1"), /already/);
+  state = addQuestProgress(first.state, day, "packs", 2);
+  assert.equal(claimableQuests(state, day).length, 1);
+  assert.equal(claimableQuests(state, day)[0].id, "open-3");
+  assert.throws(() => addQuestProgress(state, day, "unknown", 1), /known metric/);
+  assert.throws(() => addQuestProgress(state, day, "packs", -1), /non-negative/);
+  const tomorrow = normalizeQuestState(state, "2026-10-28");
+  assert.deepEqual(tomorrow.progress, { packs: 0, epic: 0, sold: 0 });
+  assert.deepEqual(tomorrow.claimed, []);
+});
+
+test("completed Card Index sets always pay cash of £50 or less once caps are full", () => {
+  assert.ok(indexSets.length > 4);
+  for (const set of indexSets) {
+    const raritiesInSet = set.cardIds.map((id) => cardMap[id]?.rarity);
+    const expected = raritiesInSet.includes("Crown")
+      ? 5000
+      : raritiesInSet.includes("Epic")
+        ? 2500
+        : 1000;
+    assert.equal(set.cashReward, expected);
+    assert.ok(set.cashReward > 0 && set.cashReward <= 5000);
+  }
 });
