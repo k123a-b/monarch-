@@ -583,6 +583,8 @@ export const catalog = [
 }));
 export const cardMap = Object.fromEntries(catalog.map((c) => [c.id, c]));
 const rarityPowerups = Object.freeze({
+  // Cheap cards may nudge Uncommon odds or offer a discount, but they never
+  // move meaningful Epic or Crown weight. Boosts scale with card quality.
   Common: [
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
@@ -595,47 +597,53 @@ const rarityPowerups = Object.freeze({
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
-    { name: "Small lucky lift", epicBonus: 25000 },
-    { name: "Uncommon nudge", epicBonus: 0, uncommonBonus: 50000 },
+    { name: "Small lucky lift", epicBonus: 10000 },
+    { name: "Uncommon nudge", epicBonus: 0, uncommonBonus: 25000 },
     { name: "Slight stumble", epicBonus: -10000 },
     { name: "Thrifty crown", epicBonus: 0, packDiscount: 10 },
   ],
   Uncommon: [
-    { name: "Uncommon lift", epicBonus: 0, uncommonBonus: 80000 },
-    { name: "A little luck", epicBonus: 70000 },
-    { name: "Steady hands", epicBonus: 40000 },
+    { name: "Uncommon lift", epicBonus: 0, uncommonBonus: 60000 },
+    { name: "A little luck", epicBonus: 0, uncommonBonus: 40000 },
+    { name: "Steady hands", epicBonus: 15000 },
     { name: "Gentle stumble", epicBonus: -25000 },
     { name: "No power-up", epicBonus: 0 },
   ],
   Epic: [
-    { name: "Court's favor", epicBonus: 180000 },
-    { name: "Measured momentum", epicBonus: 140000 },
-    { name: "Uncommon boost", epicBonus: 0, uncommonBonus: 150000 },
+    { name: "Court's favor", epicBonus: 120000 },
+    { name: "Measured momentum", epicBonus: 90000 },
+    { name: "Uncommon boost", epicBonus: 0, uncommonBonus: 120000 },
     { name: "No power-up", epicBonus: 0 },
-    { name: "Small setback", epicBonus: -35000 },
+    { name: "Small setback", epicBonus: -30000 },
   ],
   Crown: [
-    { name: "Royal decree", epicBonus: 1000000, crownBonus: 100000 },
+    { name: "Royal decree", epicBonus: 600000, crownBonus: 50000 },
     {
       name: "Crown's favor",
-      epicBonus: 850000,
+      epicBonus: 500000,
       uncommonBonus: 100000,
-      crownBonus: 150000,
+      crownBonus: 100000,
     },
     // One Crown card stays Crown-focused; the rest trade Crown odds for Epic
-    // or Uncommon so a loadout is a choice rather than four copies of the same bet.
-    { name: "Golden momentum", epicBonus: 650000, crownBonus: 300000 },
+    // or Uncommon so a loadout is a choice rather than five copies of the same bet.
+    { name: "Golden momentum", epicBonus: 350000, crownBonus: 200000 },
     {
       name: "Sovereign chance",
-      epicBonus: 450000,
+      epicBonus: 250000,
       uncommonBonus: 200000,
-      crownBonus: 50000,
+      crownBonus: 30000,
     },
   ],
+  // Chase cards are all upside; the rarest pulls should never be a downgrade.
   Chase: [
-    { name: "Chase energy", epicBonus: 1000000 },
-    { name: "Chase insight", epicBonus: 0, uncommonBonus: 150000, crownBonus: 250000 },
-    { name: "Chase misstep", epicBonus: -500000 },
+    { name: "Chase energy", epicBonus: 500000 },
+    {
+      name: "Chase insight",
+      epicBonus: 0,
+      uncommonBonus: 100000,
+      crownBonus: 100000,
+    },
+    { name: "Chase instinct", epicBonus: 300000, crownBonus: 50000 },
   ],
   Mythic: [
     {
@@ -661,15 +669,16 @@ export const ODDS_TOTAL = 100000000;
 // for pulling a 1-in-45,000 chase card.
 export const KIM_EPIC_BONUS = 2000000;
 // Every 0.1 percentage point (100,000) of Crown bonus makes the pack's chase
-// card 25% more likely, and the same bonus counts whether it comes from a
-// loadout card or a permanent set reward.
-export const CHASE_BONUS_SCALE = 400000;
+// card 10% more likely, and the same bonus counts whether it comes from a
+// loadout card or a permanent set reward. At the +1.00% Crown cap that is
+// double the base chase chance, not the sixfold spike of the old scale.
+export const CHASE_BONUS_SCALE = 1000000;
 // Loadout odds shifts, before any permanent set reward is added. A full set of
-// Crown powerups can reach +5% Epic, and Renegade Raider plus four Crown cards
-// can reach +2% Crown.
-export const EPIC_SHIFT_CAP = 5000000;
+// Crown powerups can reach +2.50% Epic, and Renegade Raider plus Crown cards
+// can reach +1.00% Crown. Uncommon cards only move a fraction of that.
+export const EPIC_SHIFT_CAP = 2500000;
 export const UNCOMMON_SHIFT_CAP = 400000;
-export const CROWN_SHIFT_CAP = 2000000;
+export const CROWN_SHIFT_CAP = 1000000;
 // Permanent character-index rewards: four completions can be claimed for each
 // reward at +0.50% Epic or +0.10% Crown per set.
 export const SET_EPIC_REWARD = 500000;
@@ -716,6 +725,23 @@ const secretPowerups = Object.freeze({
     packDiscount: 50,
   },
 });
+// Named chase cards each keep a distinct, positive effect so a rare pull is
+// always an upgrade over the generic rarity profile.
+const chasePowerups = Object.freeze({
+  crocodilo: {
+    name: "Crocodile surge",
+    epicBonus: 400000,
+    uncommonBonus: 100000,
+  },
+  signet: { name: "Gilded edge", epicBonus: 300000, crownBonus: 100000 },
+  sovereign: {
+    name: "Vault leverage",
+    epicBonus: 200000,
+    uncommonBonus: 150000,
+    crownBonus: 50000,
+  },
+  "apex-crown": { name: "Apex instinct", epicBonus: 500000, crownBonus: 100000 },
+});
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export function cardPowerup(card) {
   const template = cardMap[card?.template_id || card?.id] || card;
@@ -730,7 +756,7 @@ export function cardPowerup(card) {
       rarity: template.rarity,
       epicBonus: 150000,
       uncommonBonus: 0,
-      crownBonus: 1000000,
+      crownBonus: 500000,
       everyOtherCard: false,
     };
   if (template.id === "kim")
@@ -747,6 +773,7 @@ export function cardPowerup(card) {
     };
   const powerup =
     secretPowerups[template.id] ||
+    chasePowerups[template.id] ||
     rarityPowerups[template.rarity][
       hash % rarityPowerups[template.rarity].length
     ];

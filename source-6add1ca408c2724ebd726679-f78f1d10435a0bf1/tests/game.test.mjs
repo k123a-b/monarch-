@@ -17,6 +17,7 @@ import {
   ODDS_TOTAL,
   EPIC_SHIFT_CAP,
   CROWN_SHIFT_CAP,
+  CHASE_BONUS_SCALE,
   SET_EPIC_CAP,
   SET_CROWN_CAP,
   SET_EPIC_REWARD,
@@ -218,9 +219,9 @@ test("character index sets use existing cards and keep earned bonuses bounded", 
       (id) => cardMap[id],
     ),
   );
-  assert.equal(fourCrowns.epicBonus, 2950000);
+  assert.equal(fourCrowns.epicBonus, 1700000);
   assert.equal(fourCrowns.uncommonBonus, 300000);
-  assert.equal(fourCrowns.crownBonus, 600000);
+  assert.equal(fourCrowns.crownBonus, 380000);
   const crownProfiles = new Set(
     catalog
       .filter(
@@ -243,23 +244,23 @@ test("character index sets use existing cards and keep earned bonuses bounded", 
   assert.ok(SET_EPIC_CAP >= 2000000);
   assert.ok(SET_CROWN_CAP >= 400000);
 });
-test("five equipped Crown cards can reach the +5% Epic and +2% Crown loadout caps", () => {
+test("five equipped Crown cards can reach the +2.5% Epic and +1% Crown loadout caps", () => {
   const crownCards = catalog.filter((card) => card.rarity === "Crown");
   const epicFive = crownCards
-    .filter((card) => cardPowerup(card).epicBonus === 1000000)
+    .filter((card) => cardPowerup(card).epicBonus === 600000)
     .slice(0, 5);
   assert.equal(epicFive.length, 5);
   assert.equal(loadoutPowerup(epicFive).epicBonus, EPIC_SHIFT_CAP);
   const crownFive = [
     cardMap["fortnite-renegade-raider"],
     ...crownCards
-      .filter((card) => cardPowerup(card).crownBonus >= 300000)
+      .filter((card) => cardPowerup(card).crownBonus >= 200000)
       .slice(0, 4),
   ];
   assert.equal(crownFive.length, 5);
   assert.equal(loadoutPowerup(crownFive).crownBonus, CROWN_SHIFT_CAP);
-  assert.equal(EPIC_SHIFT_CAP, 5000000);
-  assert.equal(CROWN_SHIFT_CAP, 2000000);
+  assert.equal(EPIC_SHIFT_CAP, 2500000);
+  assert.equal(CROWN_SHIFT_CAP, 1000000);
 });
 test("permanent character-index rewards shift Epic and Crown odds by their stated amounts", () => {
   const deterministic = (value) => (max) =>
@@ -364,6 +365,37 @@ test("card powerups are defined and Kim guarantees every second pack card Uncomm
   assert.equal(cards.length, world.count);
   assert.ok(["Uncommon", "Epic", "Crown", "Alpha"].includes(cards[1].rarity));
   assert.ok(["Uncommon", "Epic", "Crown", "Alpha"].includes(cards[3].rarity));
+});
+test("power-up strength scales with card rarity and chase cards are all upside", () => {
+  const maxEpic = (rarity) =>
+    Math.max(
+      ...catalog
+        .filter((card) => card.rarity === rarity)
+        .map((card) => cardPowerup(card).epicBonus),
+    );
+  assert.ok(maxEpic("Common") <= 10000);
+  assert.ok(maxEpic("Uncommon") <= 15000);
+  assert.ok(maxEpic("Epic") < maxEpic("Crown"));
+  assert.ok(maxEpic("Crown") <= 600000);
+  const weakest = catalog
+    .filter((card) => card.rarity === "Uncommon")
+    .slice(0, 5);
+  const crownFive = catalog.filter((card) => card.rarity === "Crown").slice(0, 5);
+  assert.ok(
+    loadoutPowerup(weakest).epicBonus <
+      loadoutPowerup(crownFive).epicBonus / 10,
+    "cheap loadouts should be far weaker than a Crown loadout",
+  );
+  for (const card of catalog.filter((entry) => entry.rarity === "Chase")) {
+    const powerup = cardPowerup(card);
+    assert.ok(
+      powerup.epicBonus > 0 ||
+        powerup.uncommonBonus > 0 ||
+        powerup.crownBonus > 0 ||
+        powerup.everyOtherCard,
+      card.id + " should never roll a downgrade",
+    );
+  }
 });
 test("a pack's card values can total below or above its virtual price", () => {
   const pack = packs.find((entry) => entry.id === "brainrot");
@@ -1047,10 +1079,15 @@ test("Kim adds exactly 2% Epic chance on top of the normal loadout cap", () => {
 
 test("the Crown bonus also raises the chase chance, and does nothing without it", () => {
   const world = packs.find((p) => p.id === "world");
-  const scale = 400000 * world.chaseOdds;
-  // Pretend the chase roll lands on 799,999: a hit only when Crown bonus is 400,000.
+  const scale = CHASE_BONUS_SCALE * world.chaseOdds;
+  assert.equal(CHASE_BONUS_SCALE, 1000000);
+  // Land just under the +0.40% Crown threshold and just over the +0.10% one.
   const roll = (max) =>
-    max === 100000000 ? 0 : max === scale ? 799999 : max - 1;
+    max === ODDS_TOTAL
+      ? 0
+      : max === scale
+        ? CHASE_BONUS_SCALE + 399999
+        : max - 1;
   const hasKim = (cards) => cards.some((c) => c.id === "kim");
   assert.equal(hasKim(rollPack(world, roll)), false);
   assert.equal(hasKim(rollPack(world, roll, { permanentCrownBonus: 400000 })), true);
