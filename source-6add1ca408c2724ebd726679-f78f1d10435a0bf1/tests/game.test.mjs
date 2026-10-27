@@ -461,6 +461,17 @@ test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   assert.equal(cardMap["mythic-world"].rarity, "Mythic");
   assert.equal(cardMap["mythic-world"].value, 500000);
 });
+test("featured World Leaders cards keep their authored values", () => {
+  const leader = (name, country) =>
+    catalog.find((card) => card.name === name && card.country === country);
+  assert.equal(leader("Donald Trump", "United States").value, 50000);
+  assert.equal(leader("Andy Burnham", "United Kingdom").value, 7787);
+  assert.equal(leader("Benjamin Netanyahu", "Israel").value, 97333);
+  assert.equal(leader("King Charles III", "United Kingdom").value, 5475);
+  assert.equal(cardMap["world-israel-flag"].value, 3650);
+  const world = packs.find((pack) => pack.id === "world");
+  assert.deepEqual(world.odds, [69880000, 22000000, 8000000, 120000, 0]);
+});
 test("weighted pot draw includes every contributor, bot or player, at exact stake boundaries", () => {
   const entries = [
     { user_id: "bot", amount: 1 },
