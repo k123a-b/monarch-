@@ -8,6 +8,11 @@ import {
   packProgress,
   loadoutPowerup,
   indexSets,
+  SET_EPIC_REWARD,
+  SET_CROWN_REWARD,
+  SET_EPIC_CAP,
+  SET_CROWN_CAP,
+  secretPackDiscount,
 } from "../shared/catalog.mjs";
 import { database, pool, databaseTarget } from "../db/index.js";
 import { accounts, inventory } from "../db/schema.js";
@@ -24,6 +29,8 @@ import {
   matchedPotBotStake,
   FRIEND_ALPHABET,
   randomBelow,
+  addQuestProgress,
+  completeDailyQuest,
 } from "../shared/rules.mjs";
 
 type Client = any;
@@ -64,6 +71,23 @@ async function change(c: Client, id: string, amount: number, reason: string) {
     "INSERT INTO ledger(user_id,amount,balance,reason) VALUES($1,$2,$3,$4)",
     [id, amount, q.rows[0].balance, reason],
   );
+}
+async function recordQuestProgress(
+  c: Client,
+  id: string,
+  day: string,
+  metric: string,
+  amount: number,
+) {
+  if (amount <= 0) return;
+  const current = (
+    await c.query("SELECT quest_state FROM accounts WHERE id=$1", [id])
+  ).rows[0]?.quest_state;
+  const next = addQuestProgress(current, day, metric, amount);
+  await c.query("UPDATE accounts SET quest_state=$2::jsonb WHERE id=$1", [
+    id,
+    JSON.stringify(next),
+  ]);
 }
 async function areFriends(c: Client, a: string, b: string) {
   const q = await c.query(
@@ -459,18 +483,42 @@ export async function handle(
           if (setRewards[set.id]) fail("This set reward has already been claimed.", 409);
           const epicBonus = Number(current.permanent_epic_bonus || 0);
           const crownBonus = Number(current.permanent_crown_bonus || 0);
+          const epicRoom = SET_EPIC_CAP - epicBonus;
+          const crownRoom = SET_CROWN_CAP - crownBonus;
           if (body.reward === "epic") {
-            if (epicBonus + 500000 > 1000000) fail("Your permanent Epic chance reward is already at its limit.", 409);
-            await c.query("UPDATE accounts SET permanent_epic_bonus=permanent_epic_bonus+500000,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'epic') WHERE id=$1", [id, set.id]);
+            if (epicRoom < SET_EPIC_REWARD) fail(`Your permanent Epic bonus is at its +${(SET_EPIC_CAP / 1000000).toFixed(2)}% limit. Claim Crown or the set badge instead.`, 409);
+            await c.query("UPDATE accounts SET permanent_epic_bonus=permanent_epic_bonus+$3,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'epic') WHERE id=$1", [id, set.id, SET_EPIC_REWARD]);
           } else if (body.reward === "crown") {
-            if (crownBonus + 100000 > 100000) fail("Your permanent Crown chance reward is already at its limit.", 409);
-            await c.query("UPDATE accounts SET permanent_crown_bonus=permanent_crown_bonus+100000,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'crown') WHERE id=$1", [id, set.id]);
+            if (crownRoom < SET_CROWN_REWARD) fail(`Your permanent Crown bonus is at its +${(SET_CROWN_CAP / 1000000).toFixed(2)}% limit. Claim Epic or the set badge instead.`, 409);
+            await c.query("UPDATE accounts SET permanent_crown_bonus=permanent_crown_bonus+$3,set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'crown') WHERE id=$1", [id, set.id, SET_CROWN_REWARD]);
+          } else if (body.reward === "cash") {
+            // Once both permanent caps are full, a completed set pays cash
+            // instead of an odds bonus. The amount is authored per set (£50 max).
+            if (epicRoom >= SET_EPIC_REWARD || crownRoom >= SET_CROWN_REWARD)
+              fail("A permanent odds reward is still available for this set.", 409);
+            await change(c, id, set.cashReward, `Set completion cash: ${set.name}`);
+            await c.query("UPDATE accounts SET set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'cash') WHERE id=$1", [id, set.id]);
           } else if (body.reward === "badge") {
-            if (epicBonus + 500000 <= 1000000 || crownBonus + 100000 <= 100000)
-              fail("A permanent odds reward is still available.", 409);
+            // The badge is the reward for a set completed after both odds
+            // bonuses are maxed, so it cannot be taken instead of them.
+            if (epicRoom >= SET_EPIC_REWARD || crownRoom >= SET_CROWN_REWARD)
+              fail("A permanent odds reward is still available for this set.", 409);
             await c.query("UPDATE accounts SET set_rewards=COALESCE(set_rewards,'{}'::jsonb)||jsonb_build_object($2::text,'badge') WHERE id=$1", [id, set.id]);
           } else fail("Choose a valid set reward.");
-          return { account: await account() };
+          return { account: await account(), reward: body.reward, cash: body.reward === "cash" ? set.cashReward : 0 };
+        }
+        if (route === "quests/claim" && req.method === "POST") {
+          const today = new Date().toISOString().slice(0, 10);
+          const current = await account();
+          let claimed: any;
+          try {
+            claimed = completeDailyQuest(current.quest_state, today, body.quest);
+          } catch (e: any) {
+            fail(e.message, 409);
+          }
+          await change(c, id, claimed.quest.reward, `Daily quest: ${claimed.quest.title}`);
+          await c.query("UPDATE accounts SET quest_state=$2::jsonb WHERE id=$1", [id, JSON.stringify(claimed.state)]);
+          return { account: await account(), reward: claimed.quest.reward, quest: claimed.quest.id };
         }
         if (route === "upgrades/pack-opening" && req.method === "POST") {
           const currentAccount = await account();
@@ -522,27 +570,30 @@ export async function handle(
             fail("Your loadout has an unavailable card. Update it before opening a pack.", 409);
           const powerCards = equipped.map((row: any) => cardMap[row.template_id]);
           const effects = loadoutPowerup(powerCards);
+          const today = new Date().toISOString().slice(0, 10);
           const opened = Number(currentAccount.packs || 0);
           const discountMilestones = Math.floor((opened + quantity) / 3) - Math.floor(opened / 3);
-          const discount = Math.min(pack.price, effects.packDiscount * discountMilestones);
+          const secretDiscountPerPack = secretPackDiscount(pack, id, today, effects);
+          const discount = Math.min(
+            pack.price * quantity,
+            effects.packDiscount * discountMilestones +
+              secretDiscountPerPack * quantity,
+          );
           const pricePaid = pack.price * quantity - discount;
           await change(c, id, -pricePaid, quantity + " " + pack.name + (quantity === 1 ? "" : " packs") + " opened" + (discount ? " (loadout discount)" : ""));
+          // The Secret window opens once per UTC day. Each pack in that first
+          // purchase gets a roll; it closes whether or not anything is found.
+          const secretWindow =
+            effects.secretChance > 0 && currentAccount.secret_day !== today;
+          const secretChance = secretWindow ? effects.secretChance : 0;
           const cards: any[] = [];
-          const packOutcomes: any[][] = [];
           const guaranteedPacks: number[] = [];
           for (let offset = 0; offset < quantity; offset++) {
             const guaranteedEpic = packProgress(opened + offset).nextGuaranteed;
             if (guaranteedEpic) guaranteedPacks.push(offset + 1);
-            const packCards = rollPack(pack, randomInt, { guaranteedEpic, powerups: powerCards, permanentEpicBonus: Number(currentAccount.permanent_epic_bonus || 0), permanentCrownBonus: Number(currentAccount.permanent_crown_bonus || 0) });
-            packOutcomes.push(packCards);
+            const packCards = rollPack(pack, randomInt, { guaranteedEpic, powerups: powerCards, permanentEpicBonus: Number(currentAccount.permanent_epic_bonus || 0), permanentCrownBonus: Number(currentAccount.permanent_crown_bonus || 0), secretChance });
             cards.push(...packCards);
           }
-          const highBalanceTaxApplies = Number(currentAccount.balance) >= 2000000;
-          const taxByPack = highBalanceTaxApplies
-            ? packOutcomes.map((packCards) => Math.round(packCards.reduce((sum, card) => sum + Math.max(0, Number(card.value)), 0) * 0.05))
-            : [];
-          const tax = Math.min(taxByPack.reduce((sum, amount) => sum + amount, 0), Math.max(0, Number(currentAccount.balance) - pricePaid));
-          if (tax > 0) await change(c, id, -tax, "5% high-balance tax on positive pack pull value");
           const minted = [];
           for (const card of cards) {
             const serial = card.rarity === "Alpha"
@@ -569,7 +620,26 @@ export async function handle(
           }
           const discoveredTemplates = cards.map((card: any) => card.id);
           await c.query("UPDATE accounts SET character_index=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.character_index || $2::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1", [id, discoveredTemplates]);
-          return { cards: result, account: await account(), packCount: quantity, epicGuaranteed: guaranteedPacks.length > 0, guaranteedPacks, discount, pricePaid, tax };
+          if (secretWindow)
+            await c.query("UPDATE accounts SET secret_day=$2 WHERE id=$1", [id, today]);
+          await recordQuestProgress(c, id, today, "packs", quantity);
+          const epicPulled = cards.filter((card: any) =>
+            ["Epic", "Crown", "Alpha", "Chase", "Mythic", "Secret"].includes(card.rarity),
+          ).length;
+          if (epicPulled)
+            await recordQuestProgress(c, id, today, "epic", epicPulled);
+          return {
+            cards: result,
+            account: await account(),
+            packCount: quantity,
+            epicGuaranteed: guaranteedPacks.length > 0,
+            guaranteedPacks,
+            discount,
+            pricePaid,
+            secretChance,
+            secretWindow,
+            secretDiscount: secretDiscountPerPack * quantity,
+          };
         }
         if (route === "rewards/starter" && req.method === "POST") {
           const card = rollStarterPack(randomInt);
@@ -626,6 +696,13 @@ export async function handle(
             id,
             value,
           ]);
+          await recordQuestProgress(
+            c,
+            id,
+            new Date().toISOString().slice(0, 10),
+            "sold",
+            cards.length,
+          );
           return { account: await account(), value };
         }
         if (route === "vault" && req.method === "POST") {

@@ -35,6 +35,8 @@ export const accounts = pgTable("accounts", {
   permanentCrownBonus: integer("permanent_crown_bonus").notNull().default(0),
   loadoutSlots: integer("loadout_slots").notNull().default(3),
   packSlots: integer("pack_slots").notNull().default(1),
+  secretDay: text("secret_day").notNull().default(""),
+  questState: jsonb("quest_state").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

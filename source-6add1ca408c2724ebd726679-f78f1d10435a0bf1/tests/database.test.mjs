@@ -33,6 +33,8 @@ test(
     };
     const batchUser = { id: randomUUID(), name: "Test Batch " + suffix };
     const indexUser = { id: randomUUID(), name: "Test Index " + suffix };
+    const questUser = { id: randomUUID(), name: "Test Quests " + suffix };
+    const secretUser = { id: randomUUID(), name: "Test Secret " + suffix };
     const roundId = -Date.now();
     async function request(user, path, body) {
       const req = new Request("http://localhost:8889/api/" + path, {
@@ -139,9 +141,9 @@ test(
           assert.equal(batch.status, 200);
           assert.equal(batch.data.packCount, 3);
           assert.equal(batch.data.cards.length, 12);
-          assert.equal(batch.data.pricePaid, 300);
+          assert.equal(batch.data.pricePaid, 600);
           assert.equal(Number(batch.data.account.packs), 3);
-          assert.equal(Number(batch.data.account.balance), 99700);
+          assert.equal(Number(batch.data.account.balance), 99400);
         },
       );
       await t.test(
@@ -150,20 +152,128 @@ test(
           await request(indexUser, "me");
           const allSetCards = indexSets.flatMap((set) => set.cardIds);
           await query("UPDATE accounts SET character_index=$2::text[] WHERE id=$1", [indexUser.id, allSetCards]);
-          const epicOne = await request(indexUser, "index/claim", { set_id: indexSets[0].id, reward: "epic" });
-          assert.equal(epicOne.status, 200);
-          assert.equal(epicOne.data.account.permanent_epic_bonus, 500000);
-          const epicTwo = await request(indexUser, "index/claim", { set_id: indexSets[1].id, reward: "epic" });
-          assert.equal(epicTwo.status, 200);
-          assert.equal(epicTwo.data.account.permanent_epic_bonus, 1000000);
-          assert.equal((await request(indexUser, "index/claim", { set_id: indexSets[2].id, reward: "epic" })).status, 409);
-          const crown = await request(indexUser, "index/claim", { set_id: indexSets[2].id, reward: "crown" });
-          assert.equal(crown.status, 200);
-          assert.equal(crown.data.account.permanent_crown_bonus, 100000);
-          assert.equal((await request(indexUser, "index/claim", { set_id: indexSets[3].id, reward: "crown" })).status, 409);
-          const badge = await request(indexUser, "index/claim", { set_id: indexSets[3].id, reward: "badge" });
+          for (let index = 0; index < 4; index++) {
+            const epic = await request(indexUser, "index/claim", {
+              set_id: indexSets[index].id,
+              reward: "epic",
+            });
+            assert.equal(epic.status, 200);
+          }
+          assert.equal(
+            (await request(indexUser, "me")).data.account.permanent_epic_bonus,
+            2000000,
+          );
+          assert.equal(
+            (await request(indexUser, "index/claim", {
+              set_id: indexSets[4].id,
+              reward: "epic",
+            })).status,
+            409,
+          );
+          for (let index = 4; index < 8; index++) {
+            const crown = await request(indexUser, "index/claim", {
+              set_id: indexSets[index].id,
+              reward: "crown",
+            });
+            assert.equal(crown.status, 200);
+          }
+          assert.equal(
+            (await request(indexUser, "me")).data.account.permanent_crown_bonus,
+            400000,
+          );
+          assert.equal(
+            (await request(indexUser, "index/claim", {
+              set_id: indexSets[8].id,
+              reward: "crown",
+            })).status,
+            409,
+          );
+          const badge = await request(indexUser, "index/claim", { set_id: indexSets[8].id, reward: "badge" });
           assert.equal(badge.status, 200);
-          assert.equal(badge.data.account.set_rewards[indexSets[3].id], "badge");
+          assert.equal(badge.data.account.set_rewards[indexSets[8].id], "badge");
+          const balanceBeforeCash = Number((await request(indexUser, "me")).data.account.balance);
+          const cash = await request(indexUser, "index/claim", { set_id: indexSets[9].id, reward: "cash" });
+          assert.equal(cash.status, 200);
+          assert.equal(Number(cash.data.cash), indexSets[9].cashReward);
+          assert.equal(Number(cash.data.account.balance), balanceBeforeCash + indexSets[9].cashReward);
+          assert.equal(cash.data.account.set_rewards[indexSets[9].id], "cash");
+          assert.equal((await request(indexUser, "index/claim", { set_id: indexSets[9].id, reward: "cash" })).status, 409);
+        },
+      );
+      await t.test(
+        "daily quest claims are validated server-side and pay exactly once",
+        async () => {
+          await request(questUser, "me");
+          assert.equal(
+            (await request(questUser, "quests/claim", { quest: "open-1" })).status,
+            409,
+          );
+          const today = new Date().toISOString().slice(0, 10);
+          await query("UPDATE accounts SET quest_state=$2::jsonb WHERE id=$1", [
+            questUser.id,
+            JSON.stringify({
+              day: today,
+              progress: { packs: 3, epic: 1, sold: 3 },
+              claimed: [],
+            }),
+          ]);
+          const first = await request(questUser, "quests/claim", { quest: "open-1" });
+          assert.equal(first.status, 200);
+          assert.equal(Number(first.data.reward), 25);
+          assert.equal(Number(first.data.account.balance), 525);
+          assert.equal(
+            (await request(questUser, "quests/claim", { quest: "open-1" })).status,
+            409,
+          );
+          for (const quest of ["open-3", "epic-hunt", "sell-3"]) {
+            assert.equal(
+              (await request(questUser, "quests/claim", { quest })).status,
+              200,
+            );
+          }
+          assert.equal(Number((await request(questUser, "me")).data.account.balance), 680);
+          assert.equal(
+            Number(
+              (
+                await query(
+                  "SELECT COUNT(*) AS n FROM ledger WHERE user_id=$1 AND description LIKE 'Daily quest:%'",
+                  [questUser.id],
+                )
+              ).rows[0].n,
+            ),
+            4,
+          );
+        },
+      );
+      await t.test(
+        "the Secret window rolls once per UTC day and Crown cards set the chance",
+        async () => {
+          await request(secretUser, "me");
+          const crowns = Object.values(cardMap)
+            .filter((card) => card.rarity === "Crown")
+            .slice(0, 4);
+          assert.equal(crowns.length, 4);
+          const equipped = [];
+          for (const card of crowns) {
+            const row = await query(
+              "INSERT INTO inventory(owner_id,template_id,value,rarity) VALUES ($1,$2,$3,$4) RETURNING id",
+              [secretUser.id, card.id, card.value, card.rarity],
+            );
+            equipped.push(row.rows[0].id);
+          }
+          await query(
+            "UPDATE accounts SET balance=20000, loadout=$2::int[], secret_day='' WHERE id=$1",
+            [secretUser.id, equipped],
+          );
+          const first = await request(secretUser, "open", { pack: "world" });
+          assert.equal(first.status, 200);
+          assert.equal(first.data.secretWindow, true);
+          assert.equal(Number(first.data.secretChance), 3200);
+          const second = await request(secretUser, "open", { pack: "world" });
+          assert.equal(second.status, 200);
+          assert.equal(second.data.secretWindow, false);
+          assert.equal(Number(second.data.secretChance), 0);
+          assert.equal(Number(second.data.account.balance), 18000);
         },
       );
       await t.test(
@@ -708,7 +818,7 @@ test(
         },
       );
     } finally {
-      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id, batchUser.id, indexUser.id];
+      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id, batchUser.id, indexUser.id, questUser.id, secretUser.id];
       await query("DELETE FROM inventory WHERE owner_id=ANY($1::text[])", [
         users,
       ]);

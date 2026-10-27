@@ -286,6 +286,158 @@ const chases = [
       }
     : {}),
 }));
+// Mythic cards are exclusive to one pack each and only ever come from that
+// pack's separate jackpot roll. Their values are authored in pence and are not
+// scaled with the rest of the catalogue.
+const mythics = [
+  [
+    "mythic-brainrot",
+    "The Final Algorithm",
+    "brainrot",
+    25000,
+    "🌀",
+    "The meme that ate the internet and asked for seconds.",
+  ],
+  [
+    "mythic-royal",
+    "The Empty Throne",
+    "royal",
+    250000,
+    "♛",
+    "No one is sitting in it. That has never stopped anyone.",
+  ],
+  [
+    "mythic-vault",
+    "Vault Zero",
+    "royal",
+    1000000,
+    "🗝",
+    "The crate the treasury uses to hide from its own auditors.",
+  ],
+  [
+    "mythic-apex",
+    "Solar Sovereign",
+    "royal",
+    3000000,
+    "☀",
+    "A crown forged where the light does not politely stop.",
+  ],
+  [
+    "mythic-fortnite",
+    "Zero Point Monarch",
+    "fortnite",
+    4000000,
+    "🌌",
+    "A victory royale written into the fabric of the island.",
+  ],
+  [
+    "mythic-world",
+    "The Last Superpower",
+    "world",
+    500000,
+    "🌍",
+    "A diplomatic incident in card form. Handle with ceremony.",
+  ],
+  [
+    "mythic-fastfood",
+    "The First Franchise",
+    "fastfood",
+    9000000,
+    "🍟",
+    "The original order. The queue has been waiting for centuries.",
+  ],
+].map(([id, name, set, value, emoji, flavor]) => ({
+  id,
+  name,
+  set,
+  rarity: "Mythic",
+  value,
+  emoji,
+  pattern: "stars",
+  colors: ["#3d2a55", "#f3d489"],
+  image: "/img/mythic.svg",
+  flavor,
+}));
+// Secret cards are hidden trophy pulls. Their only roll is the once-a-day
+// Secret window, boosted by equipped Crown cards, so they never enter normal
+// rarity pools, chase rolls, jackpot rolls, or the Card Index.
+const secretCards = [
+  [
+    "secret-brainrot",
+    "The Forbidden Meme",
+    "brainrot",
+    2400,
+    "🤫",
+    "You did not see this. Neither did the algorithm.",
+    "The algorithm has no comment.",
+  ],
+  [
+    "secret-royal",
+    "The Empty Title",
+    "royal",
+    7200,
+    "🕯",
+    "The palace has no record of this card.",
+    "The palace has no record of this card.",
+  ],
+  [
+    "secret-world",
+    "The Backchannel",
+    "world",
+    12000,
+    "🤝",
+    "This meeting never happened.",
+    "This meeting never happened.",
+  ],
+  [
+    "secret-vault",
+    "The Missing Ledger",
+    "royal",
+    30000,
+    "📕",
+    "Nothing to declare. Especially not this.",
+    "Nothing to declare. Especially not this.",
+  ],
+  [
+    "secret-apex",
+    "The Shadow Sovereign",
+    "royal",
+    120000,
+    "♛",
+    "The crown denies everything.",
+    "The crown denies everything.",
+  ],
+  [
+    "secret-fortnite",
+    "The Unreleased Skin",
+    "fortnite",
+    150000,
+    "🛸",
+    "It is not in the patch notes.",
+    "It is not in the patch notes.",
+  ],
+  [
+    "secret-fastfood",
+    "The Secret Menu",
+    "fastfood",
+    360000,
+    "🍔",
+    "Off-menu. Do not ask for it by name.",
+    "Off-menu. Do not ask for it by name.",
+  ],
+].map(([id, name, set, value, emoji, flavor, caption]) => ({
+  id,
+  name,
+  set,
+  rarity: "Secret",
+  value,
+  emoji,
+  pattern: "grid",
+  colors: ["#27303a", "#d6b46a"],
+  image: "/img/secret.svg",
+  flavor,
+  secretCaption: caption,
+}));
 export const alpha = {
   id: "mystery-gold",
   name: "Mystery Gold",
@@ -380,13 +532,18 @@ export const catalog = [
   ...fortniteCards,
   ...fastFoodCards,
   ...chases,
+  ...mythics,
+  ...secretCards,
   alpha,
   ...leaderData.cards.map(rateLeader),
   ...nationFlagCards,
 ].map((c) => ({
   ...c,
   value:
-    c.id === "kim" || c.id === "fortnite-renegade-raider"
+    c.id === "kim" ||
+    c.id === "fortnite-renegade-raider" ||
+    c.rarity === "Mythic" ||
+    c.rarity === "Secret"
       ? c.value
       : c.name === "Donald Trump"
         ? 50000
@@ -458,26 +615,106 @@ const rarityPowerups = Object.freeze({
     { name: "Small setback", epicBonus: -35000 },
   ],
   Crown: [
-    { name: "Royal decree", epicBonus: 400000 },
-    { name: "Crown's favor", epicBonus: 350000, uncommonBonus: 100000 },
-    { name: "Golden momentum", epicBonus: 300000 },
-    { name: "Sovereign chance", epicBonus: 250000, uncommonBonus: 150000 },
+    { name: "Royal decree", epicBonus: 1200000, crownBonus: 200000 },
+    {
+      name: "Crown's favor",
+      epicBonus: 1000000,
+      uncommonBonus: 100000,
+      crownBonus: 250000,
+    },
+    { name: "Golden momentum", epicBonus: 900000, crownBonus: 300000 },
+    {
+      name: "Sovereign chance",
+      epicBonus: 800000,
+      uncommonBonus: 150000,
+      crownBonus: 350000,
+    },
   ],
   Chase: [
-    { name: "Chase energy", epicBonus: 250000 },
-    { name: "Chase insight", epicBonus: 0, uncommonBonus: 200000 },
-    { name: "Chase misstep", epicBonus: -50000 },
+    { name: "Chase energy", epicBonus: 1500000 },
+    { name: "Chase insight", epicBonus: 0, uncommonBonus: 200000, crownBonus: 500000 },
+    { name: "Chase misstep", epicBonus: -500000 },
+  ],
+  Mythic: [
+    {
+      name: "Mythic dominion · +2% Epic and +1% Crown",
+      epicBonus: 2000000,
+      crownBonus: 1000000,
+    },
   ],
   Alpha: [
-    { name: "Mystery Gold", epicBonus: 150000, uncommonBonus: 100000 },
+    {
+      name: "Mystery Gold",
+      epicBonus: 1500000,
+      uncommonBonus: 100000,
+      crownBonus: 500000,
+    },
   ],
+  // Every Secret card has an authored effect in secretPowerups below.
+  Secret: [{ name: "Classified", epicBonus: 0 }],
 });
 // Odds are whole numbers out of 100,000,000, so 2% is 2,000,000.
+export const ODDS_TOTAL = 100000000;
+// Kim's equipped bonus is deliberately outside the caps below: it is the reward
+// for pulling a 1-in-45,000 chase card.
 export const KIM_EPIC_BONUS = 2000000;
-// Every 0.1% (100,000) of Crown bonus makes the pack's chase card 25% more
-// likely, and the same bonus counts whether it comes from a loadout card or a
-// permanent set reward.
+// Every 0.1 percentage point (100,000) of Crown bonus makes the pack's chase
+// card 25% more likely, and the same bonus counts whether it comes from a
+// loadout card or a permanent set reward.
 export const CHASE_BONUS_SCALE = 400000;
+// Loadout odds shifts, before any permanent set reward is added. A full set of
+// Crown powerups can reach +5% Epic, and Renegade Raider plus four Crown cards
+// can reach +2% Crown.
+export const EPIC_SHIFT_CAP = 5000000;
+export const UNCOMMON_SHIFT_CAP = 400000;
+export const CROWN_SHIFT_CAP = 2000000;
+// Permanent character-index rewards: four completions can be claimed for each
+// reward at +0.50% Epic or +0.10% Crown per set.
+export const SET_EPIC_REWARD = 500000;
+export const SET_CROWN_REWARD = 100000;
+export const SET_EPIC_CAP = 2000000;
+export const SET_CROWN_CAP = 400000;
+// Crown cards each add 0.08% to the once-a-day Secret roll. The total is capped
+// at 0.40% so a full five-card loadout keeps the promised per-card value.
+// Odds are out of 1,000,000, so 0.08% is 800.
+export const SECRET_CROWN_BONUS = 800;
+export const SECRET_CHANCE_CAP = 4000;
+export const SECRET_ROLL_SCALE = 1000000;
+const secretPowerups = Object.freeze({
+  "secret-brainrot": {
+    name: "Algorithmic whisper",
+    secretBonus: 200,
+  },
+  "secret-royal": {
+    name: "Black-market invitation",
+    randomPackDiscount: 20,
+  },
+  "secret-world": {
+    name: "Off the record",
+    randomPackDiscount: 20,
+  },
+  "secret-vault": {
+    name: "Nothing to declare",
+    epicBonus: 1500000,
+    crownBonus: 300000,
+    secretBonus: 200,
+  },
+  "secret-apex": {
+    name: "Sovereign's shadow",
+    epicBonus: 2500000,
+    crownBonus: 500000,
+  },
+  "secret-fortnite": {
+    name: "Not in the patch notes",
+    randomPackDiscount: 20,
+    secretBonus: 200,
+  },
+  "secret-fastfood": {
+    name: "The secret menu",
+    packDiscount: 50,
+  },
+});
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export function cardPowerup(card) {
   const template = cardMap[card?.template_id || card?.id] || card;
   if (!template?.id || !rarityPowerups[template.rarity])
@@ -488,14 +725,16 @@ export function cardPowerup(card) {
   if (template.id === "fortnite-renegade-raider")
     return {
       name: "Renegade's command",
-      epicBonus: 0,
+      rarity: template.rarity,
+      epicBonus: 150000,
       uncommonBonus: 0,
-      crownBonus: 700000,
+      crownBonus: 1000000,
       everyOtherCard: false,
     };
   if (template.id === "kim")
     return {
       name: "Every other card · Uncommon+ and +2% Epic",
+      rarity: template.rarity,
       // Kim's +2% Epic sits on top of the normal loadout cap and never stacks
       // with a second copy of Kim.
       epicBonus: KIM_EPIC_BONUS,
@@ -505,14 +744,18 @@ export function cardPowerup(card) {
       everyOtherCard: true,
     };
   const powerup =
+    secretPowerups[template.id] ||
     rarityPowerups[template.rarity][
       hash % rarityPowerups[template.rarity].length
     ];
   return {
     ...powerup,
+    rarity: template.rarity,
     epicBonus: powerup.epicBonus || 0,
     uncommonBonus: powerup.uncommonBonus || 0,
-    crownBonus: 0,
+    crownBonus: powerup.crownBonus || 0,
+    secretBonus: powerup.secretBonus || 0,
+    randomPackDiscount: powerup.randomPackDiscount || 0,
     everyOtherCard: false,
   };
 }
@@ -520,43 +763,75 @@ export function loadoutPowerup(cards) {
   if (!Array.isArray(cards) || cards.length > 5)
     throw Error("A loadout can contain at most five cards.");
   const powerups = cards.map(cardPowerup);
-  const cappedEpic = Math.max(
-    -750000,
-    Math.min(
-      750000,
-      powerups.reduce(
-        (total, powerup) => total + (powerup.uncappedEpic ? 0 : powerup.epicBonus),
-        0,
-      ),
-    ),
+  // Kim's bonus is excluded here and re-added outside every cap, so a full
+  // loadout of boosts cannot dilute it and a second Kim cannot double it.
+  const cappedEpic = clamp(
+    powerups.reduce((total, p) => total + (p.uncappedEpic ? 0 : p.epicBonus), 0),
+    -EPIC_SHIFT_CAP,
+    EPIC_SHIFT_CAP,
   );
-  const epicBonus =
-    cappedEpic +
-    Math.max(0, ...powerups.map((p) => (p.uncappedEpic ? p.epicBonus : 0)));
-  const uncommonBonus = Math.max(
-    -400000,
-    Math.min(
-      400000,
-      powerups.reduce((total, powerup) => total + (powerup.uncommonBonus || 0), 0),
-    ),
-  );
-  const crownBonus = Math.max(
+  const uncappedEpic = Math.max(
     0,
-    Math.min(
-      700000,
-      powerups.reduce((total, powerup) => total + (powerup.crownBonus || 0), 0),
-    ),
+    ...powerups.map((p) => (p.uncappedEpic ? p.epicBonus : 0)),
+  );
+  const uncommonBonus = clamp(
+    powerups.reduce((total, p) => total + (p.uncommonBonus || 0), 0),
+    -UNCOMMON_SHIFT_CAP,
+    UNCOMMON_SHIFT_CAP,
+  );
+  const crownBonus = clamp(
+    powerups.reduce((total, p) => total + (p.crownBonus || 0), 0),
+    0,
+    CROWN_SHIFT_CAP,
+  );
+  const crownCards = powerups.filter(
+    (powerup) => powerup.rarity === "Crown",
+  ).length;
+  const secretChance = clamp(
+    crownCards * SECRET_CROWN_BONUS +
+      powerups.reduce((total, powerup) => total + powerup.secretBonus, 0),
+    0,
+    SECRET_CHANCE_CAP,
   );
   return {
-    epicBonus,
+    epicBonus: cappedEpic + uncappedEpic,
+    cappedEpic,
+    uncappedEpic,
     uncommonBonus,
     crownBonus,
+    secretChance,
+    crownCards,
     everyOtherCard: powerups.some((powerup) => powerup.everyOtherCard),
     packDiscount: Math.max(
       0,
       ...powerups.map((powerup) => powerup.packDiscount || 0),
     ),
+    randomPackDiscount: clamp(
+      powerups.reduce(
+        (total, powerup) => total + powerup.randomPackDiscount,
+        0,
+      ),
+      0,
+      40,
+    ),
   };
+}
+// Deterministic so the browser and server agree on the day's discounted pack.
+export function dailyDiscountPack(accountId, day) {
+  let hash = 2166136261;
+  for (const character of `${accountId}:${day}:secret-pack`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return packs[(hash >>> 0) % packs.length].id;
+}
+export function secretPackDiscount(pack, accountId, day, effect) {
+  if (!effect?.randomPackDiscount) return 0;
+  if (dailyDiscountPack(accountId, day) !== pack.id) return 0;
+  return Math.min(
+    pack.price,
+    Math.round((pack.price * effect.randomPackDiscount) / 100),
+  );
 }
 export const leaderSource = {
   source: leaderData.source,
@@ -569,12 +844,15 @@ export const packs = [
     name: "Brainrot Pack",
     short: "BRAINROT",
     subtitle: "A little unhinged. Entirely collectible.",
-    price: 100,
+    price: 200,
     count: 4,
     set: "brainrot",
-    odds: [82000000, 16375000, 1624675, 260, 65],
+    odds: [64000000, 26000000, 9980000, 20000, 0],
     chase: "crocodilo",
-    chaseOdds: 400,
+    chaseOdds: 800,
+    secret: "secret-brainrot",
+    jackpot: "mythic-brainrot",
+    jackpotOdds: 20000,
     art: "brainrot",
     color: "#64a3ce",
     tag: "THE PEOPLE’S FAVOURITE",
@@ -584,12 +862,15 @@ export const packs = [
     name: "Royalty Booster",
     short: "ROYALTY",
     subtitle: "An invitation to the inner circle.",
-    price: 500,
+    price: 600,
     count: 4,
     set: "royal",
-    odds: [60000000, 29900000, 10000000, 99900, 100],
+    odds: [70150000, 22000000, 7800000, 50000, 0],
     chase: "signet",
-    chaseOdds: 500,
+    chaseOdds: 1000,
+    secret: "secret-royal",
+    jackpot: "mythic-royal",
+    jackpotOdds: 60000,
     art: "royal",
     color: "#ba7983",
     tag: "A TASTE OF THE HIGH LIFE",
@@ -602,9 +883,12 @@ export const packs = [
     price: 2500,
     count: 5,
     set: "royal",
-    odds: [0, 40998000, 52500000, 6500000, 2000],
+    odds: [0, 50498000, 48000000, 1500000, 2000],
     chase: "sovereign",
-    chaseOdds: 800,
+    chaseOdds: 1000,
+    secret: "secret-vault",
+    jackpot: "mythic-vault",
+    jackpotOdds: 60000,
     art: "vault",
     color: "#70b69b",
     tag: "NO COMMONS. ALL CLASS.",
@@ -617,9 +901,12 @@ export const packs = [
     price: 10000,
     count: 5,
     set: "royal",
-    odds: [0, 0, 48990000, 51000000, 10000],
+    odds: [0, 0, 48995000, 51000000, 5000],
     chase: "apex-crown",
     chaseOdds: 2000,
+    secret: "secret-apex",
+    jackpot: "mythic-apex",
+    jackpotOdds: 100000,
     guarantee: true,
     art: "apex",
     color: "#d9bb72",
@@ -636,6 +923,9 @@ export const packs = [
     odds: [55000000, 43998990, 1000000, 1000, 10],
     chase: "fortnite-renegade-raider",
     chaseOdds: 40000,
+    secret: "secret-fortnite",
+    jackpot: "mythic-fortnite",
+    jackpotOdds: 80000,
     art: "fortnite",
     color: "#81a2b7",
     tag: "DROP IN · BUILD YOUR SQUAD",
@@ -648,9 +938,12 @@ export const packs = [
     price: 1000,
     count: 4,
     set: "world",
-    odds: [65000000, 22180000, 12500000, 319840, 160],
+    odds: [75950000, 22000000, 2000000, 50000, 0],
     chase: "kim",
     chaseOdds: 45000,
+    secret: "secret-world",
+    jackpot: "mythic-world",
+    jackpotOdds: 200000,
     art: "world",
     color: "#a8a6ce",
     tag: "THE WORLD IS YOUR COLLECTION",
@@ -666,6 +959,9 @@ export const packs = [
     odds: [76000000, 23900000, 99000, 1000, 0],
     chase: "food-mcdonalds",
     chaseOdds: 50000,
+    secret: "secret-fastfood",
+    jackpot: "mythic-fastfood",
+    jackpotOdds: 150000,
     art: "fastfood",
     color: "#df8c46",
     tag: "50 REAL CHAINS · FICTIONAL CARD VALUES",
@@ -681,15 +977,25 @@ const indexFamilies = Object.freeze({
 });
 export const indexSets = Object.freeze(
   Object.entries(indexFamilies).flatMap(([family, info]) => {
-    const cards = catalog.filter((card) => card.set === family);
+    // Mythic jackpots and Secret cards are trophy pulls, not index objectives.
+    const cards = catalog.filter(
+      (card) =>
+        card.set === family &&
+        card.rarity !== "Mythic" &&
+        card.rarity !== "Secret",
+    );
     return Array.from({ length: Math.ceil(cards.length / 8) }, (_, index) => {
       const cardIds = cards.slice(index * 8, index * 8 + 8).map((card) => card.id);
+      const hasCrown = cardIds.some((id) => cardMap[id]?.rarity === "Crown");
+      const hasEpic = cardIds.some((id) => cardMap[id]?.rarity === "Epic");
       return {
         id: family + "-set-" + String(index + 1).padStart(2, "0"),
         family,
         name: info.name + " · Set " + String(index + 1).padStart(2, "0") + " · " + cardIds.length + " cards",
         subtitle: info.subtitle + " Collect all " + cardIds.length + " cards in this set to claim its reward.",
         cardIds,
+        // Paid only after both permanent odds caps are full. £50 or less.
+        cashReward: hasCrown ? 5000 : hasEpic ? 2500 : 1000,
       };
     });
   }),
@@ -697,19 +1003,38 @@ export const indexSets = Object.freeze(
 
 export const rarities = ["Common", "Uncommon", "Epic", "Crown", "Alpha"];
 export const starterOdds = [85000000, 12000000, 2500000, 500000, 0];
+// A pack's chase card is never sold through that pack's ordinary rarity pool, so
+// the chase roll is the only way to pull it.
+const chaseIds = new Set(packs.map((pack) => pack.chase));
 // Immutable template pools are safe to reuse; player state always stays in the database.
+// Within a tier, the priciest card is the rarest pull: rank weights run from n for the
+// cheapest entry down to 1 for the most valuable, so authored card values decide the
+// chase without any revaluation.
 const normalPools = new Map();
 for (const card of catalog) {
   if (!["Common", "Uncommon", "Epic", "Crown"].includes(card.rarity)) continue;
+  if (chaseIds.has(card.id)) continue;
   const key = `${card.set}:${card.rarity}`;
   if (!normalPools.has(key)) normalPools.set(key, []);
-  normalPools.get(key).push(card);
+  normalPools.get(key).push({ card, weight: 1 });
+}
+for (const pool of normalPools.values()) {
+  const ranked = [...pool].sort((a, b) => a.card.value - b.card.value);
+  ranked.forEach((entry, index) => {
+    entry.weight = ranked.length - index;
+  });
 }
 // All randomness is injected; production supplies cryptographic integer sampling.
 export function rollPack(
   pack,
   randomInt,
-  { guaranteedEpic = false, powerups = [], permanentEpicBonus = 0, permanentCrownBonus = 0 } = {},
+  {
+    guaranteedEpic = false,
+    powerups = [],
+    permanentEpicBonus = 0,
+    permanentCrownBonus = 0,
+    secretChance = 0,
+  } = {},
 ) {
   const effect = loadoutPowerup(powerups);
   const odds = [...pack.odds];
@@ -722,8 +1047,19 @@ export function rollPack(
     odds[1] -= shifted;
     odds[0] += shifted;
   }
-  const epicBonus = Math.max(-750000, Math.min(1750000 + KIM_EPIC_BONUS, effect.epicBonus + permanentEpicBonus));
-  const crownBonus = Math.max(0, Math.min(800000, effect.crownBonus + permanentCrownBonus));
+  // Loadout and permanent index rewards share one Epic band: the floor keeps a
+  // stumble card honest, the ceiling stops rewards from emptying the Common tier.
+  const epicBonus =
+    clamp(
+      effect.cappedEpic + permanentEpicBonus,
+      -EPIC_SHIFT_CAP,
+      EPIC_SHIFT_CAP + SET_EPIC_CAP,
+    ) + effect.uncappedEpic;
+  const crownBonus = clamp(
+    effect.crownBonus + permanentCrownBonus,
+    0,
+    CROWN_SHIFT_CAP + SET_CROWN_CAP,
+  );
   if (epicBonus > 0) {
     let remaining = epicBonus;
     for (const index of [0, 1]) {
@@ -760,14 +1096,20 @@ export function rollPack(
   }
   const used = new Set();
   function pick(rarity) {
-    if (rarity === "Alpha") return { ...alpha };
+    if (rarity === "Alpha") return { ...cardMap["mystery-gold"] };
     const pool = normalPools.get(`${pack.set}:${rarity}`) || [];
-    const fresh = pool.filter((c) => !used.has(c.id));
+    const fresh = pool.filter((entry) => !used.has(entry.card.id));
     const available = fresh.length ? fresh : pool;
     if (!available.length) throw Error("Empty rarity pool");
-    const card = available[randomInt(available.length)];
-    used.add(card.id);
-    return { ...card };
+    let roll = randomInt(available.reduce((sum, entry) => sum + entry.weight, 0));
+    for (const entry of available) {
+      if (roll < entry.weight) {
+        used.add(entry.card.id);
+        return { ...entry.card };
+      }
+      roll -= entry.weight;
+    }
+    throw Error("Card pick was outside its pool weights.");
   }
   const result = Array.from({ length: pack.count }, (_, index) => {
     const floor = effect.everyOtherCard && index % 2 === 1 ? 1 : 0;
@@ -794,6 +1136,24 @@ export function rollPack(
     );
     result[lowest] = pick("Epic");
   }
+  // The Secret roll only runs inside the daily window. It is independent of
+  // the rarity bands, chase roll and Mythic jackpot.
+  if (
+    secretChance > 0 &&
+    pack.secret &&
+    cardMap[pack.secret]?.rarity === "Secret" &&
+    randomInt(SECRET_ROLL_SCALE) < secretChance
+  ) {
+    const secret = cardMap[pack.secret];
+    const eligible = result
+      .map((c, i) => ({ c, i }))
+      .filter(
+        ({ c }) => !["Alpha", "Mythic", "Chase", "Secret"].includes(c.rarity),
+      )
+      .sort((a, b) => a.c.value - b.c.value);
+    if (eligible.length)
+      result[eligible[0].i] = { ...secret, rarity: "Secret" };
+  }
   // The Crown bonus also lifts the chase chance. With no bonus this is exactly
   // the original 1-in-chaseOdds roll.
   const chaseHit =
@@ -804,9 +1164,29 @@ export function rollPack(
     const chase = cardMap[pack.chase];
     const eligible = result
       .map((c, i) => ({ c, i }))
-      .filter(({ c }) => c.rarity !== "Alpha" && c.value < chase.value)
+      .filter(
+        ({ c }) =>
+          !["Alpha", "Mythic", "Chase", "Secret"].includes(c.rarity) &&
+          c.value < chase.value,
+      )
       .sort((a, b) => a.c.value - b.c.value);
-    if (eligible.length) result[eligible[0].i] = { ...chase };
+    if (eligible.length)
+      result[eligible[0].i] = { ...chase, rarity: "Chase" };
+  }
+  // The jackpot is a separate per-pack roll, never part of the rarity bands.
+  // It can only replace an ordinary card, and never an Alpha, Secret or chase.
+  if (pack.jackpot && randomInt(pack.jackpotOdds) === 0) {
+    const mythic = cardMap[pack.jackpot];
+    if (!mythic || mythic.rarity !== "Mythic")
+      throw Error("Unknown Mythic jackpot card.");
+    const eligible = result
+      .map((c, i) => ({ c, i }))
+      .filter(
+        ({ c }) => !["Alpha", "Mythic", "Chase", "Secret"].includes(c.rarity),
+      )
+      .sort((a, b) => a.c.value - b.c.value);
+    if (eligible.length)
+      result[eligible[0].i] = { ...mythic, rarity: "Mythic" };
   }
   return result;
 }
@@ -857,7 +1237,11 @@ export function packProgress(opened = 0) {
 export function packValueRange(pack) {
   const values = catalog
     .filter(
-      (c) => c.set === pack.set && pack.odds[rarities.indexOf(c.rarity)] > 0,
+      (c) =>
+        c.set === pack.set &&
+        c.id !== pack.chase &&
+        ["Common", "Uncommon", "Epic", "Crown"].includes(c.rarity) &&
+        pack.odds[rarities.indexOf(c.rarity)] > 0,
     )
     .map((c) => c.value);
   return { min: Math.min(...values), max: Math.max(...values) };
