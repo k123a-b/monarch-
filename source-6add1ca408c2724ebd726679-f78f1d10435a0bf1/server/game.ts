@@ -26,6 +26,9 @@ import {
   validFriendCode,
   validUsername,
   friendTablePayout,
+  giftLimits,
+  giftQuotaLeft,
+  validGiftAmount,
   matchedPotBotStake,
   FRIEND_ALPHABET,
   randomBelow,
@@ -95,6 +98,13 @@ async function areFriends(c: Client, a: string, b: string) {
     [a, b],
   );
   return q.rows.length > 0;
+}
+async function giftsToday(c: Client, id: string) {
+  const q = await c.query(
+    "SELECT COUNT(*)::int AS n FROM ledger WHERE user_id=$1 AND reason LIKE 'Gift sent to %' AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'",
+    [id],
+  );
+  return Number(q.rows[0]?.n) || 0;
 }
 async function ensurePotBot(c: Client) {
   const existing = await c.query("SELECT id FROM accounts WHERE id=$1", [
@@ -747,7 +757,10 @@ export async function handle(
           return { account: await account(), reward: result.reward };
         }
         if (route === "friends" && req.method === "GET") {
+          const sentToday = await giftsToday(c, id);
           return {
+            giftLimit: giftLimits.dailyCount,
+            giftLeft: giftQuotaLeft(sentToday),
             friends: (
               await c.query(
                 "SELECT a.id,a.username,a.friend_code FROM friends f JOIN accounts a ON a.id=CASE WHEN f.user_a=$1 THEN f.user_b ELSE f.user_a END WHERE f.user_a=$1 OR f.user_b=$1",
@@ -812,6 +825,39 @@ export async function handle(
             [id, target],
           );
           return { ok: true };
+        }
+        if (route === "friends/gift" && req.method === "POST") {
+          const amount = body.amount;
+          if (!validGiftAmount(amount))
+            fail("Gifts must be between 1p and £100.00.");
+          const target = String(body.id || "");
+          if (!target) fail("Choose a friend to gift.");
+          if (target === id) fail("You cannot gift yourself.");
+          const recipient = (
+            await c.query(
+              "SELECT id,username FROM accounts WHERE id=$1 AND bot=false",
+              [target],
+            )
+          ).rows[0];
+          if (!recipient) fail("That player cannot receive gifts.", 404);
+          if (!(await areFriends(c, id, target)))
+            fail("Gift to friends only.", 403);
+          const sentToday = await giftsToday(c, id);
+          if (sentToday >= giftLimits.dailyCount)
+            fail(
+              `You have sent ${giftLimits.dailyCount} gifts today. Try again after midnight UTC.`,
+              429,
+            );
+          const sender = await account();
+          await change(c, id, -amount, `Gift sent to ${recipient.username}`);
+          await change(c, target, amount, `Gift from ${sender.username}`);
+          return {
+            account: await account(),
+            sent: amount,
+            to: recipient.username,
+            giftLimit: giftLimits.dailyCount,
+            giftLeft: giftQuotaLeft(sentToday + 1),
+          };
         }
         if (route === "tables/create" && req.method === "POST") {
           const stake = integer(body.stake);

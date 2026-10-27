@@ -2687,6 +2687,37 @@ form input {
   grid-template-columns: 1fr 1.25fr;
   gap: 24px;
 }
+.gift-panel {
+  margin-top: 24px;
+}
+.gift-panel form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.gift-panel form label {
+  margin: 0;
+}
+.gift-panel .gift-presets,
+.gift-panel form > .button.full,
+.gift-panel form > .form-error {
+  grid-column: 1 / -1;
+}
+.gift-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gift-presets .button {
+  flex: 1;
+  min-width: 64px;
+}
+.gift-quota {
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #a09680;
+}
 .friends-layout h2 {
   font-size: 23px;
 }
@@ -3284,6 +3315,9 @@ body:has(dialog[open]) {
     margin-left: auto;
   }
   .friends-layout {
+    grid-template-columns: 1fr;
+  }
+  .gift-panel form {
     grid-template-columns: 1fr;
   }
   .stats-row {

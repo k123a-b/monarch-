@@ -35,6 +35,20 @@ export function dailySpin(randomInt) {
   }
   throw Error("Daily spin roll was outside its odds.");
 }
+export const giftLimits = Object.freeze({
+  minPence: 1,
+  maxPence: 10000,
+  dailyCount: 10,
+});
+export const validGiftAmount = (amount) =>
+  Number.isSafeInteger(amount) &&
+  amount >= giftLimits.minPence &&
+  amount <= giftLimits.maxPence;
+export function giftQuotaLeft(sentToday) {
+  const sent =
+    Number.isSafeInteger(sentToday) && sentToday > 0 ? sentToday : 0;
+  return Math.max(0, giftLimits.dailyCount - sent);
+}
 export function friendTablePayout(stake, hasOpponent) {
   if (!Number.isSafeInteger(stake) || stake < 1)
     throw Error("Stake must be a positive whole-pence amount.");

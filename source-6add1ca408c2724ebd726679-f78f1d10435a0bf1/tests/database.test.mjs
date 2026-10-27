@@ -619,6 +619,60 @@ test(
         );
       });
       await t.test(
+        "friend gifts transfer virtual cash through the ledger and stop at the daily cap",
+        async () => {
+          const aBefore = Number((await request(a, "me")).data.account.balance);
+          const bBefore = Number((await request(b, "me")).data.account.balance);
+          assert.equal(
+            (await request(a, "friends/gift", { id: a.id, amount: 5 })).status,
+            400,
+          );
+          assert.equal(
+            (await request(a, "friends/gift", { id: b.id, amount: 10001 }))
+              .status,
+            400,
+          );
+          assert.equal(
+            (await request(a, "friends/gift", { id: b.id, amount: 1.5 }))
+              .status,
+            400,
+          );
+          assert.equal(
+            (
+              await request(a, "friends/gift", {
+                id: secretUser.id,
+                amount: 1,
+              })
+            ).status,
+            403,
+          );
+          const gift = await request(a, "friends/gift", {
+            id: b.id,
+            amount: 10,
+          });
+          assert.equal(gift.status, 200);
+          assert.equal(Number(gift.data.sent), 10);
+          assert.equal(Number(gift.data.account.balance), aBefore - 10);
+          assert.equal(
+            Number((await request(b, "me")).data.account.balance),
+            bBefore + 10,
+          );
+          for (let i = 0; i < 9; i++)
+            assert.equal(
+              (await request(a, "friends/gift", { id: b.id, amount: 1 }))
+                .status,
+              200,
+            );
+          assert.equal(
+            (await request(a, "friends/gift", { id: b.id, amount: 1 })).status,
+            429,
+          );
+          const friends = (await request(a, "friends")).data;
+          assert.equal(Number(friends.giftLeft), 0);
+          assert.equal(Number(friends.giftLimit), 10);
+        },
+      );
+      await t.test(
         "penalty sales cannot overdraw and failed sales preserve the card",
         async () => {
           const card = (
