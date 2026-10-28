@@ -47,6 +47,7 @@ function simulate(pack, powerups, count, withPity = false) {
   let returned = 0;
   let loss = 0;
   let smallWin = 0;
+  let moderateWin = 0;
   let mediumWin = 0;
   let jackpot = 0;
   let special = 0;
@@ -79,7 +80,10 @@ function simulate(pack, powerups, count, withPity = false) {
     returned += total;
     if (!won) loss++;
     else if (total < pack.price * 2) smallWin++;
-    else if (total < pack.price * 10) mediumWin++;
+    else {
+      if (total < pack.price * 5) moderateWin++;
+      if (total < pack.price * 10) mediumWin++;
+    }
     if (total >= pack.price * 10) jackpot++;
     if (cards.some((card) => ["Alpha", "Chase", "Mythic"].includes(card.rarity)))
       special++;
@@ -111,6 +115,7 @@ function simulate(pack, powerups, count, withPity = false) {
     returned,
     loss,
     smallWin,
+    moderateWin,
     mediumWin,
     jackpot,
     special,
@@ -143,6 +148,7 @@ const report = packs.map((pack) => {
     winningPacks: `${(((samples - result.loss) / samples) * 100).toFixed(1)}%`,
     losingPacks: `${((result.loss / samples) * 100).toFixed(1)}%`,
     smallWinsUnder2x: `${((result.smallWin / samples) * 100).toFixed(1)}%`,
+    moderateWins2xTo5x: `${((result.moderateWin / samples) * 100).toFixed(1)}%`,
     mediumWins2xTo10x: `${((result.mediumWin / samples) * 100).toFixed(1)}%`,
     winsAtLeast10x: `${((result.jackpot / samples) * 100).toFixed(3)}%`,
     bestObserved: money(values[samples - 1]),
@@ -151,6 +157,8 @@ const report = packs.map((pack) => {
     mythicPacks: result.mythics,
     mythicOdds: `1 in ${pack.jackpotOdds.toLocaleString()}`,
     mythicValue: money(cardMap[pack.jackpot].value),
+    paydayOdds: pack.payday ? `1 in ${pack.paydayOdds}` : "natural only",
+    paydayValue: pack.payday ? money(cardMap[pack.payday].value) : "n/a",
     failedGuarantees: result.failedGuarantees,
     comebackPacks: withPity.pityPacks,
     comebackAverageValue: withPity.pityPacks
@@ -231,6 +239,19 @@ for (const [index, pack] of report.entries()) {
     problems.push(`${pack.pack}: simulated RTP ${pack.returnToPlayer} is not below 100%`);
   if (!packs[index].jackpot || !cardMap[packs[index].jackpot])
     problems.push(`${pack.pack}: missing Mythic jackpot`);
+  // Every pack must keep a real moderate band: a 2x-5x win in roughly 1 in 25.
+  const moderateRate = Number.parseFloat(pack.moderateWins2xTo5x);
+  if (moderateRate < 3.5)
+    problems.push(
+      `${pack.pack}: 2x-5x wins ${pack.moderateWins2xTo5x} are below the 3.5% floor`,
+    );
+  if (packs[index].payday) {
+    const card = cardMap[packs[index].payday];
+    if (!card || card.rarity !== "Chase")
+      problems.push(`${pack.pack}: missing Payday card`);
+    else if (card.value < packs[index].price * 1.3)
+      problems.push(`${pack.pack}: Payday card cannot reach 2x the price`);
+  }
 }
 if (problems.length) {
   console.error(problems.join("\n"));

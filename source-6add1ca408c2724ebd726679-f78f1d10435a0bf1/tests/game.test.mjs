@@ -181,13 +181,14 @@ test("Fortnite Drop Pack keeps its own high-loss odds while making Epic characte
       cardMap["fortnite-midas"].value,
       cardMap["fortnite-renegade-raider"].value,
     ],
-    [1460, 3407, 2920, 6000, 10500, 15000, 400000],
+    [1358, 3134, 2686, 6000, 10500, 15000, 400000],
   );
   const fortniteCards = catalog.filter(
     (card) =>
       card.set === "fortnite" &&
       card.rarity !== "Mythic" &&
-      card.rarity !== "Secret",
+      card.rarity !== "Secret" &&
+      !card.id.startsWith("payday-"),
   );
   assert.equal(fortniteCards.length, 30);
   assert.equal(new Set(fortniteCards.map((card) => card.name)).size, 30);
@@ -215,7 +216,10 @@ test("character index sets use existing cards and keep earned bonuses bounded", 
   assert.equal(
     new Set(indexSets.flatMap((set) => set.cardIds)).size,
     catalog.filter(
-      (card) => card.rarity !== "Mythic" && card.rarity !== "Secret",
+      (card) =>
+        card.rarity !== "Mythic" &&
+        card.rarity !== "Secret" &&
+        !card.id.startsWith("payday-"),
     ).length,
   );
   for (const set of indexSets) {
@@ -452,7 +456,8 @@ test("original catalogue contains 93 non-Mythic templates before the world and F
       (c) =>
         ["brainrot", "royal", "alpha"].includes(c.set) &&
         c.rarity !== "Mythic" &&
-        c.rarity !== "Secret",
+        c.rarity !== "Secret" &&
+        !c.id.startsWith("payday-"),
     ).length,
     93,
   ));
@@ -981,6 +986,36 @@ test("every pack can produce a configured 10x or better jackpot", () => {
       `${pack.name} jackpot must pay at least 10x its price, got ${total}`,
     );
     assert.ok(cardMap[pack.jackpot].value >= pack.price * 10);
+  }
+});
+test("every Payday pack carries its own 1-in-25 card and lands a moderate win", () => {
+  const paydayPacks = packs.filter((pack) => pack.payday);
+  assert.equal(paydayPacks.length, 4);
+  for (const pack of paydayPacks) {
+    assert.equal(pack.paydayOdds, 25);
+    assert.equal(cardMap[pack.payday].rarity, "Chase");
+    assert.ok(cardMap[pack.payday].value >= pack.price * 1.3);
+    assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
+    const randomInt = (max) =>
+      max === ODDS_TOTAL
+        ? 45000000
+        : max === pack.paydayOdds
+          ? 0
+          : max - 1;
+    const cards = rollPack(pack, randomInt);
+    assert.ok(cards.some((card) => card.id === pack.payday));
+    const total = cards.reduce((sum, card) => sum + card.value, 0);
+    assert.ok(
+      total >= pack.price * 2 && total < pack.price * 5,
+      `${pack.name} payday total ${total} must land in the 2x-5x band`,
+    );
+    const withoutPayday = rollPack(pack, (max) =>
+      max === ODDS_TOTAL ? 45000000 : max - 1,
+    );
+    assert.ok(
+      !withoutPayday.some((card) => card.id === pack.payday),
+      `${pack.name} can only pull its Payday card from the Payday roll`,
+    );
   }
 });
 
