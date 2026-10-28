@@ -1079,6 +1079,19 @@ main:focus {
 .foil-pack.world img {
   filter: saturate(0.6);
 }
+.foil-pack.uk img {
+  object-fit: cover;
+  object-position: center;
+}
+.foil-pack.uk .pack-label strong {
+  font-size: 19px;
+}
+.uk-secret-note {
+  color: #c6bfca;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
 .pack-sheen {
   position: absolute;
   inset: 0;
@@ -1278,6 +1291,19 @@ main:focus {
 .world-banner-action .button {
   font-size: 9px;
   padding: 10px 15px;
+}
+.uk-banner {
+  border-color: #665b47;
+  background: linear-gradient(110deg, #292534, #20232c);
+}
+.uk-banner-art > img {
+  object-position: center;
+  opacity: 1;
+  mask-image: none;
+}
+.uk-banner p {
+  font-size: 12px;
+  line-height: 1.7;
 }
 .bottom-panels {
   display: grid;
@@ -4179,6 +4205,33 @@ body:has(dialog[open]) {
 .codex-intro > .button {
   flex-shrink: 0;
 }
+.uk-intro > div {
+  min-width: 0;
+}
+.uk-toolbar #uk-search {
+  min-width: min(100%, 240px);
+  flex: 1 1 280px;
+}
+.uk-toolbar .roster-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.uk-toolbar .roster-filters .button {
+  min-height: 44px;
+}
+.uk-toolbar .roster-filters .active {
+  color: var(--gold);
+  border-color: #b69b63;
+  background: #dbbd7b12;
+}
+.uk-grid .game-card:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.uk-more {
+  min-height: 44px;
+}
 .collection-details {
   margin-top: 16px;
   border-top: 1px solid var(--line);
@@ -4288,6 +4341,43 @@ body:has(dialog[open]) {
   font-size: 7px;
   letter-spacing: 0.8px;
   margin: -3px 0 3px;
+}
+.game-card.family-uk .uk-role {
+  color: #ded0aa;
+  font-size: 10px;
+  letter-spacing: .5px;
+  margin: -3px 0 3px;
+  overflow-wrap: anywhere;
+}
+.game-card.family-uk .portrait-source {
+  font-size: 10px;
+  min-height: 24px;
+  overflow-wrap: anywhere;
+}
+.game-card.family-uk .uk-image-credit {
+  display: block;
+  margin: 0 15px 14px;
+  color: #c6bfca;
+  font-size: 9px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.uk-image-credit a {
+  color: var(--gold);
+}
+.game-card.kind-location .card-portrait {
+  height: auto;
+  aspect-ratio: 4 / 3;
+}
+.game-card.kind-location .card-portrait img {
+  object-fit: cover;
+  object-position: center;
+  mask-image: none;
+}
+.game-card.family-uk.rarity-secret .card-portrait img {
+  object-fit: contain;
+  object-position: center;
+  mask-image: none;
 }
 .game-card .card-value {
   border-top-color: #f2d89255;
@@ -6392,6 +6482,11 @@ body:has(dialog[open]) {
 }
 .secret-odds-row {
   color: #bfeee7;
+}
+.secret-odds-row b {
+  flex-shrink: 1;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 .secret-odds-row small {
   display: block;

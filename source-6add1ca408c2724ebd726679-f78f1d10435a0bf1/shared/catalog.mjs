@@ -2,6 +2,7 @@ import flags from "./flags.json" with { type: "json" };
 import leaderData from "./leaders.json" with { type: "json" };
 import portraits from "./portraits.json" with { type: "json" };
 import { rateLeader } from "./leader-ratings.mjs";
+import { ukCards } from "./uk-cards.mjs";
 export const money = (p) =>
   new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
     p / 100,
@@ -272,6 +273,7 @@ const chases = [
   ["payday-apex", "Apex Sigil", 17500, "🔱", "royal"],
   ["payday-fortnite", "Golden Llama", 20500, "🦙", "fortnite"],
   ["payday-fastfood", "Golden Receipt", 48000, "🧾", "fastfood"],
+  ["payday-uk", "The Golden Ticket", 105000, "", "uk"],
 ].map(([id, name, value, emoji, set]) => ({
   id,
   name,
@@ -302,6 +304,7 @@ const windfalls = [
   ["fortnite", "Victory Windfall", "fortnite", 68750],
   ["world", "World Dividend", "world", 5500],
   ["fastfood", "Franchise Dividend", "fastfood", 165000],
+  ["uk", "British Windfall", "uk", 330000],
 ].map(([pack, name, set, value]) => ({
   id: "windfall-" + pack,
   name,
@@ -373,6 +376,14 @@ const mythics = [
     9000000,
     "🍟",
     "The original order. The queue has been waiting for centuries.",
+  ],
+  [
+    "mythic-uk",
+    "The National Treasure",
+    "uk",
+    2500000,
+    "",
+    "One extraordinary piece of a very British collection.",
   ],
 ].map(([id, name, set, value, emoji, flavor]) => ({
   id,
@@ -453,6 +464,15 @@ const secretCards = [
     "Off-menu. Do not ask for it by name.",
     "Off-menu. Do not ask for it by name.",
   ],
+  [
+    "secret-uk",
+    "Free Palestine",
+    "uk",
+    800000,
+    "",
+    "A flag of hope. A rare Secret from the UK Pack.",
+    "A quiet symbol. An extraordinary discovery.",
+  ],
 ].map(([id, name, set, value, emoji, flavor, caption]) => ({
   id,
   name,
@@ -462,7 +482,7 @@ const secretCards = [
   emoji,
   pattern: "grid",
   colors: ["#27303a", "#d6b46a"],
-  image: "/img/secret.svg",
+  image: id === "secret-uk" ? "/img/free-palestine-secret.webp" : "/img/secret.svg",
   flavor,
   secretCaption: caption,
 }));
@@ -653,14 +673,17 @@ export const catalog = [
   alpha,
   ...leaderData.cards.map(rateLeader),
   ...nationFlagCards,
+  ...ukCards,
 ].map((c) => ({
   ...c,
   value:
     c.id === "kim" ||
+    c.id === "world-former-keir-starmer" ||
     c.id === "fortnite-renegade-raider" ||
     c.id.startsWith("windfall-") ||
     c.rarity === "Mythic" ||
-    c.rarity === "Secret"
+    c.rarity === "Secret" ||
+    c.set === "uk"
       ? c.value
       : c.name === "Donald Trump"
         ? 50000
@@ -804,9 +827,8 @@ export const SET_EPIC_REWARD = 500000;
 export const SET_CROWN_REWARD = 100000;
 export const SET_EPIC_CAP = 2000000;
 export const SET_CROWN_CAP = 400000;
-// Crown cards each add 0.08% to the once-a-day Secret roll. The total is capped
-// at 0.40% so a full five-card loadout keeps the promised per-card value.
-// Odds are out of 1,000,000, so 0.08% is 800.
+// Daily Secrets have a base chance; equipped Crowns add weight up to the cap.
+export const SECRET_BASE_CHANCE = 500;
 export const SECRET_CROWN_BONUS = 800;
 export const SECRET_CHANCE_CAP = 4000;
 export const SECRET_ROLL_SCALE = 1000000;
@@ -842,6 +864,12 @@ const secretPowerups = Object.freeze({
   "secret-fastfood": {
     name: "The secret menu",
     packDiscount: 50,
+  },
+  "secret-uk": {
+    name: "A little hope",
+    epicBonus: 1000000,
+    randomPackDiscount: 10,
+    secretBonus: 200,
   },
 });
 // Named chase cards each keep a distinct, positive effect so a rare pull is
@@ -936,7 +964,7 @@ export function loadoutPowerup(cards) {
     (powerup) => powerup.rarity === "Crown",
   ).length;
   const secretChance = clamp(
-    crownCards * SECRET_CROWN_BONUS +
+    SECRET_BASE_CHANCE + crownCards * SECRET_CROWN_BONUS +
       powerups.reduce((total, powerup) => total + powerup.secretBonus, 0),
     0,
     SECRET_CHANCE_CAP,
@@ -999,7 +1027,7 @@ export const packs = [
     price: 200,
     count: 4,
     set: "brainrot",
-    odds: [70960000, 12000000, 17000000, 40000, 0],
+    odds: [63960000, 12000000, 24000000, 40000, 0],
     chase: "crocodilo",
     chaseOdds: 800,
     secret: "secret-brainrot",
@@ -1018,7 +1046,7 @@ export const packs = [
     price: 600,
     count: 4,
     set: "royal",
-    odds: [64190000, 20400000, 15250000, 160000, 0],
+    odds: [56190000, 20400000, 23250000, 160000, 0],
     chase: "signet",
     chaseOdds: 1000,
     secret: "secret-royal",
@@ -1037,7 +1065,7 @@ export const packs = [
     price: 2500,
     count: 5,
     set: "royal",
-    odds: [0, 26589000, 72910000, 500000, 1000],
+    odds: [0, 20589000, 78910000, 500000, 1000],
     chase: "sovereign",
     chaseOdds: 1000,
     payday: "payday-vault",
@@ -1058,7 +1086,7 @@ export const packs = [
     price: 10000,
     count: 5,
     set: "royal",
-    odds: [0, 0, 40155000, 59840000, 5000],
+    odds: [0, 0, 31155000, 68840000, 5000],
     chase: "apex-crown",
     chaseOdds: 2000,
     payday: "payday-apex",
@@ -1080,7 +1108,7 @@ export const packs = [
     price: 12500,
     count: 4,
     set: "fortnite",
-    odds: [31029000, 64668990, 4300000, 2000, 10],
+    odds: [21029000, 71668990, 7300000, 2000, 10],
     chase: "fortnite-renegade-raider",
     chaseOdds: 40000,
     payday: "payday-fortnite",
@@ -1101,7 +1129,7 @@ export const packs = [
     price: 1000,
     count: 4,
     set: "world",
-    odds: [62750000, 22000000, 15130000, 120000, 0],
+    odds: [53750000, 22000000, 24130000, 120000, 0],
     chase: "kim",
     chaseOdds: 45000,
     secret: "secret-world",
@@ -1120,7 +1148,7 @@ export const packs = [
     price: 30000,
     count: 5,
     set: "fastfood",
-    odds: [51748000, 44499000, 3750000, 3000, 0],
+    odds: [41748000, 51499000, 6750000, 3000, 0],
     chase: "food-mcdonalds",
     chaseOdds: 50000,
     payday: "payday-fastfood",
@@ -1133,6 +1161,27 @@ export const packs = [
     color: "#df8c46",
     tag: "50 REAL CHAINS · FICTIONAL CARD VALUES",
   },
+  {
+    id: "uk",
+    name: "UK Pack",
+    short: "UNITED KINGDOM",
+    subtitle: "40 celebrities. 30 locations. A collection closer to home.",
+    price: 60000,
+    count: 5,
+    set: "uk",
+    odds: [48000000, 32000000, 19900000, 100000, 0],
+    chase: "uk-celebrity-paul-mccartney",
+    chaseOdds: 25000,
+    payday: "payday-uk",
+    paydayOdds: 25,
+    secret: "secret-uk",
+    windfall: "windfall-uk",
+    jackpot: "mythic-uk",
+    jackpotOdds: 100000,
+    art: "uk",
+    color: "#b5bddc",
+    tag: "40 CELEBRITIES · 30 UK LOCATIONS",
+  },
 ];
 const indexFamilies = Object.freeze({
   brainrot: { name: "Meme Hall", subtitle: "The internet oddities collection." },
@@ -1141,6 +1190,7 @@ const indexFamilies = Object.freeze({
   world: { name: "World Stage", subtitle: "Every leader and flag in the archive." },
   alpha: { name: "Mystery Gold", subtitle: "The one-off Alpha card." },
   fastfood: { name: "Fast Food Hall of Fame", subtitle: "Fifty real chains, ranked in broad popularity tiers." },
+  uk: { name: "UK Collection", subtitle: "Forty celebrities and thirty places from across the United Kingdom." },
 });
 export const indexSets = Object.freeze(
   Object.entries(indexFamilies).flatMap(([family, info]) => {
@@ -1171,7 +1221,7 @@ export const indexSets = Object.freeze(
 );
 
 export const rarities = ["Common", "Uncommon", "Epic", "Crown", "Alpha"];
-export const starterOdds = [85000000, 12000000, 2500000, 500000, 0];
+export const starterOdds = [55000000, 35000000, 9000000, 1000000, 0];
 export const WINDFALL_ROLL_SCALE = 1000000;
 export const WINDFALL_CHANCE = 30000;
 // A pack's chase card is never sold through that pack's ordinary rarity pool, so
