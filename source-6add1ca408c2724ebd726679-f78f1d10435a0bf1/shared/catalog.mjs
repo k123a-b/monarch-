@@ -267,6 +267,11 @@ const chases = [
   ["sovereign", "Vault Sovereign", 50000, "🏛", "royal"],
   ["apex-crown", "Apex Crown", 150000, "⚡", "royal"],
   ["kim", "Kim Jong Un", 1500000, "🌏", "world"],
+  // Payday cards only ever come from their own pack's separate 1-in-25 roll.
+  ["payday-vault", "The Vault Key", 4200, "🗝", "royal"],
+  ["payday-apex", "Apex Sigil", 17500, "🔱", "royal"],
+  ["payday-fortnite", "Golden Llama", 20500, "🦙", "fortnite"],
+  ["payday-fastfood", "Golden Receipt", 48000, "🧾", "fastfood"],
 ].map(([id, name, value, emoji, set]) => ({
   id,
   name,
@@ -284,6 +289,9 @@ const chases = [
         image: leaderData.kim?.image,
         page: leaderData.kim?.page,
       }
+    : {}),
+  ...(id.startsWith("payday-")
+    ? { flavor: "A rare payout. This pack finally owed you one." }
     : {}),
 }));
 // Mythic cards are exclusive to one pack each and only ever come from that
@@ -571,6 +579,10 @@ const liftedValues = new Map([
   ["mythic-apex", 2400000],
   ["mythic-fortnite", 1600000],
   ["mystery-gold", 36500],
+  ["payday-vault", 4200],
+  ["payday-apex", 17500],
+  ["payday-fortnite", 20500],
+  ["payday-fastfood", 48000],
 ]);
 const fortniteFixedEpics = new Set([
   "fortnite-fishstick",
@@ -601,6 +613,15 @@ function liftValue(card, value) {
     !fortniteFixedEpics.has(card.id)
   )
     return Math.round(value * 0.9);
+  // Bulk-tier trims fund the 1-in-25 payday roll without touching the top pulls.
+  if (card.set === "fortnite" && card.rarity === "Common")
+    return Math.round(value * 0.93);
+  if (card.set === "fortnite" && card.rarity === "Uncommon")
+    return Math.round(value * 0.92);
+  if (card.set === "fastfood" && card.rarity === "Common")
+    return Math.round(value * 0.96);
+  if (card.set === "fastfood" && card.rarity === "Epic")
+    return Math.round(value * 0.86);
   return value;
 }
 export const catalog = [
@@ -994,9 +1015,11 @@ export const packs = [
     price: 2500,
     count: 5,
     set: "royal",
-    odds: [0, 37169000, 61500000, 1330000, 1000],
+    odds: [0, 37169000, 62330000, 500000, 1000],
     chase: "sovereign",
     chaseOdds: 1000,
+    payday: "payday-vault",
+    paydayOdds: 25,
     secret: "secret-vault",
     jackpot: "mythic-vault",
     jackpotOdds: 60000,
@@ -1012,9 +1035,11 @@ export const packs = [
     price: 10000,
     count: 5,
     set: "royal",
-    odds: [0, 0, 42995000, 57000000, 5000],
+    odds: [0, 0, 49995000, 50000000, 5000],
     chase: "apex-crown",
     chaseOdds: 2000,
+    payday: "payday-apex",
+    paydayOdds: 25,
     secret: "secret-apex",
     jackpot: "mythic-apex",
     jackpotOdds: 100000,
@@ -1034,6 +1059,8 @@ export const packs = [
     odds: [51699000, 43998990, 4300000, 2000, 10],
     chase: "fortnite-renegade-raider",
     chaseOdds: 40000,
+    payday: "payday-fortnite",
+    paydayOdds: 25,
     secret: "secret-fortnite",
     jackpot: "mythic-fortnite",
     jackpotOdds: 80000,
@@ -1070,6 +1097,8 @@ export const packs = [
     odds: [74998000, 21249000, 3750000, 3000, 0],
     chase: "food-mcdonalds",
     chaseOdds: 50000,
+    payday: "payday-fastfood",
+    paydayOdds: 25,
     secret: "secret-fastfood",
     jackpot: "mythic-fastfood",
     jackpotOdds: 150000,
@@ -1088,12 +1117,14 @@ const indexFamilies = Object.freeze({
 });
 export const indexSets = Object.freeze(
   Object.entries(indexFamilies).flatMap(([family, info]) => {
-    // Mythic jackpots and Secret cards are trophy pulls, not index objectives.
+    // Mythic jackpots, Secret cards and Payday cards are trophy pulls, not
+    // index objectives; excluding Payday also keeps existing set lists stable.
     const cards = catalog.filter(
       (card) =>
         card.set === family &&
         card.rarity !== "Mythic" &&
-        card.rarity !== "Secret",
+        card.rarity !== "Secret" &&
+        !card.id.startsWith("payday-"),
     );
     return Array.from({ length: Math.ceil(cards.length / 8) }, (_, index) => {
       const cardIds = cards.slice(index * 8, index * 8 + 8).map((card) => card.id);
@@ -1304,6 +1335,21 @@ export function rollPack(
       .sort((a, b) => a.c.value - b.c.value);
     if (eligible.length)
       result[eligible[0].i] = { ...mythic, rarity: "Mythic" };
+  }
+  // The payday roll is independent of rarities, chase and jackpot. It swaps the
+  // lowest ordinary card for the pack's Payday card, so the pack pays 2-5x.
+  if (pack.payday && randomInt(pack.paydayOdds) === 0) {
+    const payday = cardMap[pack.payday];
+    if (!payday || payday.rarity !== "Chase")
+      throw Error("Unknown Payday card.");
+    const eligible = result
+      .map((c, i) => ({ c, i }))
+      .filter(
+        ({ c }) => !["Alpha", "Mythic", "Chase", "Secret"].includes(c.rarity),
+      )
+      .sort((a, b) => a.c.value - b.c.value);
+    if (eligible.length)
+      result[eligible[0].i] = { ...payday, rarity: "Chase" };
   }
   return result;
 }
