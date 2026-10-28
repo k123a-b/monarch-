@@ -37,6 +37,7 @@ export const accounts = pgTable("accounts", {
   packSlots: integer("pack_slots").notNull().default(1),
   secretDay: text("secret_day").notNull().default(""),
   questState: jsonb("quest_state").notNull().default({}),
+  lossStreak: integer("loss_streak").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

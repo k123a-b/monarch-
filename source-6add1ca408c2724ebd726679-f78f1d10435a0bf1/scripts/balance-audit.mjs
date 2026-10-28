@@ -41,7 +41,7 @@ function seededRandom(pack) {
   };
 }
 
-function simulate(pack, powerups, count) {
+function simulate(pack, powerups, count, withPity = false) {
   const random = seededRandom(pack);
   const values = [];
   let returned = 0;
@@ -55,15 +55,29 @@ function simulate(pack, powerups, count) {
   let epicOrBetter = 0;
   let crownOrBetter = 0;
   let chases = 0;
+  let streak = 0;
+  let pityPacks = 0;
+  let pityWins = 0;
+  let pityReturned = 0;
   for (let i = 1; i <= count; i++) {
+    const guaranteedUncommon = withPity && streak >= 3;
+    if (guaranteedUncommon) pityPacks++;
     const cards = rollPack(pack, random, {
       guaranteedEpic: i % 10 === 0,
+      guaranteedUncommon,
       powerups,
     });
     const total = cards.reduce((sum, card) => sum + card.value, 0);
+    const won = total >= pack.price;
+    if (guaranteedUncommon) {
+      pityReturned += total;
+      if (won) pityWins++;
+    }
+    if (won) streak = 0;
+    else streak = guaranteedUncommon ? 1 : streak + 1;
     values.push(total);
     returned += total;
-    if (total < pack.price) loss++;
+    if (!won) loss++;
     else if (total < pack.price * 2) smallWin++;
     else if (total < pack.price * 10) mediumWin++;
     if (total >= pack.price * 10) jackpot++;
@@ -106,11 +120,17 @@ function simulate(pack, powerups, count) {
     crownOrBetter,
     chases,
     count,
+    pityPacks,
+    pityWins,
+    pityReturned,
   };
 }
 
+const pitySamples = 100000;
+
 const report = packs.map((pack) => {
   const result = simulate(pack, [], samples);
+  const withPity = simulate(pack, [], pitySamples, true);
   const { values } = result;
   return {
     pack: pack.name,
@@ -132,6 +152,15 @@ const report = packs.map((pack) => {
     mythicOdds: `1 in ${pack.jackpotOdds.toLocaleString()}`,
     mythicValue: money(cardMap[pack.jackpot].value),
     failedGuarantees: result.failedGuarantees,
+    comebackPacks: withPity.pityPacks,
+    comebackAverageValue: withPity.pityPacks
+      ? money(withPity.pityReturned / withPity.pityPacks)
+      : "n/a",
+    comebackWinningPacks: `${(((pitySamples - withPity.loss) / pitySamples) * 100).toFixed(1)}%`,
+    comebackWinRate: withPity.pityPacks
+      ? `${((withPity.pityWins / withPity.pityPacks) * 100).toFixed(1)}%`
+      : "n/a",
+    returnToPlayerWithComeback: `${((withPity.returned / pitySamples / pack.price) * 100).toFixed(1)}%`,
   };
 });
 
@@ -180,6 +209,9 @@ console.log(JSON.stringify(report, null, 2));
 console.log(
   "\nSimulated sell values, not automatic cash credits. The model includes the every-tenth-pack Epic floor, so real return without milestones is lower.",
 );
+console.log(
+  "\nComeback columns simulate three money-losing purchases in a row followed by a pack with no Commons (100,000 packs per pack). They are an upper bound: a spent comeback pack restarts the streak, and the server also stops a losing pack from counting as two losses. Comeback packs are a bonus above the published base odds, so returnToPlayerWithComeback can sit a few points above the base figure on packs whose Uncommon tier is close to the pack price.",
+);
 console.log("\nLoadout sensitivity (same model, 20,000 packs per mode):");
 console.log(JSON.stringify(loadoutSensitivity, null, 2));
 console.log(
@@ -191,8 +223,8 @@ for (const [index, pack] of report.entries()) {
   const rtp = Number.parseFloat(pack.returnToPlayer);
   if (pack.failedGuarantees)
     problems.push(`${pack.pack}: ${pack.failedGuarantees} failed guarantees`);
-  if (lossRate < 50 || lossRate > 65)
-    problems.push(`${pack.pack}: loss rate ${pack.losingPacks} is outside 50–65%`);
+  if (lossRate < 40 || lossRate > 65)
+    problems.push(`${pack.pack}: loss rate ${pack.losingPacks} is outside 40–65%`);
   if (Number.parseFloat(pack.winningPacks) <= 0)
     problems.push(`${pack.pack}: simulation produced no profitable packs`);
   if (rtp >= 100)

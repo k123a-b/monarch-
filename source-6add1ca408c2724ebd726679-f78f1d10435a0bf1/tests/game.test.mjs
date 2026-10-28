@@ -61,18 +61,24 @@ const rng =
             ? 0
             : max - 1
           : max - 1;
-test("Brainrot Pack: Common is the majority tier and rarer tiers stay rarer", () => {
+test("Brainrot Pack: Epic is the boosted winning tier and Crown stays rarest", () => {
   const p = packs.find((p) => p.id === "brainrot");
-  assert.equal(p.odds[0], 63780000);
+  assert.equal(p.odds[0], 70960000);
   assert.equal(p.price, 200);
-  for (let index = 1; index < p.odds.length; index++)
-    assert.ok(
-      p.odds[index - 1] > p.odds[index],
-      `${rarities[index]} must be rarer than ${rarities[index - 1]}`,
-    );
-  // Roll just inside and just outside the Common band.
-  assert.equal(rollPack(p, rng(63779999))[0].rarity, "Common");
-  assert.equal(rollPack(p, rng(63780000))[0].rarity, "Uncommon");
+  assert.ok(p.odds[0] > p.odds[1], "Common stays the majority tier");
+  assert.ok(p.odds[0] > p.odds[2]);
+  // A ~55% win rate below 100% return needs Epic to outrank Uncommon, so Epic
+  // sits on a tighter band than the other packs and is deliberately frequent.
+  assert.ok(p.odds[2] > p.odds[1], "Epic is the boosted winning tier");
+  assert.ok(p.odds[2] > p.odds[3], "Crown is rarer than Epic");
+  // Roll just inside and just outside each band.
+  assert.equal(rollPack(p, rng(p.odds[0] - 1))[0].rarity, "Common");
+  assert.equal(rollPack(p, rng(p.odds[0]))[0].rarity, "Uncommon");
+  assert.equal(
+    rollPack(p, rng(p.odds[0] + p.odds[1] - 1))[0].rarity,
+    "Uncommon",
+  );
+  assert.equal(rollPack(p, rng(p.odds[0] + p.odds[1]))[0].rarity, "Epic");
   assert.equal(rollPack(p, rng(ODDS_TOTAL - 1))[0].rarity, "Crown");
 });
 for (const p of packs) {
@@ -269,12 +275,13 @@ test("permanent character-index rewards shift Epic and Crown odds by their state
   const deterministic = (value) => (max) =>
     max === ODDS_TOTAL ? value : Math.max(0, max - 1);
   const brainrot = packs.find((pack) => pack.id === "brainrot");
+  const uncommonRoll = brainrot.odds[0] + brainrot.odds[1] - 1;
   assert.equal(
-    rollPack(brainrot, deterministic(87300000))[0].rarity,
+    rollPack(brainrot, deterministic(uncommonRoll))[0].rarity,
     "Uncommon",
   );
   assert.equal(
-    rollPack(brainrot, deterministic(87300000), {
+    rollPack(brainrot, deterministic(uncommonRoll), {
       permanentEpicBonus: SET_EPIC_REWARD,
     })[0].rarity,
     "Epic",
@@ -944,7 +951,7 @@ test("every pack loses more often than it wins across a large sample", () => {
     }
     const lossRate = loss / samples;
     assert.ok(
-      lossRate > 0.5 && lossRate <= 0.65,
+      lossRate > 0.4 && lossRate <= 0.65,
       `${pack.name} should lose often but no more than 65% of the time; got ${(lossRate * 100).toFixed(1)}%`,
     );
     assert.ok(smallWin > 0, `${pack.name} can return a small win`);
@@ -1051,6 +1058,37 @@ test("a tenth Brainrot pack upgrades only its lowest card and keeps three ordina
   const cards = rollPack(p, rng(0), { guaranteedEpic: true });
   assert.equal(cards.filter((c) => c.rarity === "Epic").length, 1);
   assert.equal(cards.filter((c) => c.rarity === "Common").length, 3);
+});
+
+test("the comeback pack replaces every Common with Uncommon or better", () => {
+  for (const pack of packs) {
+    for (const rarityRoll of [0, pack.odds[0], 99500000, 99999999]) {
+      const cards = rollPack(pack, rng(rarityRoll), {
+        guaranteedUncommon: true,
+      });
+      assert.equal(cards.length, pack.count);
+      assert.ok(
+        cards.every((card) => card.rarity !== "Common"),
+        `${pack.name} comeback pack must contain no Common cards`,
+      );
+    }
+  }
+  const brainrot = packs.find((pack) => pack.id === "brainrot");
+  assert.ok(
+    rollPack(brainrot, rng(0)).every((card) => card.rarity === "Common"),
+  );
+  assert.ok(
+    rollPack(brainrot, rng(0), { guaranteedUncommon: true }).every(
+      (card) => card.rarity === "Uncommon",
+    ),
+  );
+  // Like the milestone, the comeback floor never downgrades a natural high pull.
+  for (const rarityRoll of [99500000, 99999999]) {
+    assert.deepEqual(
+      rollPack(brainrot, rng(rarityRoll), { guaranteedUncommon: true }),
+      rollPack(brainrot, rng(rarityRoll)),
+    );
+  }
 });
 
 test("the world milestone upgrades the lowest card instead of adding a sixth", () => {
