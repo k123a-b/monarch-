@@ -563,10 +563,10 @@ function worldEpicValue(card) {
 // and keeping the top ordinary payouts in a tight band. Rare pulls are trimmed
 // so the higher hit rate still returns less than the pack price on average.
 const liftedValues = new Map([
-  ["crocodilo", 1825],
+  ["crocodilo", 1500],
   ["signet", 2190],
   ["apex-crown", 32800],
-  ["mythic-brainrot", 12500],
+  ["mythic-brainrot", 9000],
   ["mythic-royal", 100000],
   ["mythic-apex", 2400000],
   ["mythic-fortnite", 1600000],
@@ -577,12 +577,24 @@ const fortniteFixedEpics = new Set([
   "fortnite-agent-peely",
   "fortnite-midas",
 ]);
+// Brainrot bands: source range (post-scale) maps linearly onto the play range.
+const brainrotBands = {
+  Common: [7, 26, 8, 16],
+  Uncommon: [35, 95, 45, 62],
+  Epic: [161, 240, 168, 208],
+};
+function bandValue(value, [sourceLow, sourceHigh, low, high]) {
+  const clamped = Math.min(sourceHigh, Math.max(sourceLow, value));
+  const t = sourceHigh === sourceLow ? 0 : (clamped - sourceLow) / (sourceHigh - sourceLow);
+  return Math.round(low + t * (high - low));
+}
 function liftValue(card, value) {
   if (liftedValues.has(card.id)) return liftedValues.get(card.id);
-  if (card.set === "brainrot" && card.rarity === "Crown")
-    return Math.max(500, 1000 + Math.round((value - 1000) * 0.4));
-  if (card.set === "brainrot" && card.rarity === "Epic")
-    return Math.min(value, 240);
+  if (card.set === "brainrot") {
+    if (card.rarity === "Crown") return 800;
+    if (brainrotBands[card.rarity])
+      return bandValue(value, brainrotBands[card.rarity]);
+  }
   if (
     card.set === "fortnite" &&
     card.rarity === "Epic" &&
@@ -946,7 +958,7 @@ export const packs = [
     price: 200,
     count: 4,
     set: "brainrot",
-    odds: [63780000, 23800000, 12380000, 40000, 0],
+    odds: [70960000, 12000000, 17000000, 40000, 0],
     chase: "crocodilo",
     chaseOdds: 800,
     secret: "secret-brainrot",
@@ -1129,6 +1141,7 @@ export function rollPack(
   randomInt,
   {
     guaranteedEpic = false,
+    guaranteedUncommon = false,
     powerups = [],
     permanentEpicBonus = 0,
     permanentCrownBonus = 0,
@@ -1212,7 +1225,12 @@ export function rollPack(
   }
   const result = Array.from({ length: pack.count }, (_, index) => {
     const floor = effect.everyOtherCard && index % 2 === 1 ? 1 : 0;
-    return pick(rollRarity(floor));
+    const rarity = rollRarity(floor);
+    // Pity floor: a losing streak guarantees the pack holds no Common cards.
+    // Only Common results are upgraded, so Epic, Crown and Alpha odds stay put.
+    return pick(
+      guaranteedUncommon && rarity === "Common" ? "Uncommon" : rarity,
+    );
   });
   if (
     pack.guarantee &&

@@ -598,11 +598,22 @@ export async function handle(
           const secretChance = secretWindow ? effects.secretChance : 0;
           const cards: any[] = [];
           const guaranteedPacks: number[] = [];
+          const pityPacks: number[] = [];
+          // Three money-losing packs in a row unlock one pack with no Commons.
+          // The guarantee is spent when it is applied; a losing pity pack counts
+          // as the first loss of the next streak.
+          let lossStreak = Math.max(0, Number(currentAccount.loss_streak || 0));
+          const perPackPrice = pricePaid / quantity;
           for (let offset = 0; offset < quantity; offset++) {
             const guaranteedEpic = packProgress(opened + offset).nextGuaranteed;
             if (guaranteedEpic) guaranteedPacks.push(offset + 1);
-            const packCards = rollPack(pack, randomInt, { guaranteedEpic, powerups: powerCards, permanentEpicBonus: Number(currentAccount.permanent_epic_bonus || 0), permanentCrownBonus: Number(currentAccount.permanent_crown_bonus || 0), secretChance });
+            const guaranteedUncommon = lossStreak >= 3;
+            if (guaranteedUncommon) pityPacks.push(offset + 1);
+            const packCards = rollPack(pack, randomInt, { guaranteedEpic, guaranteedUncommon, powerups: powerCards, permanentEpicBonus: Number(currentAccount.permanent_epic_bonus || 0), permanentCrownBonus: Number(currentAccount.permanent_crown_bonus || 0), secretChance });
             cards.push(...packCards);
+            const packTotal = packCards.reduce((sum: number, card: any) => sum + Number(card.value), 0);
+            if (packTotal >= perPackPrice) lossStreak = 0;
+            else lossStreak = guaranteedUncommon ? 1 : lossStreak + 1;
           }
           const minted = [];
           for (const card of cards) {
@@ -632,6 +643,7 @@ export async function handle(
           await c.query("UPDATE accounts SET character_index=COALESCE((SELECT array_agg(DISTINCT template_id ORDER BY template_id) FROM unnest(accounts.character_index || $2::text[]) AS discovered(template_id)),ARRAY[]::text[]) WHERE id=$1", [id, discoveredTemplates]);
           if (secretWindow)
             await c.query("UPDATE accounts SET secret_day=$2 WHERE id=$1", [id, today]);
+          await c.query("UPDATE accounts SET loss_streak=$2 WHERE id=$1", [id, lossStreak]);
           await recordQuestProgress(c, id, today, "packs", quantity);
           const epicPulled = cards.filter((card: any) =>
             ["Epic", "Crown", "Alpha", "Chase", "Mythic", "Secret"].includes(card.rarity),
@@ -644,6 +656,9 @@ export async function handle(
             packCount: quantity,
             epicGuaranteed: guaranteedPacks.length > 0,
             guaranteedPacks,
+            pityGuaranteed: pityPacks.length > 0,
+            pityPacks,
+            lossStreak,
             discount,
             pricePaid,
             secretChance,
