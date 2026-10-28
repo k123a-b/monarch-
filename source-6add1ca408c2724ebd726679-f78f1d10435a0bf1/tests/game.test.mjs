@@ -25,6 +25,8 @@ import {
   SECRET_CROWN_BONUS,
   SECRET_CHANCE_CAP,
   SECRET_ROLL_SCALE,
+  WINDFALL_CHANCE,
+  WINDFALL_ROLL_SCALE,
   dailyDiscountPack,
   secretPackDiscount,
 } from "../shared/catalog.mjs";
@@ -67,8 +69,6 @@ test("Brainrot Pack: Epic is the boosted winning tier and Crown stays rarest", (
   assert.equal(p.price, 200);
   assert.ok(p.odds[0] > p.odds[1], "Common stays the majority tier");
   assert.ok(p.odds[0] > p.odds[2]);
-  // A ~55% win rate below 100% return needs Epic to outrank Uncommon, so Epic
-  // sits on a tighter band than the other packs and is deliberately frequent.
   assert.ok(p.odds[2] > p.odds[1], "Epic is the boosted winning tier");
   assert.ok(p.odds[2] > p.odds[3], "Crown is rarer than Epic");
   // Roll just inside and just outside each band.
@@ -167,9 +167,9 @@ for (const p of packs) {
       });
   });
 }
-test("Fortnite Drop Pack keeps its own high-loss odds while making Epic characters much rarer", () => {
+test("Fortnite Drop Pack favors Uncommons without inflating its Epic character values", () => {
   const pack = packs.find((entry) => entry.id === "fortnite");
-  assert.deepEqual(pack.odds, [51699000, 43998990, 4300000, 2000, 10]);
+  assert.deepEqual(pack.odds, [31029000, 64668990, 4300000, 2000, 10]);
   assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
   assert.deepEqual(
     [
@@ -188,7 +188,8 @@ test("Fortnite Drop Pack keeps its own high-loss odds while making Epic characte
       card.set === "fortnite" &&
       card.rarity !== "Mythic" &&
       card.rarity !== "Secret" &&
-      !card.id.startsWith("payday-"),
+      !card.id.startsWith("payday-") &&
+      !card.id.startsWith("windfall-"),
   );
   assert.equal(fortniteCards.length, 30);
   assert.equal(new Set(fortniteCards.map((card) => card.name)).size, 30);
@@ -219,7 +220,8 @@ test("character index sets use existing cards and keep earned bonuses bounded", 
       (card) =>
         card.rarity !== "Mythic" &&
         card.rarity !== "Secret" &&
-        !card.id.startsWith("payday-"),
+        !card.id.startsWith("payday-") &&
+        !card.id.startsWith("windfall-"),
     ).length,
   );
   for (const set of indexSets) {
@@ -457,7 +459,8 @@ test("original catalogue contains 93 non-Mythic templates before the world and F
         ["brainrot", "royal", "alpha"].includes(c.set) &&
         c.rarity !== "Mythic" &&
         c.rarity !== "Secret" &&
-        !c.id.startsWith("payday-"),
+        !c.id.startsWith("payday-") &&
+        !c.id.startsWith("windfall-"),
     ).length,
     93,
   ));
@@ -482,7 +485,7 @@ test("featured World Leaders cards keep their authored values", () => {
   assert.equal(leader("King Charles III", "United Kingdom").value, 5475);
   assert.equal(cardMap["world-israel-flag"].value, 3650);
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [69880000, 22000000, 8000000, 120000, 0]);
+  assert.deepEqual(world.odds, [62750000, 22000000, 15130000, 120000, 0]);
 });
 test("weighted pot draw includes every contributor, bot or player, at exact stake boundaries", () => {
   const entries = [
@@ -677,7 +680,8 @@ test("every country in the world collection has a flag and stable template IDs",
     (c) =>
       c.set === "world" &&
       c.rarity !== "Mythic" &&
-      c.rarity !== "Secret",
+      c.rarity !== "Secret" &&
+      !c.id.startsWith("windfall-"),
   );
   assert.equal(new Set(leaders.map((c) => c.country)).size, 195);
   assert.equal(new Set(catalog.map((c) => c.id)).size, catalog.length);
@@ -748,9 +752,9 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
   assert.ok(Math.max(...flagValues[1]) < Math.min(...flagValues[2]));
   assert.ok(Math.max(...flagValues[2]) < Math.min(...flagValues[3]));
 });
-test("World Leaders uses its own deliberately unprofitable rarity bands", () => {
+test("World Leaders uses its own balanced rarity bands", () => {
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [69880000, 22000000, 8000000, 120000, 0]);
+  assert.deepEqual(world.odds, [62750000, 22000000, 15130000, 120000, 0]);
   assert.equal(
     world.odds.reduce((sum, odds) => sum + odds, 0),
     ODDS_TOTAL,
@@ -923,7 +927,7 @@ test("world packs can return less or more than their purchase price", () => {
   assert.ok(low < p.price);
   assert.ok(high > p.price);
 });
-test("every pack loses more often than it wins across a large sample", () => {
+test("every pack wins about 55% of the time and keeps small and big payouts", () => {
   for (const pack of packs) {
     let seed = [...pack.id].reduce(
       (n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) >>> 0,
@@ -944,6 +948,7 @@ test("every pack loses more often than it wins across a large sample", () => {
     let loss = 0;
     let smallWin = 0;
     let mediumWin = 0;
+    let bigWin = 0;
     let totalValue = 0;
     for (let i = 1; i <= samples; i++) {
       const total = rollPack(pack, randomInt, {
@@ -953,17 +958,20 @@ test("every pack loses more often than it wins across a large sample", () => {
       if (total < pack.price) loss++;
       else if (total < pack.price * 2) smallWin++;
       else mediumWin++;
+      if (total >= pack.price * 5 && total < pack.price * 10) bigWin++;
     }
     const lossRate = loss / samples;
     assert.ok(
-      lossRate > 0.4 && lossRate <= 0.65,
-      `${pack.name} should lose often but no more than 65% of the time; got ${(lossRate * 100).toFixed(1)}%`,
+      lossRate >= 0.42 && lossRate <= 0.46,
+      `${pack.name} should lose about 45% of the time; got ${(lossRate * 100).toFixed(1)}%`,
     );
-    assert.ok(smallWin > 0, `${pack.name} can return a small win`);
+    assert.ok(smallWin / samples > 0.3, `${pack.name} keeps frequent small wins`);
     assert.ok(mediumWin > 0, `${pack.name} can return 2x or more`);
+    assert.ok(bigWin / samples >= 0.025 && bigWin / samples <= 0.04,
+      `${pack.name} keeps roughly 3% of openings in the 5x–10x band`);
     assert.ok(
-      totalValue / samples < pack.price,
-      `${pack.name} should return less than it costs on average over ${samples} packs`,
+      totalValue / samples <= pack.price * 1.45,
+      `${pack.name} keeps simulated average returns below the 145% inflation ceiling`,
     );
   }
 });
@@ -1020,6 +1028,43 @@ test("every Payday pack carries its own 1-in-25 card and lands a moderate win", 
 });
 
 for (const pack of packs) {
+  test(`${pack.name}: Windfall hits exactly inside the 3% boundary`, () => {
+    assert.equal(cardMap[pack.windfall].value, pack.price * 5.5);
+    assert.equal(cardMap[pack.windfall].rarity, "Chase");
+    assert.ok(!indexSets.some((set) => set.cardIds.includes(pack.windfall)));
+    const draw = (windfallRoll) => rollPack(pack, (max) =>
+      max === ODDS_TOTAL ? 0 : max === WINDFALL_ROLL_SCALE ? windfallRoll : max - 1,
+    );
+    for (const roll of [0, WINDFALL_CHANCE - 1]) {
+      const cards = draw(roll);
+      assert.equal(cards.length, pack.count);
+      assert.equal(new Set(cards.map((card) => card.id)).size, pack.count);
+      assert.equal(cards.filter((card) => card.id === pack.windfall).length, 1);
+      const total = cards.reduce((sum, card) => sum + card.value, 0);
+      assert.ok(total >= pack.price * 5 && total < pack.price * 10);
+    }
+    for (const roll of [WINDFALL_CHANCE, WINDFALL_ROLL_SCALE - 1])
+      assert.ok(!draw(roll).some((card) => card.id === pack.windfall));
+    if (pack.odds[4] > 0) {
+      const cards = rollPack(pack, (max) =>
+        max === ODDS_TOTAL ? max - 1 : max === WINDFALL_ROLL_SCALE ? 0 : max - 1,
+      );
+      assert.ok(cards.every((card) => card.rarity === "Alpha"));
+    }
+  });
+  test(`${pack.name}: Windfall preserves every other special pull`, () => {
+    const cards = rollPack(pack, (max) =>
+      max === ODDS_TOTAL ? 0 :
+      [WINDFALL_ROLL_SCALE, pack.chaseOdds, pack.jackpotOdds, pack.paydayOdds].includes(max)
+        ? 0 : max - 1,
+      { secretChance: 1 },
+    );
+    const protectedIds = [pack.chase, pack.jackpot, pack.secret, pack.payday].filter(Boolean);
+    for (const id of protectedIds)
+      assert.ok(cards.some((card) => card.id === id), id + " survives the Windfall roll");
+    assert.equal(cards.some((card) => card.id === pack.windfall), protectedIds.length < pack.count);
+    assert.equal(cards.length, pack.count);
+  });
   test(`${pack.name}: tenth-pack floor preserves count, unique cards and an Epic or better`, () => {
     for (const rarityRoll of [0, 92000000, 99500000, 99999600, 99999999]) {
       for (const chase of [false, true]) {
