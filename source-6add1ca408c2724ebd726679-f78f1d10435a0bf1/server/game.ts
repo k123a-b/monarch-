@@ -34,6 +34,7 @@ import {
   randomBelow,
   addQuestProgress,
   completeDailyQuest,
+  upgradePrices,
 } from "../shared/rules.mjs";
 
 type Client = any;
@@ -477,7 +478,7 @@ export async function handle(
           const slots = Number(currentAccount.loadout_slots || 3);
           if (slots >= 5) fail("All five loadout slots are unlocked.", 409);
           const nextSlots = slots + 1;
-          const cost = nextSlots === 4 ? 40000 : 50000;
+          const cost = upgradePrices.loadoutSlots[nextSlots as 4 | 5];
           await change(c, id, -cost, "Unlocked loadout slot " + nextSlots);
           await c.query("UPDATE accounts SET loadout_slots=$2 WHERE id=$1", [id, nextSlots]);
           return { account: await account() };
@@ -536,7 +537,7 @@ export async function handle(
           if (slots >= 3) fail("All pack-opening upgrades are unlocked.", 409);
           const nextSlots = slots + 1;
           if (body.pack_slots !== nextSlots) fail("Unlock pack-opening slots one step at a time.", 409);
-          const cost = nextSlots === 2 ? 45000 : 55000;
+          const cost = upgradePrices.packSlots[nextSlots as 2 | 3];
           await change(c, id, -cost, "Unlocked opening up to " + nextSlots + " packs at once");
           await c.query("UPDATE accounts SET pack_slots=$2 WHERE id=$1", [id, nextSlots]);
           return { account: await account() };
@@ -591,8 +592,9 @@ export async function handle(
           );
           const pricePaid = pack.price * quantity - discount;
           await change(c, id, -pricePaid, quantity + " " + pack.name + (quantity === 1 ? "" : " packs") + " opened" + (discount ? " (loadout discount)" : ""));
-          // The Secret window opens once per UTC day. Each pack in that first
-          // purchase gets a roll; it closes whether or not anything is found.
+          // The Secret window opens on the first successful purchase per UTC day.
+          // Each pack in that purchase gets a roll; the day is spent on commit
+          // whether or not anything is found. Failed purchases roll everything back.
           const secretWindow =
             effects.secretChance > 0 && currentAccount.secret_day !== today;
           const secretChance = secretWindow ? effects.secretChance : 0;

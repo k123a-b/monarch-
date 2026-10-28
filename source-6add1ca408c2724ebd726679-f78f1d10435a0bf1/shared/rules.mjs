@@ -8,19 +8,23 @@ export const validUsername = (value) =>
   /^[a-zA-Z0-9_ -]+$/.test(value);
 export const playReward = Object.freeze({
   intervalSeconds: 600,
-  firstPence: 50,
-  increasePence: 25,
-  dailyCap: 500,
+  firstPence: 100,
+  increasePence: 100,
+  dailyCap: 1500,
+});
+export const upgradePrices = Object.freeze({
+  packSlots: Object.freeze({ 2: 12000, 3: 24000 }),
+  loadoutSlots: Object.freeze({ 4: 8000, 5: 16000 }),
 });
 export const dailySpinSegments = Object.freeze([
-  { id: "miss-a", label: "No prize", reward: 0, weight: 25000000 },
-  { id: "miss-b", label: "No prize", reward: 0, weight: 25000000 },
-  { id: "miss-c", label: "No prize", reward: 0, weight: 25000000 },
-  { id: "small", label: "25p", reward: 25, weight: 10000000 },
-  { id: "nice", label: "50p", reward: 50, weight: 7000000 },
-  { id: "bright", label: "£1", reward: 100, weight: 5000000 },
-  { id: "gold", label: "£5", reward: 500, weight: 2900000 },
-  { id: "silver", label: "£45", reward: 4500, weight: 100000 },
+  { id: "miss-a", label: "No prize", reward: 0, weight: 15000000 },
+  { id: "miss-b", label: "No prize", reward: 0, weight: 15000000 },
+  { id: "miss-c", label: "No prize", reward: 0, weight: 10000000 },
+  { id: "small", label: "£1", reward: 100, weight: 25000000 },
+  { id: "nice", label: "£2", reward: 200, weight: 20000000 },
+  { id: "bright", label: "£5", reward: 500, weight: 10000000 },
+  { id: "gold", label: "£10", reward: 1000, weight: 4900000 },
+  { id: "silver", label: "£50", reward: 5000, weight: 100000 },
 ]);
 export function dailySpin(randomInt) {
   const total = dailySpinSegments.reduce(
@@ -136,7 +140,7 @@ export const dailyQuests = Object.freeze([
     text: "Open 1 pack today.",
     metric: "packs",
     target: 1,
-    reward: 100,
+    reward: 200,
   },
   {
     id: "open-3",
@@ -144,7 +148,7 @@ export const dailyQuests = Object.freeze([
     text: "Open 3 packs today.",
     metric: "packs",
     target: 3,
-    reward: 150,
+    reward: 300,
   },
   {
     id: "epic-hunt",
@@ -152,7 +156,7 @@ export const dailyQuests = Object.freeze([
     text: "Pull an Epic or better card today.",
     metric: "epic",
     target: 1,
-    reward: 100,
+    reward: 300,
   },
   {
     id: "sell-3",
@@ -160,7 +164,7 @@ export const dailyQuests = Object.freeze([
     text: "Sell 3 cards today.",
     metric: "sold",
     target: 3,
-    reward: 75,
+    reward: 200,
   },
 ]);
 const questMetrics = new Set(dailyQuests.map((quest) => quest.metric));

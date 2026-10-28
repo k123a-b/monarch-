@@ -125,25 +125,25 @@ test(
         },
       );
       await t.test(
-        "pack upgrades charge £450 then £550 and batch-open three packs together",
+        "pack upgrades charge £120 then £240 and batch-open three packs together",
         async () => {
           await request(batchUser, "me");
           await query("UPDATE accounts SET balance=200000 WHERE id=$1", [batchUser.id]);
           const secondSlot = await request(batchUser, "upgrades/pack-opening", { pack_slots: 2 });
           assert.equal(secondSlot.status, 200);
           assert.equal(secondSlot.data.account.pack_slots, 2);
-          assert.equal(Number(secondSlot.data.account.balance), 155000);
+          assert.equal(Number(secondSlot.data.account.balance), 188000);
           assert.equal((await request(batchUser, "open", { pack: "brainrot", quantity: 3 })).status, 409);
           const thirdSlot = await request(batchUser, "upgrades/pack-opening", { pack_slots: 3 });
           assert.equal(thirdSlot.status, 200);
-          assert.equal(Number(thirdSlot.data.account.balance), 100000);
+          assert.equal(Number(thirdSlot.data.account.balance), 164000);
           const batch = await request(batchUser, "open", { pack: "brainrot", quantity: 3 });
           assert.equal(batch.status, 200);
           assert.equal(batch.data.packCount, 3);
           assert.equal(batch.data.cards.length, 12);
           assert.equal(batch.data.pricePaid, 600);
           assert.equal(Number(batch.data.account.packs), 3);
-          assert.equal(Number(batch.data.account.balance), 99400);
+          assert.equal(Number(batch.data.account.balance), 163400);
         },
       );
       await t.test(
@@ -219,8 +219,8 @@ test(
           ]);
           const first = await request(questUser, "quests/claim", { quest: "open-1" });
           assert.equal(first.status, 200);
-          assert.equal(Number(first.data.reward), 100);
-          assert.equal(Number(first.data.account.balance), 600);
+          assert.equal(Number(first.data.reward), 200);
+          assert.equal(Number(first.data.account.balance), 700);
           assert.equal(
             (await request(questUser, "quests/claim", { quest: "open-1" })).status,
             409,
@@ -231,12 +231,12 @@ test(
               200,
             );
           }
-          assert.equal(Number((await request(questUser, "me")).data.account.balance), 925);
+          assert.equal(Number((await request(questUser, "me")).data.account.balance), 1500);
           assert.equal(
             Number(
               (
                 await query(
-                  "SELECT COUNT(*) AS n FROM ledger WHERE user_id=$1 AND description LIKE 'Daily quest:%'",
+                  "SELECT COUNT(*) AS n FROM ledger WHERE user_id=$1 AND reason LIKE 'Daily quest:%'",
                   [questUser.id],
                 )
               ).rows[0].n,
@@ -246,7 +246,7 @@ test(
         },
       );
       await t.test(
-        "the Secret window rolls once per UTC day and Crown cards set the chance",
+        "the Secret window rolls once per UTC day and Crown cards add to the base chance",
         async () => {
           await request(secretUser, "me");
           const crowns = Object.values(cardMap)
@@ -268,7 +268,7 @@ test(
           const first = await request(secretUser, "open", { pack: "world" });
           assert.equal(first.status, 200);
           assert.equal(first.data.secretWindow, true);
-          assert.equal(Number(first.data.secretChance), 3200);
+          assert.equal(Number(first.data.secretChance), 3700);
           const second = await request(secretUser, "open", { pack: "world" });
           assert.equal(second.status, 200);
           assert.equal(second.data.secretWindow, false);
@@ -309,7 +309,7 @@ test(
           const result = await request(a, "open", { pack: "brainrot" });
           assert.equal(result.status, 200);
           assert.equal(result.data.cards.length, 4);
-          assert.equal(Number(result.data.account.balance), 400);
+          assert.equal(Number(result.data.account.balance), 300);
           const persisted = (
             await query(
               "SELECT * FROM inventory WHERE owner_id=$1 ORDER BY id",
@@ -328,7 +328,7 @@ test(
         },
       );
       await t.test(
-        "fourth loadout slot unlocks once and discounts every third pack by 10p",
+        "loadout slots charge £80 then £160 once and discount every third pack by 10p",
         async () => {
           const discountTemplate = Object.values(cardMap).find(
             (card) => cardPowerup(card).packDiscount === 10,
@@ -361,11 +361,15 @@ test(
           const unlocked = await request(a, "loadout/upgrade", {});
           assert.equal(unlocked.status, 200);
           assert.equal(unlocked.data.account.loadout_slots, 4);
-          assert.equal(Number(unlocked.data.account.balance), 10000);
+          assert.equal(Number(unlocked.data.account.balance), 42000);
+          const fifthSlot = await request(a, "loadout/upgrade", {});
+          assert.equal(fifthSlot.status, 200);
+          assert.equal(fifthSlot.data.account.loadout_slots, 5);
+          assert.equal(Number(fifthSlot.data.account.balance), 26000);
           assert.equal((await request(a, "loadout/upgrade", {})).status, 409);
           assert.equal(
             Number((await request(a, "me")).data.account.balance),
-            10000,
+            26000,
           );
           assert.equal(
             (
@@ -381,7 +385,7 @@ test(
           });
           assert.equal(undiscounted.status, 200);
           assert.equal(undiscounted.data.discount, 0);
-          assert.equal(Number(undiscounted.data.account.balance), 9900);
+          assert.equal(Number(undiscounted.data.account.balance), 25800);
 
           assert.equal(
             (await request(a, "loadout", { ids: [discountCard.id] })).status,
@@ -392,7 +396,7 @@ test(
           assert.equal(discounted.status, 200);
           assert.equal(discounted.data.discount, 10);
           assert.equal(Number(discounted.data.account.packs), 3);
-          assert.equal(Number(discounted.data.account.balance), 9810);
+          assert.equal(Number(discounted.data.account.balance), 25610);
         },
       );
       await t.test(
@@ -786,7 +790,7 @@ test(
           );
           const after = (await request(milestoneUser, "me")).data.account;
           assert.equal(Number(after.packs), 11);
-          assert.equal(Number(after.balance), 300);
+          assert.equal(Number(after.balance), 100);
           assert.equal(
             (await request(milestoneUser, "open", { pack: "apex" })).status,
             409,

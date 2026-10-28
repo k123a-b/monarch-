@@ -22,6 +22,7 @@ import {
   SET_CROWN_CAP,
   SET_EPIC_REWARD,
   SET_CROWN_REWARD,
+  SECRET_BASE_CHANCE,
   SECRET_CROWN_BONUS,
   SECRET_CHANCE_CAP,
   SECRET_ROLL_SCALE,
@@ -29,9 +30,12 @@ import {
   WINDFALL_ROLL_SCALE,
   dailyDiscountPack,
   secretPackDiscount,
+  starterOdds,
 } from "../shared/catalog.mjs";
 import {
   activityReward,
+  playReward,
+  upgradePrices,
   dailySpin,
   dailySpinSegments,
   dailyQuests,
@@ -51,6 +55,7 @@ import {
 } from "../shared/rules.mjs";
 import { rateLeader } from "../shared/leader-ratings.mjs";
 import leaderData from "../shared/leaders.json" with { type: "json" };
+import ukMedia from "../shared/uk-media.json" with { type: "json" };
 const rng =
   (rarityRoll, chase = false) =>
   (max) =>
@@ -65,7 +70,7 @@ const rng =
           : max - 1;
 test("Brainrot Pack: Epic is the boosted winning tier and Crown stays rarest", () => {
   const p = packs.find((p) => p.id === "brainrot");
-  assert.equal(p.odds[0], 70960000);
+  assert.equal(p.odds[0], 63960000);
   assert.equal(p.price, 200);
   assert.ok(p.odds[0] > p.odds[1], "Common stays the majority tier");
   assert.ok(p.odds[0] > p.odds[2]);
@@ -81,42 +86,47 @@ test("Brainrot Pack: Epic is the boosted winning tier and Crown stays rarest", (
   assert.equal(rollPack(p, rng(p.odds[0] + p.odds[1]))[0].rarity, "Epic");
   assert.equal(rollPack(p, rng(ODDS_TOTAL - 1))[0].rarity, "Crown");
 });
+test("starter pack grants one common-heavy card from every regular collection", () => {
+  assert.deepEqual(starterOdds, [55000000, 35000000, 9000000, 1000000, 0]);
+  assert.equal(starterOdds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
+  const bands = [
+    [0, 54999999, "Common"],
+    [55000000, 89999999, "Uncommon"],
+    [90000000, 98999999, "Epic"],
+    [99000000, 99999999, "Crown"],
+  ];
+  for (const [start, end, rarity] of bands) {
+    for (const rarityRoll of [start, end]) {
+      for (const [setIndex, set] of ["brainrot", "royal", "world"].entries()) {
+        let call = 0;
+        const card = rollStarterPack((max) => {
+          call++;
+          if (call === 1) {
+            assert.equal(max, ODDS_TOTAL);
+            return rarityRoll;
+          }
+          if (call === 2) return setIndex;
+          return max - 1;
+        });
+        assert.equal(card.rarity, rarity);
+        assert.equal(card.set, set, "each regular collection is present in every band");
+        assert.ok(Number.isSafeInteger(card.value) && card.value >= 0);
+      }
+    }
+  }
+  for (let n = 0; n < 100; n++) {
+    const card = rollStarterPack((max) => (n * 104729) % max);
+    assert.ok(["brainrot", "royal", "world"].includes(card.set));
+    assert.ok(["Common", "Uncommon", "Epic", "Crown"].includes(card.rarity));
+    assert.ok(Number.isSafeInteger(card.value) && card.value >= 0);
+    assert.notEqual(card.rarity, "Alpha");
+    assert.notEqual(card.rarity, "Chase");
+  }
+});
 for (const p of packs) {
-  test(`${p.name}: integer odds sum to exactly 100%`, () =>
-    assert.equal(
-      p.odds.reduce((s, n) => s + n, 0),
-      ODDS_TOTAL,
-    ));
-  test("starter pack grants one common-heavy card from every regular collection", () => {
-    const roll = (rarityRoll) =>
-      rollStarterPack((max) => (max === 100000000 ? rarityRoll : 0));
-    assert.equal(roll(0).rarity, "Common");
-    assert.equal(roll(84999999).rarity, "Common");
-    assert.equal(roll(85000000).rarity, "Uncommon");
-    assert.equal(roll(97000000).rarity, "Epic");
-    assert.equal(roll(99500000).rarity, "Crown");
-    for (let n = 0; n < 100; n++) {
-      const card = rollStarterPack((max) => (n * 104729) % max);
-      assert.ok(["brainrot", "royal", "world"].includes(card.set));
-      assert.ok(["Common", "Uncommon", "Epic", "Crown"].includes(card.rarity));
-      assert.ok(card.value >= 0);
-      assert.notEqual(card.rarity, "Alpha");
-      assert.notEqual(card.rarity, "Chase");
-    }
-    for (const [setIndex, set] of ["brainrot", "royal", "world"].entries()) {
-      let call = 0;
-      const card = rollStarterPack((max) => {
-        call++;
-        if (call === 1) return 0;
-        if (call === 2) return setIndex;
-        return max - 1;
-      });
-      assert.equal(
-        card.set,
-        set,
-        "each regular collection is present in the pool",
-      );
-    }
+  test(`${p.name}: integer odds sum to exactly 100%`, () => {
+    assert.ok(p.odds.every((weight) => Number.isSafeInteger(weight) && weight >= 0));
+    assert.equal(p.odds.reduce((s, n) => s + n, 0), ODDS_TOTAL);
   });
   test(`${p.name}: exactly ${p.count} cards, no duplicates with a non-exhausted pool`, () => {
     const pull = rollPack(p, rng(0));
@@ -169,7 +179,7 @@ for (const p of packs) {
 }
 test("Fortnite Drop Pack favors Uncommons without inflating its Epic character values", () => {
   const pack = packs.find((entry) => entry.id === "fortnite");
-  assert.deepEqual(pack.odds, [31029000, 64668990, 4300000, 2000, 10]);
+  assert.deepEqual(pack.odds, [21029000, 71668990, 7300000, 2000, 10]);
   assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
   assert.deepEqual(
     [
@@ -432,25 +442,36 @@ test("a pack's card values can total below or above its virtual price", () => {
     "a pack can return more than its purchase price",
   );
 });
-test("daily rewards wheel has three no-prize sectors and an exact 0.1% £45 silver prize", () => {
-  assert.equal(
-    dailySpinSegments.reduce((sum, segment) => sum + segment.weight, 0),
-    100000000,
-  );
-  assert.equal(
-    dailySpinSegments.filter((segment) => segment.reward === 0).length,
-    3,
-  );
-  assert.equal(
-    dailySpinSegments.find((segment) => segment.id === "silver").weight,
-    100000,
-  );
-  assert.equal(
-    dailySpinSegments.find((segment) => segment.id === "silver").reward,
-    4500,
-  );
+test("daily rewards wheel preserves eight IDs, 40% misses and an exact 0.1% £50 silver prize", () => {
+  assert.deepEqual(dailySpinSegments.map((segment) => segment.id), [
+    "miss-a", "miss-b", "miss-c", "small", "nice", "bright", "gold", "silver",
+  ]);
+  assert.deepEqual(dailySpinSegments.map(({ reward, weight }) => [reward, weight]), [
+    [0, 15000000], [0, 15000000], [0, 10000000], [100, 25000000],
+    [200, 20000000], [500, 10000000], [1000, 4900000], [5000, 100000],
+  ]);
+  assert.equal(dailySpinSegments.reduce((sum, segment) => sum + segment.weight, 0), ODDS_TOTAL);
+  const misses = dailySpinSegments.filter((segment) => segment.reward === 0);
+  assert.equal(misses.length, 3);
+  assert.equal(misses.reduce((sum, segment) => sum + segment.weight, 0), 40000000);
+  assert.equal(dailySpinSegments.filter((segment) => segment.reward > 0)
+    .reduce((sum, segment) => sum + segment.weight, 0), 60000000);
+  assert.equal(dailySpinSegments.find((segment) => segment.id === "silver").label, "£50");
+  let boundary = 0;
+  for (const segment of dailySpinSegments) {
+    for (const roll of [boundary, boundary + segment.weight - 1]) {
+      let calls = 0;
+      assert.equal(dailySpin((max) => {
+        calls++;
+        assert.equal(max, ODDS_TOTAL);
+        return roll;
+      }), segment);
+      assert.equal(calls, 1, "a miss must not be rerolled into an automatic daily win");
+    }
+    boundary += segment.weight;
+  }
   assert.equal(dailySpin((max) => max - 1).id, "silver");
-  assert.equal(dailySpin((max) => 0).reward, 0);
+  assert.equal(dailySpin(() => 0).reward, 0);
 });
 test("original catalogue contains 93 non-Mythic templates before the world and Fortnite expansions", () =>
   assert.equal(
@@ -485,7 +506,7 @@ test("featured World Leaders cards keep their authored values", () => {
   assert.equal(leader("King Charles III", "United Kingdom").value, 5475);
   assert.equal(cardMap["world-israel-flag"].value, 3650);
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [62750000, 22000000, 15130000, 120000, 0]);
+  assert.deepEqual(world.odds, [53750000, 22000000, 24130000, 120000, 0]);
 });
 test("weighted pot draw includes every contributor, bot or player, at exact stake boundaries", () => {
   const entries = [
@@ -573,12 +594,12 @@ const account = {
   reward_steps: 0,
   last_heartbeat: new Date(now - 30000),
 };
-test("active 10-minute threshold pays 50 pence", () =>
+test("active 10-minute threshold pays 100 pence", () =>
   assert.deepEqual(activityReward(account, true, now), {
     day: "2026-10-24",
-    reward: 50,
+    reward: 100,
     active: 0,
-    paid: 50,
+    paid: 100,
     steps: 1,
   }));
 test("background tabs earn no additional time", () =>
@@ -605,12 +626,21 @@ test("replayed simultaneous heartbeats earn no additional time", () =>
     ).active,
     0,
   ));
-test("play rewards step up by 25 pence and cap at five pounds per day", () => {
+test("play rewards step up by 100 pence and cap at fifteen pounds per day", () => {
+  assert.deepEqual(playReward, {
+    intervalSeconds: 600, firstPence: 100, increasePence: 100, dailyCap: 1500,
+  });
+  assert.ok(Object.isFrozen(playReward));
   let progress = { ...account, active_seconds: 570 };
   const rewards = [];
+  let paid = 0;
   for (let steps = 0; steps < 5; steps++) {
     const result = activityReward(progress, true, now);
     rewards.push(result.reward);
+    paid += (steps + 1) * 100;
+    assert.equal(result.active, 0);
+    assert.equal(result.paid, paid);
+    assert.equal(result.steps, steps + 1);
     progress = {
       ...progress,
       active_seconds: 570,
@@ -618,28 +648,58 @@ test("play rewards step up by 25 pence and cap at five pounds per day", () => {
       reward_steps: result.steps,
     };
   }
-  assert.deepEqual(rewards, [50, 75, 100, 125, 150]);
+  assert.deepEqual(rewards, [100, 200, 300, 400, 500]);
+  assert.deepEqual(activityReward(progress, true, now), {
+    day: "2026-10-24", reward: 0, active: 600, paid: 1500, steps: 5,
+  });
+});
+test("a partial-cap reward pays only the remaining pence and cannot be replayed", () => {
   const result = activityReward(
-    { ...progress, daily_reward: 500, reward_steps: 5 },
-    true,
-    now,
+    { ...account, daily_reward: 1475, reward_steps: 4 }, true, now,
   );
-  assert.equal(result.reward, 0);
-  assert.equal(result.paid, 500);
+  assert.deepEqual(result, {
+    day: "2026-10-24", reward: 25, active: 0, paid: 1500, steps: 5,
+  });
+  const next = {
+    ...account, active_seconds: result.active, daily_reward: result.paid,
+    reward_steps: result.steps, last_heartbeat: new Date(now),
+  };
+  assert.deepEqual(activityReward(next, true, now), { ...result, reward: 0 });
+  assert.deepEqual(activityReward({ ...next, active_seconds: 600 }, true, now), {
+    ...result, reward: 0, active: 600,
+  });
 });
 test("UTC midnight resets both daily earnings and progress", () => {
   const result = activityReward(
     {
       ...account,
       reward_day: "2026-10-23",
-      daily_reward: 500,
+      daily_reward: 1500,
       reward_steps: 5,
     },
     true,
     now,
   );
-  assert.equal(result.paid, 0);
-  assert.equal(result.active, 30);
+  assert.deepEqual(result, {
+    day: "2026-10-24", paid: 0, active: 30, reward: 0, steps: 0,
+  });
+});
+test("upgrade prices are consistent whole-pence values and deeply frozen", () => {
+  assert.deepEqual(upgradePrices, {
+    packSlots: { 2: 12000, 3: 24000 },
+    loadoutSlots: { 4: 8000, 5: 16000 },
+  });
+  assert.ok(Object.isFrozen(upgradePrices));
+  for (const prices of Object.values(upgradePrices)) {
+    assert.ok(Object.isFrozen(prices));
+    for (const [slot, price] of Object.entries(prices)) {
+      assert.ok(Number.isSafeInteger(price) && price > 0);
+      assert.throws(() => { prices[slot] = price + 1; }, TypeError);
+    }
+    const [first, second] = Object.values(prices);
+    assert.equal(second, first * 2);
+  }
+  assert.throws(() => { upgradePrices.packSlots = {}; }, TypeError);
 });
 test("first heartbeat never retroactively credits time", () =>
   assert.equal(
@@ -752,15 +812,17 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
   assert.ok(Math.max(...flagValues[1]) < Math.min(...flagValues[2]));
   assert.ok(Math.max(...flagValues[2]) < Math.min(...flagValues[3]));
 });
-test("World Leaders uses its own balanced rarity bands", () => {
+test("World Leaders boosts Epics above Uncommons while keeping Common most likely", () => {
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [62750000, 22000000, 15130000, 120000, 0]);
+  assert.deepEqual(world.odds, [53750000, 22000000, 24130000, 120000, 0]);
   assert.equal(
     world.odds.reduce((sum, odds) => sum + odds, 0),
     ODDS_TOTAL,
   );
-  for (let index = 1; index < world.odds.length; index++)
-    assert.ok(world.odds[index - 1] > world.odds[index]);
+  assert.ok(world.odds[0] > world.odds[2]);
+  assert.ok(world.odds[2] > world.odds[1]);
+  assert.ok(world.odds[1] > world.odds[3]);
+  assert.ok(world.odds[3] > world.odds[4]);
   assert.equal(world.price, 1000);
   assert.equal(world.count, 4);
   assert.equal(world.jackpotOdds, 200000);
@@ -891,7 +953,7 @@ test("requested featured cards keep their fictional GBP values and flags", () =>
     catalog.filter((c) => c.value < 0).map((c) => c.id),
     ["world-former-keir-starmer"],
   );
-  assert.equal(cardMap["world-former-keir-starmer"].value, -183);
+  assert.equal(cardMap["world-former-keir-starmer"].value, -250);
 });
 test("ordinary World Leaders Epics sit in a tight band around the pack price", () => {
   const featured = new Set([
@@ -927,53 +989,83 @@ test("world packs can return less or more than their purchase price", () => {
   assert.ok(low < p.price);
   assert.ok(high > p.price);
 });
-test("every pack wins about 55% of the time and keeps small and big payouts", () => {
-  for (const pack of packs) {
-    let seed = [...pack.id].reduce(
-      (n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) >>> 0,
-      8374201,
-    );
-    const randomInt = (max) => {
-      const limit = 2 ** 32 - (2 ** 32 % max);
-      let value;
-      do {
-        seed ^= seed << 13;
-        seed ^= seed >>> 17;
-        seed ^= seed << 5;
-        value = seed >>> 0;
-      } while (value >= limit);
-      return value % max;
-    };
-    const samples = 20000;
-    let loss = 0;
-    let smallWin = 0;
-    let mediumWin = 0;
-    let bigWin = 0;
-    let totalValue = 0;
-    for (let i = 1; i <= samples; i++) {
-      const total = rollPack(pack, randomInt, {
-        guaranteedEpic: i % 10 === 0,
-      }).reduce((sum, card) => sum + card.value, 0);
-      totalValue += total;
-      if (total < pack.price) loss++;
-      else if (total < pack.price * 2) smallWin++;
-      else mediumWin++;
-      if (total >= pack.price * 5 && total < pack.price * 10) bigWin++;
-    }
-    const lossRate = loss / samples;
-    assert.ok(
-      lossRate >= 0.42 && lossRate <= 0.46,
-      `${pack.name} should lose about 45% of the time; got ${(lossRate * 100).toFixed(1)}%`,
-    );
-    assert.ok(smallWin / samples > 0.3, `${pack.name} keeps frequent small wins`);
-    assert.ok(mediumWin > 0, `${pack.name} can return 2x or more`);
-    assert.ok(bigWin / samples >= 0.025 && bigWin / samples <= 0.04,
-      `${pack.name} keeps roughly 3% of openings in the 5x–10x band`);
-    assert.ok(
-      totalValue / samples <= pack.price * 1.45,
-      `${pack.name} keeps simulated average returns below the 145% inflation ceiling`,
-    );
+const previousPackOdds = {
+  brainrot: [70960000, 12000000, 17000000, 40000, 0],
+  royalty: [64190000, 20400000, 15250000, 160000, 0],
+  vault: [0, 26589000, 72910000, 500000, 1000],
+  apex: [0, 0, 40155000, 59840000, 5000],
+  fortnite: [31029000, 64668990, 4300000, 2000, 10],
+  world: [62750000, 22000000, 15130000, 120000, 0],
+  fastfood: [51748000, 44499000, 3750000, 3000, 0],
+};
+function seededRandomInt(id) {
+  let seed = [...id].reduce(
+    (n, c) => (Math.imul(n, 31) + c.charCodeAt(0)) >>> 0, 8374201,
+  );
+  return (max) => {
+    assert.ok(Number.isSafeInteger(max) && max > 0 && max <= 2 ** 32);
+    const limit = 2 ** 32 - (2 ** 32 % max);
+    let value;
+    do {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      value = seed >>> 0;
+    } while (value >= limit);
+    return value % max;
+  };
+}
+function simulatePack(pack, samples = 20000) {
+  const randomInt = seededRandomInt(pack.id);
+  const result = { losses: 0, substantiveLosses: 0, priceRecovery: 0, smallWins: 0, twoX: 0, fiveX: 0 };
+  for (let i = 1; i <= samples; i++) {
+    const cards = rollPack(pack, randomInt, { guaranteedEpic: i % 10 === 0 });
+    assert.equal(cards.length, pack.count);
+    assert.ok(cards.every((card) => Number.isSafeInteger(card.value)));
+    const total = cards.reduce((sum, card) => sum + card.value, 0);
+    assert.ok(Number.isSafeInteger(total), `${pack.name} totals stay safe whole pence`);
+    if (total < pack.price) result.losses++;
+    else result.priceRecovery++;
+    if (total < pack.price * 0.75) result.substantiveLosses++;
+    if (total >= pack.price && total < pack.price * 2) result.smallWins++;
+    if (total >= pack.price * 2) result.twoX++;
+    if (total >= pack.price * 5) result.fiveX++;
   }
+  assert.equal(result.losses + result.priceRecovery, samples);
+  return result;
+}
+test("all eight packs retain losses, small wins, 2x+ and 5x+ seeded outcomes", () => {
+  assert.deepEqual(packs.map((pack) => pack.id), [...Object.keys(previousPackOdds), "uk"]);
+  for (const pack of packs) {
+    const result = simulatePack(pack);
+    assert.ok(result.losses > 0, `${pack.name} can lose money`);
+    assert.ok(result.substantiveLosses > 0, `${pack.name} can lose more than 25% of its price`);
+    assert.ok(result.priceRecovery > 0, `${pack.name} can recover its price`);
+    assert.ok(result.smallWins > 0, `${pack.name} retains smaller wins`);
+    assert.ok(result.twoX > 0, `${pack.name} can return 2x or more`);
+    assert.ok(result.fiveX > 0, `${pack.name} can return 5x or more`);
+  }
+});
+test("the old seven packs improve seeded price recovery by changing only their previous odds", (t) => {
+  const catalogBefore = structuredClone(catalog.filter((card) => card.set !== "uk"));
+  for (const [id, odds] of Object.entries(previousPackOdds)) {
+    const pack = packs.find((entry) => entry.id === id);
+    const packBefore = structuredClone(pack);
+    const baseline = { ...pack, odds: [...odds] };
+    const baselineBefore = structuredClone(baseline);
+    assert.equal(baseline.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
+    assert.deepEqual({ ...baseline, odds: pack.odds }, pack,
+      "baseline uses identical prices, values, guarantees and special rolls");
+    const oldResult = simulatePack(baseline);
+    const newResult = simulatePack(pack);
+    assert.ok(newResult.priceRecovery > oldResult.priceRecovery,
+      `${pack.name} price recovery must improve: new ${newResult.priceRecovery}/20000, old ${oldResult.priceRecovery}/20000`);
+    assert.deepEqual(pack, packBefore, "rolls never mutate the current pack");
+    assert.deepEqual(baseline, baselineBefore, "rolls never mutate cloned baseline odds");
+    t.diagnostic(`${id}: price recovery ${(oldResult.priceRecovery / 200).toFixed(2)}% -> ${(newResult.priceRecovery / 200).toFixed(2)}%`);
+  }
+  assert.deepEqual(catalog.filter((card) => card.set !== "uk"), catalogBefore,
+    "baseline comparisons leave every old-family template and value unchanged");
 });
 test("every pack can produce a configured 10x or better jackpot", () => {
   for (const pack of packs) {
@@ -998,7 +1090,7 @@ test("every pack can produce a configured 10x or better jackpot", () => {
 });
 test("every Payday pack carries its own 1-in-25 card and lands a moderate win", () => {
   const paydayPacks = packs.filter((pack) => pack.payday);
-  assert.equal(paydayPacks.length, 4);
+  assert.equal(paydayPacks.length, 5);
   for (const pack of paydayPacks) {
     assert.equal(pack.paydayOdds, 25);
     assert.equal(cardMap[pack.payday].rarity, "Chase");
@@ -1195,7 +1287,7 @@ test("weighted pots allocate exactly one ticket per staked penny without a house
     wins[weightedWinner(entries, () => ticket)]++;
   assert.deepEqual(wins, { one: 1, two: 2, seven: 7 });
 });
-test("simultaneous tabs cannot multiply the five-pound daily play reward", () => {
+test("simultaneous tabs cannot multiply the fifteen-pound daily play reward", () => {
   const start = Date.parse("2026-10-24T12:00:00Z");
   let a = {
     reward_day: "2026-10-24",
@@ -1210,6 +1302,8 @@ test("simultaneous tabs cannot multiply the five-pound daily play reward", () =>
     for (let tab = 0; tab < 4; tab++) {
       const result = activityReward(a, true, at);
       credited += result.reward;
+      if (tab > 0) assert.equal(result.reward, 0, "concurrent tabs cannot earn a second payout");
+      assert.ok(result.paid <= 1500);
       a = {
         ...a,
         reward_day: result.day,
@@ -1220,15 +1314,18 @@ test("simultaneous tabs cannot multiply the five-pound daily play reward", () =>
       };
     }
   }
-  assert.equal(credited, 500);
-  assert.equal(a.daily_reward, 500);
+  assert.equal(credited, 1500);
+  assert.equal(a.daily_reward, 1500);
+  assert.equal(a.reward_steps, 5);
+  assert.equal(a.active_seconds, 600);
 });
 test("a heartbeat crossing UTC midnight credits only the new day’s seconds", () => {
   const result = activityReward(
     {
       reward_day: "2026-10-23",
       active_seconds: 590,
-      daily_reward: 300,
+      daily_reward: 1500,
+      reward_steps: 5,
       last_heartbeat: new Date("2026-10-23T23:59:45Z"),
     },
     true,
@@ -1286,11 +1383,13 @@ test("the Crown bonus also raises the chase chance, and does nothing without it"
 
 test("Secret cards are isolated, valuable and carry working power-ups", () => {
   const secrets = catalog.filter((card) => card.rarity === "Secret");
-  assert.equal(secrets.length, 7);
+  assert.equal(secrets.length, 8);
   assert.ok(secrets.every((card) => card.value >= 2400));
   assert.ok(
-    secrets.every((card) => card.secretCaption && card.image === "/img/secret.svg"),
+    secrets.every((card) => card.secretCaption && card.image ===
+      (card.id === "secret-uk" ? "/img/free-palestine-secret.webp" : "/img/secret.svg")),
   );
+  assert.ok(secrets.every((card) => existsSync(new URL(`../public${card.image}`, import.meta.url))));
   for (const pack of packs) {
     assert.equal(cardMap[pack.secret]?.rarity, "Secret");
     assert.equal(cardMap[pack.secret]?.set, pack.set);
@@ -1308,20 +1407,22 @@ test("Secret cards are isolated, valuable and carry working power-ups", () => {
   assert.equal(cardPowerup(cardMap["secret-brainrot"]).secretBonus, 200);
 });
 
-test("each equipped Crown card adds 0.08% Secret chance up to a 0.40% cap", () => {
+test("a 0.05% base Secret chance grows 0.08% per equipped Crown up to a 0.40% cap", () => {
   const crownCards = catalog
     .filter((card) => card.rarity === "Crown")
     .slice(0, 5);
   assert.equal(crownCards.length, 5);
+  assert.equal(SECRET_BASE_CHANCE, 500);
   assert.equal(SECRET_CROWN_BONUS, 800);
   assert.equal(SECRET_CHANCE_CAP, 4000);
-  assert.equal(loadoutPowerup(crownCards.slice(0, 1)).secretChance, 800);
-  assert.equal(loadoutPowerup(crownCards.slice(0, 2)).secretChance, 1600);
+  assert.equal(loadoutPowerup([]).secretChance, 500);
+  assert.equal(loadoutPowerup(crownCards.slice(0, 1)).secretChance, 1300);
+  assert.equal(loadoutPowerup(crownCards.slice(0, 2)).secretChance, 2100);
   assert.equal(loadoutPowerup(crownCards).secretChance, 4000);
   const vault = cardMap["secret-vault"];
   assert.equal(
     loadoutPowerup([...crownCards.slice(0, 4), vault]).secretChance,
-    3400,
+    3900,
   );
   const crownCount = loadoutPowerup([
     ...crownCards.slice(0, 4),
@@ -1383,8 +1484,8 @@ test("daily quests track progress, pay once and reset on a new UTC day", () => {
   assert.equal(dailyQuests.length, 4);
   assert.ok(dailyQuests.every((quest) => quest.reward > 0));
   assert.ok(
-    dailyQuests.reduce((total, quest) => total + quest.reward, 0) >= 400,
-    "the day's quests should pay at least £4.00",
+    dailyQuests.reduce((total, quest) => total + quest.reward, 0) >= 1000,
+    "the day's quests should pay at least £10.00",
   );
   let state = normalizeQuestState({}, day);
   assert.deepEqual(state.progress, { packs: 0, epic: 0, sold: 0 });
@@ -1392,7 +1493,7 @@ test("daily quests track progress, pay once and reset on a new UTC day", () => {
   state = addQuestProgress(state, day, "packs", 1);
   assert.equal(claimableQuests(state, day).length, 1);
   const first = completeDailyQuest(state, day, "open-1");
-  assert.equal(first.quest.reward, 100);
+  assert.equal(first.quest.reward, 200);
   assert.deepEqual(first.state.claimed, ["open-1"]);
   assert.equal(claimableQuests(first.state, day).length, 0);
   assert.throws(() => completeDailyQuest(first.state, day, "open-1"), /already/);
