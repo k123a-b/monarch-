@@ -6,6 +6,8 @@ import {
   money,
   packs,
   rollPack,
+  WINDFALL_CHANCE,
+  WINDFALL_ROLL_SCALE,
 } from "../shared/catalog.mjs";
 
 const samples = 100000;
@@ -150,6 +152,7 @@ const report = packs.map((pack) => {
     smallWinsUnder2x: `${((result.smallWin / samples) * 100).toFixed(1)}%`,
     moderateWins2xTo5x: `${((result.moderateWin / samples) * 100).toFixed(1)}%`,
     mediumWins2xTo10x: `${((result.mediumWin / samples) * 100).toFixed(1)}%`,
+    bigWins5xTo10x: `${(((result.mediumWin - result.moderateWin) / samples) * 100).toFixed(2)}%`,
     winsAtLeast10x: `${((result.jackpot / samples) * 100).toFixed(3)}%`,
     bestObserved: money(values[samples - 1]),
     worstObserved: money(values[0]),
@@ -159,6 +162,8 @@ const report = packs.map((pack) => {
     mythicValue: money(cardMap[pack.jackpot].value),
     paydayOdds: pack.payday ? `1 in ${pack.paydayOdds}` : "natural only",
     paydayValue: pack.payday ? money(cardMap[pack.payday].value) : "n/a",
+    windfallChance: `${(100 * WINDFALL_CHANCE / WINDFALL_ROLL_SCALE).toFixed(2)}%`,
+    windfallValue: money(cardMap[pack.windfall].value),
     failedGuarantees: result.failedGuarantees,
     comebackPacks: withPity.pityPacks,
     comebackAverageValue: withPity.pityPacks
@@ -231,12 +236,13 @@ for (const [index, pack] of report.entries()) {
   const rtp = Number.parseFloat(pack.returnToPlayer);
   if (pack.failedGuarantees)
     problems.push(`${pack.pack}: ${pack.failedGuarantees} failed guarantees`);
-  if (lossRate < 40 || lossRate > 65)
-    problems.push(`${pack.pack}: loss rate ${pack.losingPacks} is outside 40–65%`);
-  if (Number.parseFloat(pack.winningPacks) <= 0)
-    problems.push(`${pack.pack}: simulation produced no profitable packs`);
-  if (rtp >= 100)
-    problems.push(`${pack.pack}: simulated RTP ${pack.returnToPlayer} is not below 100%`);
+  if (lossRate < 42 || lossRate > 46)
+    problems.push(`${pack.pack}: loss rate ${pack.losingPacks} is outside 42–46%`);
+  if (Number.parseFloat(pack.smallWinsUnder2x) < 30)
+    problems.push(`${pack.pack}: small wins ${pack.smallWinsUnder2x} are below 30%`);
+  // The virtual economy permits positive returns but still bounds payout inflation.
+  if (rtp > 145)
+    problems.push(`${pack.pack}: simulated RTP ${pack.returnToPlayer} exceeds 145%`);
   if (!packs[index].jackpot || !cardMap[packs[index].jackpot])
     problems.push(`${pack.pack}: missing Mythic jackpot`);
   // Every pack must keep a real moderate band: a 2x-5x win in roughly 1 in 25.
@@ -245,6 +251,12 @@ for (const [index, pack] of report.entries()) {
     problems.push(
       `${pack.pack}: 2x-5x wins ${pack.moderateWins2xTo5x} are below the 3.5% floor`,
     );
+  const bigRate = Number.parseFloat(pack.bigWins5xTo10x);
+  if (bigRate < 2.7 || bigRate > 4)
+    problems.push(`${pack.pack}: 5x–10x wins ${pack.bigWins5xTo10x} are outside 2.7–4%`);
+  const windfall = cardMap[packs[index].windfall];
+  if (!windfall || windfall.rarity !== "Chase" || windfall.value !== packs[index].price * 5.5)
+    problems.push(`${pack.pack}: invalid Windfall card`);
   if (packs[index].payday) {
     const card = cardMap[packs[index].payday];
     if (!card || card.rarity !== "Chase")

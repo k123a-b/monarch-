@@ -294,6 +294,26 @@ const chases = [
     ? { flavor: "A rare payout. This pack finally owed you one." }
     : {}),
 }));
+const windfalls = [
+  ["brainrot", "Algorithm Windfall", "brainrot", 1100],
+  ["royalty", "Royal Dividend", "royal", 3300],
+  ["vault", "Treasury Windfall", "royal", 13750],
+  ["apex", "Sovereign Dividend", "royal", 55000],
+  ["fortnite", "Victory Windfall", "fortnite", 68750],
+  ["world", "World Dividend", "world", 5500],
+  ["fastfood", "Franchise Dividend", "fastfood", 165000],
+].map(([pack, name, set, value]) => ({
+  id: "windfall-" + pack,
+  name,
+  set,
+  value,
+  rarity: "Chase",
+  emoji: "",
+  pattern: "rays",
+  colors: ["#4e3919", "#f0ca77"],
+  image: "/img/apex.png",
+  flavor: "The court shares a little more of its fortune.",
+}));
 // Mythic cards are exclusive to one pack each and only ever come from that
 // pack's separate jackpot roll. Their values are authored in pence and are not
 // scaled with the rest of the catalogue.
@@ -567,9 +587,6 @@ function worldEpicValue(card) {
     worldEpicBand.get(card.id) ?? Math.round(Math.abs(card.value) * 0.73)
   );
 }
-// Every pack lifts its win chance by moving a slice of the cheap tier into Epic
-// and keeping the top ordinary payouts in a tight band. Rare pulls are trimmed
-// so the higher hit rate still returns less than the pack price on average.
 const liftedValues = new Map([
   ["crocodilo", 1500],
   ["signet", 2190],
@@ -602,6 +619,7 @@ function bandValue(value, [sourceLow, sourceHigh, low, high]) {
 }
 function liftValue(card, value) {
   if (liftedValues.has(card.id)) return liftedValues.get(card.id);
+  if (card.id.startsWith("windfall-")) return value;
   if (card.set === "brainrot") {
     if (card.rarity === "Crown") return 800;
     if (brainrotBands[card.rarity])
@@ -629,6 +647,7 @@ export const catalog = [
   ...fortniteCards,
   ...fastFoodCards,
   ...chases,
+  ...windfalls,
   ...mythics,
   ...secretCards,
   alpha,
@@ -639,6 +658,7 @@ export const catalog = [
   value:
     c.id === "kim" ||
     c.id === "fortnite-renegade-raider" ||
+    c.id.startsWith("windfall-") ||
     c.rarity === "Mythic" ||
     c.rarity === "Secret"
       ? c.value
@@ -983,6 +1003,7 @@ export const packs = [
     chase: "crocodilo",
     chaseOdds: 800,
     secret: "secret-brainrot",
+    windfall: "windfall-brainrot",
     jackpot: "mythic-brainrot",
     jackpotOdds: 20000,
     art: "brainrot",
@@ -997,10 +1018,11 @@ export const packs = [
     price: 600,
     count: 4,
     set: "royal",
-    odds: [68940000, 20400000, 10500000, 160000, 0],
+    odds: [64190000, 20400000, 15250000, 160000, 0],
     chase: "signet",
     chaseOdds: 1000,
     secret: "secret-royal",
+    windfall: "windfall-royalty",
     jackpot: "mythic-royal",
     jackpotOdds: 60000,
     art: "royal",
@@ -1015,12 +1037,13 @@ export const packs = [
     price: 2500,
     count: 5,
     set: "royal",
-    odds: [0, 37169000, 62330000, 500000, 1000],
+    odds: [0, 26589000, 72910000, 500000, 1000],
     chase: "sovereign",
     chaseOdds: 1000,
     payday: "payday-vault",
     paydayOdds: 25,
     secret: "secret-vault",
+    windfall: "windfall-vault",
     jackpot: "mythic-vault",
     jackpotOdds: 60000,
     art: "vault",
@@ -1035,12 +1058,13 @@ export const packs = [
     price: 10000,
     count: 5,
     set: "royal",
-    odds: [0, 0, 49995000, 50000000, 5000],
+    odds: [0, 0, 40155000, 59840000, 5000],
     chase: "apex-crown",
     chaseOdds: 2000,
     payday: "payday-apex",
     paydayOdds: 25,
     secret: "secret-apex",
+    windfall: "windfall-apex",
     jackpot: "mythic-apex",
     jackpotOdds: 100000,
     guarantee: true,
@@ -1056,12 +1080,13 @@ export const packs = [
     price: 12500,
     count: 4,
     set: "fortnite",
-    odds: [51699000, 43998990, 4300000, 2000, 10],
+    odds: [31029000, 64668990, 4300000, 2000, 10],
     chase: "fortnite-renegade-raider",
     chaseOdds: 40000,
     payday: "payday-fortnite",
     paydayOdds: 25,
     secret: "secret-fortnite",
+    windfall: "windfall-fortnite",
     jackpot: "mythic-fortnite",
     jackpotOdds: 80000,
     art: "fortnite",
@@ -1076,10 +1101,11 @@ export const packs = [
     price: 1000,
     count: 4,
     set: "world",
-    odds: [69880000, 22000000, 8000000, 120000, 0],
+    odds: [62750000, 22000000, 15130000, 120000, 0],
     chase: "kim",
     chaseOdds: 45000,
     secret: "secret-world",
+    windfall: "windfall-world",
     jackpot: "mythic-world",
     jackpotOdds: 200000,
     art: "world",
@@ -1094,12 +1120,13 @@ export const packs = [
     price: 30000,
     count: 5,
     set: "fastfood",
-    odds: [74998000, 21249000, 3750000, 3000, 0],
+    odds: [51748000, 44499000, 3750000, 3000, 0],
     chase: "food-mcdonalds",
     chaseOdds: 50000,
     payday: "payday-fastfood",
     paydayOdds: 25,
     secret: "secret-fastfood",
+    windfall: "windfall-fastfood",
     jackpot: "mythic-fastfood",
     jackpotOdds: 150000,
     art: "fastfood",
@@ -1117,14 +1144,14 @@ const indexFamilies = Object.freeze({
 });
 export const indexSets = Object.freeze(
   Object.entries(indexFamilies).flatMap(([family, info]) => {
-    // Mythic jackpots, Secret cards and Payday cards are trophy pulls, not
-    // index objectives; excluding Payday also keeps existing set lists stable.
+    // New trophy pulls must not shift existing set IDs or claimed rewards.
     const cards = catalog.filter(
       (card) =>
         card.set === family &&
         card.rarity !== "Mythic" &&
         card.rarity !== "Secret" &&
-        !card.id.startsWith("payday-"),
+        !card.id.startsWith("payday-") &&
+        !card.id.startsWith("windfall-"),
     );
     return Array.from({ length: Math.ceil(cards.length / 8) }, (_, index) => {
       const cardIds = cards.slice(index * 8, index * 8 + 8).map((card) => card.id);
@@ -1145,6 +1172,8 @@ export const indexSets = Object.freeze(
 
 export const rarities = ["Common", "Uncommon", "Epic", "Crown", "Alpha"];
 export const starterOdds = [85000000, 12000000, 2500000, 500000, 0];
+export const WINDFALL_ROLL_SCALE = 1000000;
+export const WINDFALL_CHANCE = 30000;
 // A pack's chase card is never sold through that pack's ordinary rarity pool, so
 // the chase roll is the only way to pull it.
 const chaseIds = new Set(packs.map((pack) => pack.chase));
@@ -1336,8 +1365,7 @@ export function rollPack(
     if (eligible.length)
       result[eligible[0].i] = { ...mythic, rarity: "Mythic" };
   }
-  // The payday roll is independent of rarities, chase and jackpot. It swaps the
-  // lowest ordinary card for the pack's Payday card, so the pack pays 2-5x.
+  // Independent trophy rolls never replace another special pull.
   if (pack.payday && randomInt(pack.paydayOdds) === 0) {
     const payday = cardMap[pack.payday];
     if (!payday || payday.rarity !== "Chase")
@@ -1350,6 +1378,21 @@ export function rollPack(
       .sort((a, b) => a.c.value - b.c.value);
     if (eligible.length)
       result[eligible[0].i] = { ...payday, rarity: "Chase" };
+  }
+  if (pack.windfall && randomInt(WINDFALL_ROLL_SCALE) < WINDFALL_CHANCE) {
+    const windfall = cardMap[pack.windfall];
+    if (!windfall || windfall.rarity !== "Chase")
+      throw Error("Unknown Windfall card.");
+    const eligible = result
+      .map((c, i) => ({ c, i }))
+      .filter(
+        ({ c }) =>
+          !["Alpha", "Mythic", "Chase", "Secret"].includes(c.rarity) &&
+          c.value < windfall.value,
+      )
+      .sort((a, b) => a.c.value - b.c.value);
+    if (eligible.length)
+      result[eligible[0].i] = { ...windfall };
   }
   return result;
 }
