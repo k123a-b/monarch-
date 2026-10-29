@@ -7176,3 +7176,81 @@ body:has(dialog[open]) {
     letter-spacing: 0.14em;
   }
 }
+
+/* Slot result receipt: centre of the screen, in and out inside a second. */
+.slot-pop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.slot-pop-inner {
+  display: grid;
+  gap: 4px;
+  transform: scale(0.86);
+  transition: transform 0.24s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.slot-pop.is-open {
+  opacity: 1;
+}
+.slot-pop.is-open .slot-pop-inner {
+  transform: scale(1);
+}
+/* The receipt can land on the cream lever button, so it always dims what is behind it. */
+.slot-pop:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 45%, #050810b8 0%, #0508108f 45%, #0508104d 100%);
+}
+.slot-pop strong,
+.slot-pop span {
+  position: relative;
+  z-index: 1;
+}
+.slot-pop strong {
+  font-family: var(--heading);
+  font-size: clamp(34px, 6vw, 62px);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.slot-pop span {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.slot-pop.is-win strong {
+  color: var(--gold);
+  text-shadow: 0 0 26px #dbbd7b55;
+}
+.slot-pop.is-loss strong {
+  color: #a99680;
+}
+.slot-pop.is-big strong {
+  color: #ffe9b6;
+  text-shadow: 0 0 38px #dbbd7b99;
+}
+.slot-pop.is-jackpot strong {
+  color: #fff6dd;
+  font-size: clamp(44px, 8vw, 86px);
+  text-shadow: 0 0 60px #e0c58fcc;
+}
+.slot-pop.is-jackpot:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, #e0c58f3d 0%, transparent 60%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .slot-pop {
+    transition: none;
+  }
+}
