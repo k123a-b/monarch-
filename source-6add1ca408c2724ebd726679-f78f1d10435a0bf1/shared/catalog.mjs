@@ -575,10 +575,9 @@ const nationFlagCards = nationFlagValues.map(([country, value], index) => {
       "A national flag card. Its fictional value reflects a broad game-power tier.",
   };
 });
-// World Leaders packs compare each four-card pull with a £10 price, so the
-// ordinary Epics sit in a tight, still-unique band just below and above it.
-// That keeps the loss rate honest instead of concentrating almost all value in
-// rare Epics. The three headline Epics keep their full authored values.
+// World Leaders packs price a four-card pull at £10, so the ordinary Epics are
+// the carrier tier: each one is worth roughly twice the pack on its own. The
+// three headline Epics keep their full authored values.
 const featuredWorldEpics = new Set([
   "Andy Burnham",
   "King Charles III",
@@ -598,8 +597,8 @@ const ordinaryWorldEpics = [
 const worldEpicBand = new Map(
   ordinaryWorldEpics.map((card, index) => [
     card.id,
-    950 +
-      Math.round((index * 200) / Math.max(1, ordinaryWorldEpics.length - 1)),
+    2100 +
+      Math.round((index * 300) / Math.max(1, ordinaryWorldEpics.length - 1)),
   ]),
 );
 function worldEpicValue(card) {
@@ -610,12 +609,12 @@ function worldEpicValue(card) {
 const liftedValues = new Map([
   ["crocodilo", 1500],
   ["signet", 2190],
-  ["apex-crown", 32800],
+  ["apex-crown", 66000],
   ["mythic-brainrot", 9000],
   ["mythic-royal", 100000],
   ["mythic-apex", 2400000],
   ["mythic-fortnite", 1600000],
-  ["mystery-gold", 36500],
+  ["mystery-gold", 33750],
   ["payday-vault", 5200],
   ["payday-apex", 31000],
   ["payday-fortnite", 26000],
@@ -627,10 +626,12 @@ const fortniteFixedEpics = new Set([
   "fortnite-midas",
 ]);
 // Brainrot bands: source range (post-scale) maps linearly onto the play range.
+// The £2 pack carries on Epic, so Epics sit at about twice the price, Crowns
+// clear five times it and the two Commons tiers stay worth pocket change.
 const brainrotBands = {
-  Common: [7, 26, 8, 16],
-  Uncommon: [35, 95, 45, 62],
-  Epic: [161, 240, 168, 208],
+  Common: [7, 26, 10, 16],
+  Uncommon: [35, 95, 26, 38],
+  Epic: [161, 240, 400, 480],
 };
 function bandValue(value, [sourceLow, sourceHigh, low, high]) {
   const clamped = Math.min(sourceHigh, Math.max(sourceLow, value));
@@ -638,17 +639,18 @@ function bandValue(value, [sourceLow, sourceHigh, low, high]) {
   return Math.round(low + t * (high - low));
 }
 // A pack only reads as a gamble when its tiers straddle the price: dust well
-// under it, a mid tier near it and a carrier tier above it. These factors slide
-// each set's pullable pool onto that ladder so roughly half the packs lose and
-// a third of them pay two times or more. Headline cards keep authored values.
+// under it, one carrier tier at about twice the price and trophies above that.
+// A pull then either holds a card worth more than the pack cost or it does not,
+// which is the difference between a win and a shrug. Headline cards keep their
+// authored values, so Kim, Burnham and Renegade Raider are never re-laddered.
+// Royal is drawn by three packs at £6, £25 and £150, so its five rungs step by
+// roughly five times each: Royalty carries on Epic, Vault on Crown, Apex on the
+// Alpha serial and every cheaper rung is dust for the pack above it.
 const tierScales = {
-  "brainrot:Common": 1.47,
-  "brainrot:Uncommon": 0.62,
-  "brainrot:Crown": 0.46,
-  "royal:Common": 0.67,
-  "royal:Uncommon": 0.95,
-  "royal:Epic": 1.79,
-  "royal:Crown": 2.47,
+  "royal:Common": 0.61,
+  "royal:Uncommon": 0.79,
+  "royal:Epic": 2.1,
+  "royal:Crown": 1.71,
   "fortnite:Common": 0.2,
   "fortnite:Uncommon": 0.3,
   "fortnite:Epic": 1.69,
@@ -697,7 +699,7 @@ function liftValue(card, value) {
   if (liftedValues.has(card.id)) return liftedValues.get(card.id);
   if (card.id.startsWith("windfall-")) return value;
   if (card.set === "brainrot") {
-    if (card.rarity === "Crown") return 800;
+    if (card.rarity === "Crown") return 1100;
     if (brainrotBands[card.rarity])
       return bandValue(value, brainrotBands[card.rarity]);
   }
@@ -1090,7 +1092,7 @@ export const packs = [
     price: 200,
     count: 4,
     set: "brainrot",
-    odds: [70000000, 16000000, 9000000, 5000000, 0],
+    odds: [65300000, 22700000, 11000000, 1000000, 0],
     chase: "crocodilo",
     chaseOdds: 800,
     secret: "secret-brainrot",
@@ -1109,7 +1111,7 @@ export const packs = [
     price: 600,
     count: 4,
     set: "royal",
-    odds: [66860000, 22510000, 10500000, 130000, 0],
+    odds: [78600000, 11000000, 10000000, 400000, 0],
     chase: "signet",
     chaseOdds: 1000,
     secret: "secret-royal",
@@ -1128,7 +1130,7 @@ export const packs = [
     price: 2500,
     count: 5,
     set: "royal",
-    odds: [0, 66499000, 29000000, 4500000, 1000],
+    odds: [0, 82400000, 11000000, 6500000, 100000],
     chase: "sovereign",
     chaseOdds: 1000,
     payday: "payday-vault",
@@ -1149,7 +1151,7 @@ export const packs = [
     price: 15000,
     count: 5,
     set: "royal",
-    odds: [0, 0, 69500000, 30000000, 500000],
+    odds: [0, 69500000, 13000000, 10000000, 7500000],
     chase: "apex-crown",
     chaseOdds: 2000,
     payday: "payday-apex",
@@ -1192,7 +1194,7 @@ export const packs = [
     price: 1000,
     count: 4,
     set: "world",
-    odds: [44000000, 42000000, 11000000, 3000000, 0],
+    odds: [47000000, 40500000, 11000000, 1500000, 0],
     chase: "kim",
     chaseOdds: 45000,
     secret: "secret-world",
@@ -1211,7 +1213,7 @@ export const packs = [
     price: 30000,
     count: 5,
     set: "fastfood",
-    odds: [42000000, 34000000, 19000000, 5000000, 0],
+    odds: [52000000, 29000000, 11000000, 8000000, 0],
     chase: "food-mcdonalds",
     chaseOdds: 50000,
     payday: "payday-fastfood",
@@ -1232,7 +1234,7 @@ export const packs = [
     price: 60000,
     count: 5,
     set: "uk",
-    odds: [64120000, 11040000, 19660000, 5180000, 0],
+    odds: [59500000, 22000000, 11000000, 7500000, 0],
     chase: "uk-celebrity-paul-mccartney",
     chaseOdds: 25000,
     payday: "payday-uk",

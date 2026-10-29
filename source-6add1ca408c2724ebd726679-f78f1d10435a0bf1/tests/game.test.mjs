@@ -76,7 +76,7 @@ const rng =
           : max - 1;
 test("Brainrot Pack: rarity odds descend from Common down to the Crown tier", () => {
   const p = packs.find((p) => p.id === "brainrot");
-  assert.equal(p.odds[0], 70000000);
+  assert.equal(p.odds[0], 65300000);
   assert.equal(p.price, 200);
   assert.ok(p.odds[0] > p.odds[1], "Common stays the majority tier");
   assert.ok(p.odds[1] > p.odds[2], "Uncommon is likelier than Epic");
@@ -223,9 +223,11 @@ test("Fortnite Drop Pack keeps a descending rarity ladder without inflating its 
 });
 
 test("Apex replaces exactly one low card with Crown when all rolls are Epic", () => {
+  const apex = packs.find((p) => p.id === "apex");
   const pull = rollPack(
-    packs.find((p) => p.id === "apex"),
-    rng(0),
+    apex,
+    // Land every rarity draw just inside the Epic band.
+    rng(apex.odds[0] + apex.odds[1]),
   );
   assert.equal(pull.filter((c) => c.rarity === "Crown").length, 1);
   assert.equal(pull.filter((c) => c.rarity === "Epic").length, 4);
@@ -519,7 +521,7 @@ test("featured World Leaders cards keep their authored values", () => {
   assert.equal(leader("King Charles III", "United Kingdom").value, 5475);
   assert.equal(cardMap["world-israel-flag"].value, 3650);
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [44000000, 42000000, 11000000, 3000000, 0]);
+  assert.deepEqual(world.odds, [47000000, 40500000, 11000000, 1500000, 0]);
 });
 test("weighted pot draw includes every contributor, bot or player, at exact stake boundaries", () => {
   const entries = [
@@ -827,7 +829,7 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
 });
 test("World Leaders keeps a descending rarity ladder with Common most likely", () => {
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [44000000, 42000000, 11000000, 3000000, 0]);
+  assert.deepEqual(world.odds, [47000000, 40500000, 11000000, 1500000, 0]);
   assert.equal(
     world.odds.reduce((sum, odds) => sum + odds, 0),
     ODDS_TOTAL,
@@ -891,7 +893,7 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   assert.ok(
     nonUkCharles
       .filter((card) => card.rarity === "Epic")
-      .every((card) => card.value >= 950 && card.value <= 1150),
+      .every((card) => card.value >= 2100 && card.value <= 2400),
   );
   assert.ok(
     catalog
@@ -980,8 +982,8 @@ test("ordinary World Leaders Epics sit in a tight band around the pack price", (
   const ordinary = epics.filter((card) => !featured.has(card.name));
   assert.ok(ordinary.length > 30);
   assert.ok(
-    ordinary.every((card) => card.value >= 950 && card.value <= 1150),
-    "ordinary World Epics stay in the £9.50–£11.50 band",
+    ordinary.every((card) => card.value >= 2100 && card.value <= 2400),
+    "ordinary World Epics carry the £10 pack at two to two-and-a-half times its price",
   );
   assert.equal(
     new Set(ordinary.map((card) => card.value)).size,
@@ -1031,6 +1033,7 @@ function seededRandomInt(id) {
 function simulatePack(pack, samples = 20000) {
   const randomInt = seededRandomInt(pack.id);
   const result = { losses: 0, substantiveLosses: 0, priceRecovery: 0, smallWins: 0, twoX: 0, fiveX: 0 };
+  const winTotals = [];
   for (let i = 1; i <= samples; i++) {
     const cards = rollPack(pack, randomInt, { guaranteedEpic: i % 10 === 0 });
     assert.equal(cards.length, pack.count);
@@ -1038,36 +1041,65 @@ function simulatePack(pack, samples = 20000) {
     const total = cards.reduce((sum, card) => sum + card.value, 0);
     assert.ok(Number.isSafeInteger(total), `${pack.name} totals stay safe whole pence`);
     if (total < pack.price) result.losses++;
-    else result.priceRecovery++;
+    else {
+      result.priceRecovery++;
+      winTotals.push(total);
+    }
     if (total < pack.price * 0.75) result.substantiveLosses++;
     if (total >= pack.price && total < pack.price * 2) result.smallWins++;
     if (total >= pack.price * 2) result.twoX++;
     if (total >= pack.price * 5) result.fiveX++;
   }
   assert.equal(result.losses + result.priceRecovery, samples);
-  return result;
+  winTotals.sort((a, b) => a - b);
+  return { ...result, winTotals };
 }
-test("all eight packs retain losses, small wins, 2x+ and 5x+ seeded outcomes", () => {
+test("all eight packs retain losses, 2x+ and 5x+ seeded outcomes", () => {
   assert.deepEqual(packs.map((pack) => pack.id), [...Object.keys(previousPackOdds), "uk"]);
   for (const pack of packs) {
     const result = simulatePack(pack);
     assert.ok(result.losses > 0, `${pack.name} can lose money`);
     assert.ok(result.substantiveLosses > 0, `${pack.name} can lose more than 25% of its price`);
     assert.ok(result.priceRecovery > 0, `${pack.name} can recover its price`);
-    assert.ok(result.smallWins > 0, `${pack.name} retains smaller wins`);
+    assert.ok(
+      result.twoX >= result.smallWins,
+      `${pack.name} wins are mostly clear doubles, not price recoveries`,
+    );
     assert.ok(result.twoX > 0, `${pack.name} can return 2x or more`);
     assert.ok(result.fiveX > 0, `${pack.name} can return 5x or more`);
   }
 });
-test("every pack lands in the seeded 40-60% price recovery band", (t) => {
+test("the median winning pack pays at least twice its price", () => {
+  for (const pack of packs) {
+    const result = simulatePack(pack);
+    // simulatePack keeps the sell value of every price-recovering opening,
+    // so the median of that list is what a win actually feels like.
+    const winners = result.winTotals;
+    assert.ok(winners.length > 0, `${pack.name} has winning openings`);
+    const median = winners[Math.floor(winners.length / 2)];
+    assert.ok(
+      median >= pack.price * 2,
+      `${pack.name} pays ${(median / pack.price).toFixed(2)}x at the median win; a win must clear 2x`,
+    );
+    assert.ok(
+      result.smallWins <= result.twoX,
+      `${pack.name} has more refund-shaped wins than clear wins`,
+    );
+  }
+});
+test("every pack lands in the seeded 35-65% price recovery band", (t) => {
   const catalogBefore = structuredClone(catalog.filter((card) => card.set !== "uk"));
   for (const pack of packs) {
     const packBefore = structuredClone(pack);
     const result = simulatePack(pack);
     const recovery = (result.priceRecovery / 200).toFixed(2);
     assert.ok(
-      result.priceRecovery >= 8000 && result.priceRecovery <= 12000,
-      `${pack.name} must recover its price about half the time: ${recovery}%`,
+      result.priceRecovery >= 7000 && result.priceRecovery <= 13000,
+      `${pack.name} recovers its price between a third and two thirds of the time: ${recovery}%`,
+    );
+    assert.ok(
+      result.twoX >= 4000,
+      `${pack.name} must pay two times the price at least a fifth of the time: ${(result.twoX / 200).toFixed(2)}%`,
     );
     assert.ok(
       result.substantiveLosses >= 2000,
