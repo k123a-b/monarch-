@@ -150,15 +150,22 @@ let lastActivity = Date.now();
 let renderVersion = 0;
 let viewRequest = 0;
 let syncRequest = 0;
+// vercel.json only whitelists these widths; any other w= makes /_vercel/image answer 400.
+const IMAGE_SIZES = [400, 500, 650];
 const image = (src, w = 500) => {
   const source = imageSource(src);
   if (source.startsWith("https://cdn.jsdelivr.net/npm/simple-icons@")) return source;
+  const size = IMAGE_SIZES.reduce(
+    (best, candidate) =>
+      Math.abs(candidate - w) < Math.abs(best - w) ? candidate : best,
+    IMAGE_SIZES[0],
+  );
   return source.startsWith("/img/flags/") ||
     (source.startsWith("/") && source.endsWith(".svg"))
     ? source
     : import.meta.env.DEV
       ? source
-      : `/_vercel/image?url=${encodeURIComponent(source)}&w=${w}&q=75`;
+      : `/_vercel/image?url=${encodeURIComponent(source)}&w=${size}&q=75`;
 };
 const art = (pack) =>
   image(

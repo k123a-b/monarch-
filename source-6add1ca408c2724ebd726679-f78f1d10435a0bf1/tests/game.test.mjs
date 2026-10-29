@@ -1658,3 +1658,19 @@ test("missing slot reels never triple, never show the face and favour near-misse
     `two-of-a-kind should land most of the time, got ${(pairs / spins) * 100}%`,
   );
 });
+
+test("the client only requests image widths Vercel is configured to serve", () => {
+  const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
+  const client = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
+  const declared = client.match(/const IMAGE_SIZES = \[[^\]]*\]/)?.[0];
+  assert.ok(declared, "the client clamps requested image widths");
+  assert.deepEqual(
+    JSON.parse(declared.slice(declared.indexOf("["))).sort((a, b) => a - b),
+    [...config.images.sizes].sort((a, b) => a - b),
+    "IMAGE_SIZES must track vercel.json images.sizes or /_vercel/image answers 400",
+  );
+  assert.ok(
+    !/&w=\$\{w\}/.test(client),
+    "image URLs must be built from the clamped size, not the raw request",
+  );
+});
