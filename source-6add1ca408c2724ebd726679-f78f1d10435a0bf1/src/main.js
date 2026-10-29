@@ -956,6 +956,44 @@ function updateSlotStake() {
   const note = $(".slot-side h2")?.parentElement?.querySelector("p");
   if (note) note.textContent = `Multipliers apply to your current ${money(state.slotBet)} stake.`;
 }
+let slotPopTimer = null;
+function hideSlotPop() {
+  clearTimeout(slotPopTimer);
+  $("#slot-pop")?.classList.remove("is-open");
+}
+// A receipt for the spin, not a second animation to wait through: it pops in
+// as soon as the reels settle and is gone inside about a second.
+function slotPop(result) {
+  const pop = $("#slot-pop");
+  if (!pop) return;
+  const won = result.payout > 0;
+  const big = result.outcome.multiplier >= 10;
+  pop.classList.remove("is-open", "is-win", "is-loss", "is-big", "is-jackpot");
+  pop.innerHTML = `<div class="slot-pop-inner">${
+    won
+      ? `<strong>${money(result.payout)}</strong><span>${esc(result.outcome.label)} · ${
+          result.outcome.multiplier
+        }× stake${big ? " · big win" : ""}</span>`
+      : `<strong>${money(result.bet)} gone</strong><span>No line · pull again</span>`
+  }</div>`;
+  pop.classList.add(won ? "is-win" : "is-loss");
+  if (big) pop.classList.add("is-big");
+  if (result.outcome.id === "jackpot") pop.classList.add("is-jackpot");
+  requestAnimationFrame(() => pop.classList.add("is-open"));
+  clearTimeout(slotPopTimer);
+  slotPopTimer = setTimeout(
+    hideSlotPop,
+    slotReducedMotion()
+      ? 900
+      : result.outcome.id === "jackpot"
+        ? 2000
+        : big
+          ? 1500
+          : won
+            ? 1000
+            : 800,
+  );
+}
 async function slotSpinAction() {
   const machine = $("[data-slot-machine]");
   if (!machine || state.busy) return;
@@ -975,6 +1013,12 @@ async function slotSpinAction() {
   }
   state.busy = true;
   state.slotBet = bet;
+  hideSlotPop();
+  // Keeps the reels under the receipt that lands on them a second later.
+  machine.scrollIntoView({
+    block: "center",
+    behavior: slotReducedMotion() ? "auto" : "smooth",
+  });
   const lever = $('[data-action="slot-spin"]');
   if (lever) lever.disabled = true;
   const status = $("#slot-status");
@@ -1044,9 +1088,7 @@ async function slotSpinAction() {
         state.slotStats.returned,
       )} · net ${money(state.slotStats.returned - state.slotStats.wagered)}`;
     sound(result.outcome.id === "jackpot" || result.outcome.id === "triple" ? "Mythic" : big ? "Crown" : result.payout ? "Epic" : "Common");
-    if (result.outcome.id === "jackpot")
-      toast(`Monarch jackpot! ${money(result.payout)} lands in your balance.`);
-    else if (big) toast(`${result.outcome.label} pays ${result.outcome.multiplier}× — ${money(result.payout)}.`);
+    slotPop(result);
   } catch (e) {
     machine.classList.remove("is-spinning");
     reels.forEach((reel) => {
@@ -1309,6 +1351,7 @@ function upgradesView() {
 }
 function render() {
   renderVersion++;
+  if (state.view !== "slots") hideSlotPop();
   shell();
   (
     ({

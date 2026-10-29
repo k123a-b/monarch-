@@ -1674,3 +1674,22 @@ test("the client only requests image widths Vercel is configured to serve", () =
     "image URLs must be built from the clamped size, not the raw request",
   );
 });
+
+test("every slot spin shows a self-clearing receipt over the reels", () => {
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const client = readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
+  // Outside #app, because render() replaces that subtree on every navigation.
+  assert.match(
+    html,
+    /<div id="app"><\/div>[\s\S]*<div id="slot-pop"[\s\S]*role="status"[\s\S]*aria-live="polite"/,
+  );
+  const spinStart = client.indexOf("async function slotSpinAction");
+  const spin = client.slice(spinStart, client.indexOf("\nasync function", spinStart + 1));
+  assert.ok(spin.length > 1000, "the spin handler was found");
+  assert.match(spin, /slotPop\(result\);/, "a settled spin must raise the receipt");
+  assert.match(spin, /hideSlotPop\(\);/, "a new spin must clear the previous receipt");
+  assert.match(client, /slotPopTimer = setTimeout\(/, "the receipt must clear itself");
+  assert.match(client, /if \(state\.view !== "slots"\) hideSlotPop\(\);/);
+  assert.match(css, /\.slot-pop \{[^}]*pointer-events: none;/s, "the receipt must not eat clicks");
+});
