@@ -35,6 +35,10 @@ import {
   addQuestProgress,
   completeDailyQuest,
   upgradePrices,
+  slotLimits,
+  slotSpin,
+  slotReels,
+  validSlotBet,
 } from "../shared/rules.mjs";
 
 type Client = any;
@@ -558,6 +562,39 @@ export async function handle(
             [id, today, prize.reward],
           );
           return { prize, account: await account() };
+        }
+        if (route === "slots" && req.method === "POST") {
+          const bet = integer(body.bet, slotLimits.minPence, slotLimits.maxPence);
+          if (!validSlotBet(bet)) fail("Stake must be between £5 and £12,000.");
+          const current = await account();
+          if (Number(current.balance) < bet)
+            fail("Not enough virtual cash for that stake.", 409);
+          const outcome = slotSpin(randomInt);
+          const reels = slotReels(outcome, randomInt);
+          const payout = bet * outcome.multiplier;
+          await change(c, id, -bet, "Slots stake");
+          if (payout > 0)
+            await change(
+              c,
+              id,
+              payout,
+              "Slots win · " +
+                outcome.label +
+                " pays " +
+                outcome.multiplier +
+                "× the stake",
+            );
+          return {
+            outcome: {
+              id: outcome.id,
+              label: outcome.label,
+              multiplier: outcome.multiplier,
+            },
+            reels,
+            bet,
+            payout,
+            account: await account(),
+          };
         }
         if (route === "ledger" && req.method === "GET")
           return (

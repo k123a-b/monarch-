@@ -44,6 +44,62 @@ export const giftLimits = Object.freeze({
   maxPence: 10000,
   dailyCount: 10,
 });
+// The royal one-armed bandit. Stakes are whole pence between £5 and £12,000
+// and every payout is a multiple of the stake, so a £5 spin can win big but
+// never millions. Weights are parts per million: 60% of spins lose the stake
+// and 40% line up a win, from a common 2× up to the 100× face jackpot.
+export const slotLimits = Object.freeze({
+  minPence: 500,
+  maxPence: 1200000,
+});
+export const slotSymbols = Object.freeze(["face", "crown", "coin", "pot", "bolt"]);
+export const slotOutcomes = Object.freeze([
+  { id: "miss", label: "No line", symbol: null, multiplier: 0, weight: 600000 },
+  { id: "coin", label: "Coins", symbol: "coin", multiplier: 2, weight: 350000 },
+  { id: "pot", label: "Pots", symbol: "pot", multiplier: 3, weight: 35000 },
+  { id: "bolt", label: "Bolts", symbol: "bolt", multiplier: 5, weight: 10000 },
+  { id: "crown", label: "Crowns", symbol: "crown", multiplier: 10, weight: 4000 },
+  { id: "triple", label: "Triple crown", symbol: "crown", multiplier: 25, weight: 800 },
+  { id: "jackpot", label: "Monarch jackpot", symbol: "face", multiplier: 100, weight: 200 },
+]);
+export function slotSpin(randomInt) {
+  const total = slotOutcomes.reduce((sum, outcome) => sum + outcome.weight, 0);
+  if (total !== 1000000) throw Error("Slot odds must total one million parts.");
+  let roll = randomInt(total);
+  for (const outcome of slotOutcomes) {
+    if (roll < outcome.weight) return outcome;
+    roll -= outcome.weight;
+  }
+  throw Error("Slot roll was outside its odds.");
+}
+export function validSlotBet(amount) {
+  return (
+    Number.isSafeInteger(amount) &&
+    amount >= slotLimits.minPence &&
+    amount <= slotLimits.maxPence
+  );
+}
+// Presentation only: winning lines show three of the matching symbol; a miss
+// deliberately lands two-of-a-kind more often than a blank spread for the
+// classic near-miss feel, but never three of a kind.
+export function slotReels(outcome, randomInt) {
+  if (outcome.multiplier > 0)
+    return [outcome.symbol, outcome.symbol, outcome.symbol];
+  // The face never lands outside the jackpot line.
+  const spinning = slotSymbols.filter((symbol) => symbol !== "face");
+  const pick = () => spinning[randomInt(spinning.length)];
+  if (randomInt(2) === 0) {
+    const pair = pick();
+    let odd = pick();
+    while (odd === pair) odd = pick();
+    const reels = [pair, pair, odd];
+    const swap = randomInt(3);
+    return [reels[swap], reels[(swap + 1) % 3], reels[(swap + 2) % 3]];
+  }
+  const reels = [pick(), pick(), pick()];
+  while (reels[0] === reels[1] && reels[1] === reels[2]) reels[2] = pick();
+  return reels;
+}
 export const validGiftAmount = (amount) =>
   Number.isSafeInteger(amount) &&
   amount >= giftLimits.minPence &&

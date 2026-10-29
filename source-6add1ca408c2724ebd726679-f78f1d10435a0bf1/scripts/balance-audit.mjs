@@ -1,6 +1,7 @@
 // Reproducible simulation only: no accounts, database writes, or production RNG changes.
 import {
   cardMap,
+  cardPowerup,
   catalog,
   loadoutPowerup,
   money,
@@ -193,9 +194,15 @@ const crownLoadout = [
 const uncommonLoadout = catalog
   .filter((card) => card.rarity === "Uncommon")
   .slice(0, 5);
+// The strongest five Epic cards, so the mid-game ceiling is measured too.
+const epicLoadout = catalog
+  .filter((card) => card.rarity === "Epic")
+  .sort((a, b) => cardPowerup(b).epicBonus - cardPowerup(a).epicBonus)
+  .slice(0, 5);
 const loadoutSensitivity = packs.flatMap((pack) =>
   [
     ["Crown loadout", crownLoadout],
+    ["Epic loadout", epicLoadout],
     ["Uncommon loadout", uncommonLoadout],
   ].map(([mode, cards]) => {
     const result = simulate(pack, cards, sensitivitySamples);
@@ -232,7 +239,7 @@ console.log(
 console.log("\nLoadout sensitivity (same model, 20,000 packs per mode):");
 console.log(JSON.stringify(loadoutSensitivity, null, 2));
 console.log(
-  "Crown loadout: 5 distinct Crown-rarity cards reaching the Epic cap. Uncommon loadout: the five Uncommon-rarity cards. Both exclude Kim, Secret cards and permanent Index bonuses.",
+  "Crown loadout: 5 distinct Crown-rarity cards reaching the Epic cap. Epic loadout: the five strongest Epic-rarity cards, the mid-game ceiling. Uncommon loadout: the five Uncommon-rarity cards. All three exclude Kim, Secret cards and permanent Index bonuses.",
 );
 const problems = [];
 for (const [index, pack] of report.entries()) {

@@ -52,6 +52,12 @@ import {
   validTradeCards,
   validUsername,
   randomBelow,
+  slotLimits,
+  slotSymbols,
+  slotOutcomes,
+  slotSpin,
+  slotReels,
+  validSlotBet,
 } from "../shared/rules.mjs";
 import { rateLeader } from "../shared/leader-ratings.mjs";
 import leaderData from "../shared/leaders.json" with { type: "json" };
@@ -68,14 +74,13 @@ const rng =
             ? 0
             : max - 1
           : max - 1;
-test("Brainrot Pack: Epic is the boosted winning tier and Crown stays rarest", () => {
+test("Brainrot Pack: rarity odds descend from Common down to the Crown tier", () => {
   const p = packs.find((p) => p.id === "brainrot");
-  assert.equal(p.odds[0], 63960000);
+  assert.equal(p.odds[0], 70000000);
   assert.equal(p.price, 200);
   assert.ok(p.odds[0] > p.odds[1], "Common stays the majority tier");
-  assert.ok(p.odds[0] > p.odds[2]);
-  assert.ok(p.odds[2] > p.odds[1], "Epic is the boosted winning tier");
-  assert.ok(p.odds[2] > p.odds[3], "Crown is rarer than Epic");
+  assert.ok(p.odds[1] > p.odds[2], "Uncommon is likelier than Epic");
+  assert.ok(p.odds[2] > p.odds[3], "Crown is the rarest tier");
   // Roll just inside and just outside each band.
   assert.equal(rollPack(p, rng(p.odds[0] - 1))[0].rarity, "Common");
   assert.equal(rollPack(p, rng(p.odds[0]))[0].rarity, "Uncommon");
@@ -177,10 +182,13 @@ for (const p of packs) {
       });
   });
 }
-test("Fortnite Drop Pack favors Uncommons without inflating its Epic character values", () => {
+test("Fortnite Drop Pack keeps a descending rarity ladder without inflating its Epic character values", () => {
   const pack = packs.find((entry) => entry.id === "fortnite");
-  assert.deepEqual(pack.odds, [21029000, 71668990, 7300000, 2000, 10]);
+  assert.deepEqual(pack.odds, [44349990, 41620000, 7130000, 6900000, 10]);
   assert.equal(pack.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
+  assert.ok(pack.odds[0] > pack.odds[1], "Common stays the likeliest tier");
+  assert.ok(pack.odds[1] > pack.odds[2], "Uncommon is likelier than Epic");
+  assert.ok(pack.odds[2] > pack.odds[3], "Epic is likelier than Crown");
   assert.deepEqual(
     [
       cardMap["fortnite-recruit"].value,
@@ -191,7 +199,7 @@ test("Fortnite Drop Pack favors Uncommons without inflating its Epic character v
       cardMap["fortnite-midas"].value,
       cardMap["fortnite-renegade-raider"].value,
     ],
-    [1358, 3134, 2686, 6000, 10500, 15000, 400000],
+    [272, 940, 806, 10140, 17745, 25350, 400000],
   );
   const fortniteCards = catalog.filter(
     (card) =>
@@ -303,12 +311,16 @@ test("permanent character-index rewards shift Epic and Crown odds by their state
     "Epic",
   );
   const fortnite = packs.find((pack) => pack.id === "fortnite");
+  // The Crown bonus takes its weight from Common then Uncommon, so the top of
+  // the Epic band moves down by exactly the bonus and this roll falls through.
+  const lastEpic =
+    fortnite.odds[0] + fortnite.odds[1] + fortnite.odds[2] - 1;
   assert.equal(
-    rollPack(fortnite, deterministic(99950000))[0].rarity,
+    rollPack(fortnite, deterministic(lastEpic))[0].rarity,
     "Epic",
   );
   assert.equal(
-    rollPack(fortnite, deterministic(99950000), {
+    rollPack(fortnite, deterministic(lastEpic), {
       permanentCrownBonus: SET_CROWN_REWARD,
     })[0].rarity,
     "Crown",
@@ -399,10 +411,11 @@ test("power-up strength scales with card rarity and chase cards are all upside",
         .filter((card) => card.rarity === rarity)
         .map((card) => cardPowerup(card).epicBonus),
     );
-  assert.ok(maxEpic("Common") <= 10000);
-  assert.ok(maxEpic("Uncommon") <= 15000);
+  assert.ok(maxEpic("Common") <= 20000);
+  assert.ok(maxEpic("Uncommon") <= 30000);
   assert.ok(maxEpic("Epic") < maxEpic("Crown"));
   assert.ok(maxEpic("Crown") <= 600000);
+  assert.ok(maxEpic("Epic") >= 320000, "Epics carry a real loadout tier");
   const weakest = catalog
     .filter((card) => card.rarity === "Uncommon")
     .slice(0, 5);
@@ -506,7 +519,7 @@ test("featured World Leaders cards keep their authored values", () => {
   assert.equal(leader("King Charles III", "United Kingdom").value, 5475);
   assert.equal(cardMap["world-israel-flag"].value, 3650);
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [53750000, 22000000, 24130000, 120000, 0]);
+  assert.deepEqual(world.odds, [44000000, 42000000, 11000000, 3000000, 0]);
 });
 test("weighted pot draw includes every contributor, bot or player, at exact stake boundaries", () => {
   const entries = [
@@ -812,16 +825,16 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
   assert.ok(Math.max(...flagValues[1]) < Math.min(...flagValues[2]));
   assert.ok(Math.max(...flagValues[2]) < Math.min(...flagValues[3]));
 });
-test("World Leaders boosts Epics above Uncommons while keeping Common most likely", () => {
+test("World Leaders keeps a descending rarity ladder with Common most likely", () => {
   const world = packs.find((pack) => pack.id === "world");
-  assert.deepEqual(world.odds, [53750000, 22000000, 24130000, 120000, 0]);
+  assert.deepEqual(world.odds, [44000000, 42000000, 11000000, 3000000, 0]);
   assert.equal(
     world.odds.reduce((sum, odds) => sum + odds, 0),
     ODDS_TOTAL,
   );
-  assert.ok(world.odds[0] > world.odds[2]);
-  assert.ok(world.odds[2] > world.odds[1]);
-  assert.ok(world.odds[1] > world.odds[3]);
+  assert.ok(world.odds[0] > world.odds[1], "Common outsells Uncommon");
+  assert.ok(world.odds[1] > world.odds[2], "Uncommon outsells Epic");
+  assert.ok(world.odds[2] > world.odds[3], "Epic outsells Crown");
   assert.ok(world.odds[3] > world.odds[4]);
   assert.equal(world.price, 1000);
   assert.equal(world.count, 4);
@@ -1046,23 +1059,33 @@ test("all eight packs retain losses, small wins, 2x+ and 5x+ seeded outcomes", (
     assert.ok(result.fiveX > 0, `${pack.name} can return 5x or more`);
   }
 });
-test("the old seven packs improve seeded price recovery by changing only their previous odds", (t) => {
+test("every pack lands in the seeded 40-60% price recovery band", (t) => {
   const catalogBefore = structuredClone(catalog.filter((card) => card.set !== "uk"));
-  for (const [id, odds] of Object.entries(previousPackOdds)) {
-    const pack = packs.find((entry) => entry.id === id);
+  for (const pack of packs) {
     const packBefore = structuredClone(pack);
-    const baseline = { ...pack, odds: [...odds] };
-    const baselineBefore = structuredClone(baseline);
-    assert.equal(baseline.odds.reduce((sum, weight) => sum + weight, 0), ODDS_TOTAL);
-    assert.deepEqual({ ...baseline, odds: pack.odds }, pack,
-      "baseline uses identical prices, values, guarantees and special rolls");
-    const oldResult = simulatePack(baseline);
-    const newResult = simulatePack(pack);
-    assert.ok(newResult.priceRecovery > oldResult.priceRecovery,
-      `${pack.name} price recovery must improve: new ${newResult.priceRecovery}/20000, old ${oldResult.priceRecovery}/20000`);
+    const result = simulatePack(pack);
+    const recovery = (result.priceRecovery / 200).toFixed(2);
+    assert.ok(
+      result.priceRecovery >= 8000 && result.priceRecovery <= 12000,
+      `${pack.name} must recover its price about half the time: ${recovery}%`,
+    );
+    assert.ok(
+      result.substantiveLosses >= 2000,
+      `${pack.name} must lose a quarter of its price often: ${(result.substantiveLosses / 200).toFixed(2)}%`,
+    );
     assert.deepEqual(pack, packBefore, "rolls never mutate the current pack");
-    assert.deepEqual(baseline, baselineBefore, "rolls never mutate cloned baseline odds");
-    t.diagnostic(`${id}: price recovery ${(oldResult.priceRecovery / 200).toFixed(2)}% -> ${(newResult.priceRecovery / 200).toFixed(2)}%`);
+    const previous = previousPackOdds[pack.id];
+    if (previous) {
+      const baseline = structuredClone({ ...pack, odds: previous });
+      assert.equal(
+        baseline.odds.reduce((sum, weight) => sum + weight, 0),
+        ODDS_TOTAL,
+      );
+      const oldResult = simulatePack(baseline);
+      assert.deepEqual(baseline, { ...pack, odds: previous },
+        "cloned baseline keeps identical prices, values, guarantees and special rolls");
+      t.diagnostic(`${pack.id}: price recovery ${(oldResult.priceRecovery / 200).toFixed(2)}% -> ${recovery}%`);
+    }
   }
   assert.deepEqual(catalog.filter((card) => card.set !== "uk"), catalogBefore,
     "baseline comparisons leave every old-family template and value unchanged");
@@ -1519,4 +1542,119 @@ test("completed Card Index sets always pay cash of £50 or less once caps are fu
     assert.equal(set.cashReward, expected);
     assert.ok(set.cashReward > 0 && set.cashReward <= 5000);
   }
+});
+
+const slotRandom = (seedStart) => {
+  let seed = seedStart >>> 0;
+  return (max) => {
+    assert.ok(Number.isSafeInteger(max) && max > 0);
+    seed ^= seed << 13;
+    seed >>>= 0;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    seed >>>= 0;
+    return seed % max;
+  };
+};
+
+test("slot stakes run from £5 to £12,000 and reject anything else", () => {
+  assert.deepEqual({ ...slotLimits }, { minPence: 500, maxPence: 1200000 });
+  for (const amount of [500, 501, 1200000])
+    assert.ok(validSlotBet(amount), `${amount}p is a legal stake`);
+  for (const amount of [0, 1, 499, 1200001, 12000000, 1000.5, NaN, Infinity, "1000", null])
+    assert.ok(!validSlotBet(amount), `${amount} is not a legal stake`);
+});
+
+test("slot odds lose exactly 60% of spins and always total one million parts", () => {
+  const total = slotOutcomes.reduce((sum, outcome) => sum + outcome.weight, 0);
+  assert.equal(total, 1000000);
+  assert.equal(
+    slotOutcomes.find((outcome) => outcome.id === "miss").weight,
+    600000,
+  );
+  const wins = slotOutcomes
+    .filter((outcome) => outcome.multiplier > 0)
+    .reduce((sum, outcome) => sum + outcome.weight, 0);
+  assert.equal(wins, 400000, "40% of spins line up a win");
+  assert.equal(slotSymbols.length, 5);
+  assert.deepEqual(slotSymbols, ["face", "crown", "coin", "pot", "bolt"]);
+});
+
+test("slot payouts scale with the stake and keep the face as the top prize", () => {
+  const expected = [
+    ["miss", 0, 600000],
+    ["coin", 2, 350000],
+    ["pot", 3, 35000],
+    ["bolt", 5, 10000],
+    ["crown", 10, 4000],
+    ["triple", 25, 800],
+    ["jackpot", 100, 200],
+  ];
+  assert.deepEqual(
+    slotOutcomes.map((outcome) => [
+      outcome.id,
+      outcome.multiplier,
+      outcome.weight,
+    ]),
+    expected,
+  );
+  const ev = slotOutcomes.reduce(
+    (sum, outcome) => sum + outcome.multiplier * outcome.weight,
+    0,
+  );
+  assert.equal(ev / 1000000, 0.935, "the bandit keeps a 6.5% house edge");
+  assert.equal(slotOutcomes.at(-1).symbol, "face");
+  assert.equal(slotLimits.minPence * 100, 50000);
+  assert.ok(
+    slotOutcomes.every((outcome) => slotLimits.minPence * outcome.multiplier < 100000000),
+    "a £5 stake can never mint millions",
+  );
+});
+
+test("slotSpin returns each outcome across its whole cumulative weight band", () => {
+  const total = slotOutcomes.reduce((sum, outcome) => sum + outcome.weight, 0);
+  let boundary = 0;
+  for (const outcome of slotOutcomes) {
+    const band = [boundary, boundary + outcome.weight - 1];
+    boundary += outcome.weight;
+    for (const roll of band) {
+      const random = (max) => {
+        assert.equal(max, 1000000);
+        return roll;
+      };
+      assert.equal(slotSpin(random).id, outcome.id, `roll ${roll}`);
+    }
+  }
+  assert.equal(boundary, total, "bands must tile the whole million without gaps");
+});
+
+test("winning slot reels always line up three of the outcome symbol", () => {
+  for (const outcome of slotOutcomes.filter((entry) => entry.multiplier > 0)) {
+    const reels = slotReels(outcome, slotRandom(20261029));
+    assert.deepEqual(reels, [outcome.symbol, outcome.symbol, outcome.symbol]);
+  }
+});
+
+test("missing slot reels never triple, never show the face and favour near-misses", () => {
+  const miss = slotOutcomes.find((outcome) => outcome.id === "miss");
+  let pairs = 0;
+  const spins = 4000;
+  for (let i = 0; i < spins; i++) {
+    const reels = slotReels(miss, slotRandom(1000003 + i * 7919));
+    assert.equal(reels.length, 3);
+    assert.ok(reels.every((symbol) => slotSymbols.includes(symbol)));
+    assert.ok(!reels.includes("face"), "the face only lands on the jackpot line");
+    assert.ok(
+      !(reels[0] === reels[1] && reels[1] === reels[2]),
+      "a miss can never read as three of a kind",
+    );
+    if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2])
+      pairs++;
+  }
+  // The near-miss branch lands half the time and a free spread of three from
+  // four symbols pairs about 62.5% of the time, so ~81% of misses show a pair.
+  assert.ok(
+    pairs / spins > 0.7 && pairs / spins < 0.9,
+    `two-of-a-kind should land most of the time, got ${(pairs / spins) * 100}%`,
+  );
 });

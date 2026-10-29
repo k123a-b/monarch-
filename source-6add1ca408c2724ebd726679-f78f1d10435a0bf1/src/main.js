@@ -36,6 +36,8 @@ import {
   normalizeQuestState,
   claimableQuests,
   upgradePrices,
+  slotLimits,
+  slotOutcomes,
 } from "../shared/rules.mjs";
 const ordinaryPullNote = "Stronger ordinary pulls, real wins and losses; sell cards to credit your balance.";
 const secretRollNote = () =>
@@ -52,6 +54,24 @@ const ukCoreCards = () => catalog.filter((card) =>
 const silverPrize = () => dailySpinSegments.find((segment) => segment.id === "silver");
 const spinWeight = () => dailySpinSegments.reduce((sum, segment) => sum + segment.weight, 0);
 const spinPercent = (weight) => Number((weight / spinWeight() * 100).toFixed(3));
+const slotWeight = () => slotOutcomes.reduce((sum, outcome) => sum + outcome.weight, 0);
+const slotPercent = (weight) => Number((weight / slotWeight() * 100).toFixed(3));
+const slotReturnRate = () =>
+  slotOutcomes.reduce((sum, outcome) => sum + outcome.multiplier * outcome.weight, 0) /
+  slotWeight();
+const slotMissWeight = slotOutcomes.find((outcome) => !outcome.multiplier).weight;
+const slotBigWeight = slotOutcomes
+  .filter((outcome) => outcome.multiplier >= 10)
+  .reduce((sum, outcome) => sum + outcome.weight, 0);
+const slotOddsNote = () =>
+  slotOutcomes
+    .map(
+      (outcome) =>
+        `${slotPercent(outcome.weight)}% ${
+          outcome.multiplier ? `pays ${outcome.multiplier}×` : "loses the stake"
+        }`,
+    )
+    .join(" · ");
 const collectionRarities = [...rarities, "Mythic", "Chase", "Secret"];
 const $ = (s, root = document) => root.querySelector(s);
 const esc = (s) =>
@@ -88,6 +108,9 @@ const icons = {
     '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>',
   chevron: '<path d="m9 5 7 7-7 7"/>',
   coin: '<circle cx="12" cy="12" r="9"/><path d="M15 7h-3a3 3 0 0 0-3 3v7m-2-5h7m-6 5h8"/>',
+  slots:
+    '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 5v14m5-14v14m5-14v14M3 12h18"/>',
+  bolt: '<path d="M13 2 5 13h5l-2 9 9-12h-5l2-8Z"/>',
   settings:
     '<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.6a7.8 7.8 0 0 1-1.5.9L16 21h-3l-.3-2.1a7.8 7.8 0 0 1-1.5-.9l-1.7.6-1.4-2.4 1.4-1.1a7 7 0 0 1 0-1.8l-1.4-1.1 1.4-2.4 1.7.6a7.8 7.8 0 0 1 1.5-.9L13 7h3l.3 2.1a7.8 7.8 0 0 1 1.5.9l1.7-.6 1.4 2.4-1.4 1.1a7 7 0 0 1-.1 2.1Z"/>',
 };
@@ -114,6 +137,9 @@ let state = {
   ukKind: "all",
   ukLimit: 40,
   indexFamily: "all",
+  slotBet: 1000,
+  slotLast: null,
+  slotStats: { spins: 0, wagered: 0, returned: 0 },
   muted: false,
   busy: false,
 };
@@ -252,6 +278,7 @@ const tabs = [
   "loadout",
   "upgrades",
   "pot",
+  "slots",
   "friends",
   "rewards",
   "leaderboards",
@@ -812,6 +839,220 @@ async function potView() {
     if (v === renderVersion && request === viewRequest) errorView(e);
   }
 }
+const slotSpinOrder = ["coin", "crown", "pot", "face", "bolt"];
+const slotStripCells = 20;
+const slotCellHtml = (symbol) =>
+  `<div class="slot-cell${symbol === "face" ? " slot-cell-face" : ""}" data-slot-symbol="${symbol}">${
+    symbol === "face"
+      ? `<img src="${image("/img/slot-face.webp", 400)}" alt="" draggable="false">`
+      : icon(symbol)
+  }</div>`;
+const slotBlurStrip = () =>
+  Array.from({ length: slotStripCells }, (_, i) => slotCellHtml(slotSpinOrder[i % slotSpinOrder.length])).join("");
+const slotLandStrip = (finalSymbol) =>
+  Array.from({ length: slotStripCells }, (_, i) =>
+    slotCellHtml(i === slotStripCells - 1 ? finalSymbol : slotSpinOrder[(i * 2 + 1) % slotSpinOrder.length]),
+  ).join("");
+const slotReducedMotion = () =>
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
+const slotStakePence = () => {
+  const raw = String($("#slot-stake")?.value ?? "").trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(raw)) return NaN;
+  return Math.round(Number(raw) * 100);
+};
+function slotPaytable(bet) {
+  const rows = [...slotOutcomes].reverse();
+  return rows
+    .map(
+      (outcome) =>
+        `<div class="slot-pay-row${outcome.multiplier >= 25 ? " slot-pay-big" : ""}">${
+          outcome.symbol
+            ? `<span class="slot-pay-glyph${outcome.symbol === "face" ? " is-face" : ""}">${
+                outcome.symbol === "face"
+                  ? `<img src="${image("/img/slot-face.webp", 200)}" alt="">`
+                  : icon(outcome.symbol)
+              }</span>`
+            : '<span class="slot-pay-glyph is-miss">–</span>'
+        }<span class="slot-pay-label">${esc(outcome.label)}</span><b>${
+          outcome.multiplier ? outcome.multiplier + "×" : "—"
+        }</b><i>${money(bet * outcome.multiplier)}</i><small>${slotPercent(outcome.weight)}% · 1 in ${(
+          slotWeight() / outcome.weight
+        ).toLocaleString("en-GB", { maximumFractionDigits: 1 })}</small></div>`,
+    )
+    .join("");
+}
+function slotsView() {
+  const balance = Number(state.account?.balance || 0);
+  const bet = Math.min(Math.max(state.slotBet, slotLimits.minPence), slotLimits.maxPence);
+  const maxBet = Math.min(slotLimits.maxPence, balance);
+  const presets = [slotLimits.minPence, 2500, 10000, 50000, 100000, 250000, 1000000].filter(
+    (amount) => amount <= slotLimits.maxPence && amount !== bet,
+  );
+  const last = state.slotLast;
+  const reels = last ? last.reels : ["coin", "crown", "pot"];
+  const stats = state.slotStats;
+  const edge = (100 - slotReturnRate() * 100).toFixed(1);
+  $("#main").innerHTML =
+    title(
+      "THE MONARCH PARLOUR",
+      "Three in a row.",
+      "Choose a stake, pull the lever and watch the reels settle. Every line pays a multiple of your stake.",
+    ) +
+    `<div class="slots-layout"><section class="panel slot-machine" data-slot-machine><div class="slot-cabinet"><div class="slot-marquee">${icon("crown")}<span>MONARCH SLOTS</span>${icon("crown")}</div><div class="slot-reels">${reels
+      .map(
+        (symbol, index) =>
+          `<div class="slot-reel" data-reel="${index}"><div class="slot-strip">${slotCellHtml(symbol)}</div></div>`,
+      )
+      .join("")}</div><div class="slot-payline" aria-hidden="true"></div><div class="slot-glare" aria-hidden="true"></div></div><p id="slot-status" class="slot-status" role="status" aria-live="polite">${
+      last
+        ? last.payout > 0
+          ? `${esc(last.outcome.label)} · ${last.outcome.multiplier}× · ${money(last.payout)} credited.`
+          : `${esc(last.outcome.label)} · ${money(last.bet)} stake lost.`
+        : "Set your stake and pull the lever."
+    }</p><div class="slot-stake-row"><label class="slot-stake-label" for="slot-stake"><span>Stake</span><span class="slot-stake-input"><i>£</i><input id="slot-stake" type="number" min="5" max="12000" step="1" inputmode="decimal" value="${(bet / 100).toFixed(2)}"></span></label><div class="slot-stake-side"><div class="slot-presets">${presets
+      .map(
+        (amount) =>
+          `<button type="button" class="button ghost small" data-action="slot-stake" data-amount="${amount}">${money(amount)}</button>`,
+      )
+      .join("")}<button type="button" class="button ghost small" data-action="slot-stake" data-amount="max">Max ${money(maxBet)}</button></div><p class="fine-print">Minimum ${money(slotLimits.minPence)} · maximum ${money(slotLimits.maxPence)} or your whole balance, whichever is smaller. You hold ${money(balance)}.</p></div></div><div class="slot-win-lines"><span>${slotPercent(slotMissWeight)}% lose the stake</span><span>${slotPercent(
+      slotWeight() - slotMissWeight,
+    )}% line up a win</span><span>${slotPercent(slotBigWeight)}% pay 10× or more</span></div><button class="button full slot-lever" data-action="slot-spin" ${
+      state.user && balance >= bet ? "" : "disabled"
+    }>${
+      state.user
+        ? balance >= bet
+          ? `Pull the lever · ${money(bet)} ${icon("spark")}`
+          : `Stake more than your ${money(balance)} balance`
+        : "Sign in to play"
+    }</button><p class="slot-session" data-slot-session>${
+      stats.spins
+        ? `${stats.spins} spin${stats.spins === 1 ? "" : "s"} this visit · wagered ${money(stats.wagered)} · returned ${money(stats.returned)} · net ${money(stats.returned - stats.wagered)}`
+        : "No spins yet this visit."
+    }</p></section><aside class="panel slot-side"><div class="spin-heading"><div><span class="eyebrow">PAYTABLE</span><h2>What each line pays</h2><p>Multipliers apply to your current ${money(bet)} stake.</p></div></div><div class="slot-pay-list" data-slot-paytable>${slotPaytable(bet)}</div><div class="slot-edge"><span>House edge</span><strong>${edge}% per spin</strong></div><p class="fine-print">Roughly ${money(slotReturnRate() * 10000)} of every ${money(10000)} staked comes back as an average. The parlour is a slow drain: it is a way to burn or grow a stack quickly, not a living.</p><p class="fine-print">Odds are fixed server-side and rolled with cryptographic randomness on every spin: ${slotOddsNote()}. A win credits your virtual balance in the same transaction that takes the stake. ${slotPercent(slotBigWeight)}% of spins pay 10× or more.</p></aside></div>`;
+  if (last) $("[data-slot-machine]").classList.add("has-result");
+}
+function updateSlotStake() {
+  const bet = Number.isSafeInteger(slotStakePence()) ? slotStakePence() : state.slotBet;
+  state.slotBet = Math.min(Math.max(bet, slotLimits.minPence), slotLimits.maxPence);
+  const table = $("[data-slot-paytable]");
+  if (table) table.innerHTML = slotPaytable(state.slotBet);
+  const lever = $('[data-action="slot-spin"]');
+  const balance = Number(state.account?.balance || 0);
+  if (lever) {
+    lever.disabled = !state.user || balance < state.slotBet;
+    lever.innerHTML = state.user
+      ? balance >= state.slotBet
+        ? `Pull the lever · ${money(state.slotBet)} ${icon("spark")}`
+        : `Stake more than your ${money(balance)} balance`
+      : "Sign in to play";
+  }
+  const note = $(".slot-side h2")?.parentElement?.querySelector("p");
+  if (note) note.textContent = `Multipliers apply to your current ${money(state.slotBet)} stake.`;
+}
+async function slotSpinAction() {
+  const machine = $("[data-slot-machine]");
+  if (!machine || state.busy) return;
+  const raw = slotStakePence();
+  if (!Number.isSafeInteger(raw)) {
+    toast("Enter a stake in pounds with at most two decimals.");
+    return;
+  }
+  const bet = raw;
+  if (bet < slotLimits.minPence || bet > slotLimits.maxPence) {
+    toast(`Stakes run from ${money(slotLimits.minPence)} to ${money(slotLimits.maxPence)}.`);
+    return;
+  }
+  if (bet > Number(state.account?.balance || 0)) {
+    toast("That stake is bigger than your virtual balance.");
+    return;
+  }
+  state.busy = true;
+  state.slotBet = bet;
+  const lever = $('[data-action="slot-spin"]');
+  if (lever) lever.disabled = true;
+  const status = $("#slot-status");
+  const reduced = slotReducedMotion();
+  const reels = Array.from(machine.querySelectorAll(".slot-reel"));
+  machine.classList.add("is-spinning");
+  machine.classList.remove("is-jackpot", "is-big");
+  if (!reduced) {
+    machine.classList.remove("has-result");
+    reels.forEach((reel) => {
+      reel.classList.add("spinning");
+      const strip = reel.querySelector(".slot-strip");
+      strip.style.transition = "";
+      strip.style.transform = "";
+      strip.innerHTML = slotBlurStrip();
+    });
+  }
+  try {
+    const result = await api("slots", { bet });
+    state.account = result.account;
+    $("#wallet-value").textContent = money(Number(result.account.balance));
+    state.slotLast = result;
+    state.slotStats.spins += 1;
+    state.slotStats.wagered += result.bet;
+    state.slotStats.returned += result.payout;
+    const big = result.outcome.multiplier >= 10;
+    if (!reduced) {
+      const cellHeight = reels[0].clientHeight;
+      const settle = (reel, symbol, delay) =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            const strip = reel.querySelector(".slot-strip");
+            reel.classList.remove("spinning");
+            strip.innerHTML = slotLandStrip(symbol);
+            strip.style.transition = "none";
+            strip.style.transform = "translateY(0)";
+            strip.getBoundingClientRect();
+            strip.style.transition = `transform ${big ? 1.45 : 1.05}s cubic-bezier(.22,.84,.28,1.06)`;
+            strip.style.transform = `translateY(-${(slotStripCells - 1) * cellHeight}px)`;
+            setTimeout(resolve, big ? 1500 : 1100);
+          }, delay);
+        });
+      for (let index = 0; index < reels.length; index++) {
+        await settle(reels[index], result.reels[index], index * 200);
+      }
+    } else {
+      reels.forEach((reel, index) => {
+        reel.querySelector(".slot-strip").innerHTML = slotCellHtml(result.reels[index]);
+      });
+    }
+    machine.classList.remove("is-spinning");
+    if (status) {
+      status.textContent =
+        result.payout > 0
+          ? `${result.outcome.label} · ${result.outcome.multiplier}× · ${money(result.payout)} credited.`
+          : `${result.outcome.label} · ${money(result.bet)} stake lost.`;
+      status.classList.toggle("is-win", result.payout > 0);
+      status.classList.toggle("is-jackpot", result.outcome.id === "jackpot");
+    }
+    machine.classList.toggle("is-jackpot", result.outcome.id === "jackpot");
+    machine.classList.toggle("is-big", big && result.outcome.id !== "jackpot");
+    const session = $("[data-slot-session]");
+    if (session)
+      session.textContent = `${state.slotStats.spins} spin${
+        state.slotStats.spins === 1 ? "" : "s"
+      } this visit · wagered ${money(state.slotStats.wagered)} · returned ${money(
+        state.slotStats.returned,
+      )} · net ${money(state.slotStats.returned - state.slotStats.wagered)}`;
+    sound(result.outcome.id === "jackpot" || result.outcome.id === "triple" ? "Mythic" : big ? "Crown" : result.payout ? "Epic" : "Common");
+    if (result.outcome.id === "jackpot")
+      toast(`Monarch jackpot! ${money(result.payout)} lands in your balance.`);
+    else if (big) toast(`${result.outcome.label} pays ${result.outcome.multiplier}× — ${money(result.payout)}.`);
+  } catch (e) {
+    machine.classList.remove("is-spinning");
+    reels.forEach((reel) => {
+      reel.classList.remove("spinning");
+      reel.querySelector(".slot-strip").innerHTML = slotCellHtml("crown");
+    });
+    if (status) status.textContent = e.message;
+    toast(e.message);
+  } finally {
+    state.busy = false;
+    updateSlotStake();
+  }
+}
 function rewardsView() {
   const a = state.account;
   const earned =
@@ -1070,6 +1311,7 @@ function render() {
       loadout: loadoutView,
       upgrades: upgradesView,
       rewards: rewardsView,
+      slots: slotsView,
       pot: potView,
       friends: friendsView,
       leaderboards: leaderboardView,
@@ -1093,7 +1335,7 @@ window.addEventListener("hashchange", () => {
     render();
     if (
       state.user &&
-      ["collection", "index", "loadout", "upgrades", "profile", "friends"].includes(v)
+      ["collection", "index", "loadout", "upgrades", "profile", "friends", "slots"].includes(v)
     )
       sync()
         .then(() => {
@@ -1134,7 +1376,7 @@ function settingsModal() {
     return;
   }
   showModal(
-    `<span class="eyebrow">YOUR COURT, YOUR CALL</span><h2>Account settings</h2><p>Choose the username other players see. It must be unique.</p><form id="username-form"><label for="username-input">Username</label><input id="username-input" name="username" value="${esc(state.account.username)}" minlength="3" maxlength="24" pattern="[A-Za-z0-9_ -]+" autocomplete="nickname" required><p class="form-error" role="alert"></p><button class="button full">Save username ${icon("arrow")}</button></form><div class="settings-divider"></div><section class="panel patch-notes"><span class="eyebrow">LATEST UPDATE · 28 OCTOBER 2026</span><h3>UK icons & stronger ordinary pulls</h3><ul><li>${ordinaryPullNote}</li><li>The UK collection brings 40 celebrities and 30 locations, including the £6,000 Paul McCartney Chase. Each £600 pack contains five cards. Free Palestine is a separate £8,000 Secret; special trophies are excluded from the 70 core cards.</li><li>Windfall remains a separate ${100 * WINDFALL_CHANCE / WINDFALL_ROLL_SCALE}% per-pack roll for a trophy worth 5.5× the listed price. It only replaces a cheaper ordinary card and never removes an Alpha, Chase, Mythic or Secret.</li><li>${secretRollNote()}</li><li>Play rewards grow from ${money(playReward.firstPence)} in ${money(playReward.increasePence)} steps every 10 active minutes, up to ${money(playReward.dailyCap)} daily. Daily quests offer ${money(dailyQuests.reduce((total, quest) => total + quest.reward, 0))} total. The free spin has ${spinPercent(dailySpinSegments.filter((segment) => !segment.reward).reduce((total, segment) => total + segment.weight, 0))}% no-prize odds and a ${money(silverPrize().reward)} jackpot at ${spinPercent(silverPrize().weight)}%.</li></ul></section><section class="panel patch-notes"><span class="eyebrow">EARLIER UPDATE · 28 OCTOBER 2026</span><h3>The payday pull</h3><ul><li>Some packs carry a separate Payday roll, replacing a lower-value eligible card. Current card values and per-pack chances are disclosed in Know your odds.</li></ul></section><section class="panel patch-notes"><span class="eyebrow">EARLIER UPDATE · 28 OCTOBER 2026</span><h3>The comeback promise & a luckier Brainrot</h3><ul><li>Lose money on three packs in a row and your next pack contains no Common cards: every card is Uncommon or better. The promise is spent when that pack opens, a losing comeback pack still counts as the first loss of your next streak, and every pack type counts toward the same streak.</li><li>Friends can now send virtual cash from the Friends tab: 1p–£100 per gift, up to 10 gifts per UTC day, straight from your balance.</li><li>Secret cards sit outside the Card Index. Their daily eligibility and current chances are disclosed in Know your odds.</li><li>Secret cards carry new power-ups: up to 20% off one random pack each day, bonus Secret chance, Epic/Crown shifts and a 50p recurring pack discount.</li><li>Claim completed daily quests from Rewards; rewards and limits come from the shared game rules.</li><li>Current ordinary odds and separate special chances are shown in Know your odds.</li><li>Power-ups now scale with card quality: Uncommon cards only nudge Uncommon odds, Epic cards stay modest, and Crown and Chase cards carry the real boosts. Each +0.10% Crown now adds 10% to the chase chance instead of 25%.</li><li>Every named Chase card now carries a positive power-up, so the rarest pulls are never a downgrade.</li><li>Completed Card Index sets pay £10–£50 cash once both permanent odds caps are full, so every completed set still has a reward.</li><li>Multi-pack openings now play every special animation side by side, including a full-length Andy Burnham sequence and new Secret reveals.</li><li>The rewards dot only appears when there is something to claim. Loadout caps are now +2.50% Epic / +1.00% Crown; index caps remain +2.00% Epic / +0.40% Crown.</li></ul></section><button class="button ghost full" data-action="change-user">Switch Google account</button><button class="text-button full" data-action="logout">Log out</button>`,
+    `<span class="eyebrow">YOUR COURT, YOUR CALL</span><h2>Account settings</h2><p>Choose the username other players see. It must be unique.</p><form id="username-form"><label for="username-input">Username</label><input id="username-input" name="username" value="${esc(state.account.username)}" minlength="3" maxlength="24" pattern="[A-Za-z0-9_ -]+" autocomplete="nickname" required><p class="form-error" role="alert"></p><button class="button full">Save username ${icon("arrow")}</button></form><div class="settings-divider"></div><section class="panel patch-notes"><span class="eyebrow">LATEST UPDATE · 29 OCTOBER 2026</span><h3>The slot room &amp; a fairer coin flip</h3><ul><li><strong>New: Slots.</strong> Choose any stake from ${money(slotLimits.minPence)} to ${money(slotLimits.maxPence)} and pull the lever on three reels. You lose the stake 60% of the time and line up a win the other 40%, from 2× up to the 100× Monarch jackpot that lands the face on all three reels. Every win pays a whole multiple of your stake, so a ${money(slotLimits.minPence)} spin tops out at ${money(slotLimits.minPence * 100)} — small stakes never mint millions. The server rolls, the ledger pays, and reduced-motion settles the reels straight to their symbols.</li><li><strong>Every pack rebalanced</strong> to roughly fifty-fifty: 44.3%–52.7% of openings now recover their price, and losses bite — 21.8%–53.6% of openings return less than 75% of the price you paid. Returns of 2×–10× land in 11.3%–30.9% of openings.</li><li><strong>The Apex Alpha Pack is now ${money(15000)}</strong> for five cards with 30% Crown and 0.5% Alpha odds. That repricing is what finally lets the pack lose heavily while keeping its Crown guarantee.</li><li><strong>Rarity ladders are honest now:</strong> no pack makes a rarer tier more likely than a cheaper one, and each collection's values were re-laddered so commons are dust, mid tiers sit near the pack price and Crowns carry the wins.</li><li><strong>Payday cards pay properly:</strong> each one is worth about 2.1× its pack price, so a 1-in-25 Payday hit usually lands the 2×–5× band on its own.</li><li><strong>Buffs rebalanced on every card:</strong> Epic cards are now a real loadout tier (+0.32% to +0.40% Epic each, so five reach +2.00% of the +2.50% cap), Uncommons nudge Uncommon odds by up to +0.80%, and every Chase keeps an all-positive boost. The UK Secret moved up to the Vault power tier.</li><li>${ordinaryPullNote}</li></ul></section><section class="panel patch-notes"><span class="eyebrow">EARLIER UPDATE · 28 OCTOBER 2026</span><h3>UK icons & stronger ordinary pulls</h3><ul><li>${ordinaryPullNote}</li><li>The UK collection brings 40 celebrities and 30 locations, including the £6,000 Paul McCartney Chase. Each £600 pack contains five cards. Free Palestine is a separate £8,000 Secret; special trophies are excluded from the 70 core cards.</li><li>Windfall remains a separate ${100 * WINDFALL_CHANCE / WINDFALL_ROLL_SCALE}% per-pack roll for a trophy worth 5.5× the listed price. It only replaces a cheaper ordinary card and never removes an Alpha, Chase, Mythic or Secret.</li><li>${secretRollNote()}</li><li>Play rewards grow from ${money(playReward.firstPence)} in ${money(playReward.increasePence)} steps every 10 active minutes, up to ${money(playReward.dailyCap)} daily. Daily quests offer ${money(dailyQuests.reduce((total, quest) => total + quest.reward, 0))} total. The free spin has ${spinPercent(dailySpinSegments.filter((segment) => !segment.reward).reduce((total, segment) => total + segment.weight, 0))}% no-prize odds and a ${money(silverPrize().reward)} jackpot at ${spinPercent(silverPrize().weight)}%.</li></ul></section><section class="panel patch-notes"><span class="eyebrow">EARLIER UPDATE · 28 OCTOBER 2026</span><h3>The payday pull</h3><ul><li>Some packs carry a separate Payday roll, replacing a lower-value eligible card. Current card values and per-pack chances are disclosed in Know your odds.</li></ul></section><section class="panel patch-notes"><span class="eyebrow">EARLIER UPDATE · 28 OCTOBER 2026</span><h3>The comeback promise & a luckier Brainrot</h3><ul><li>Lose money on three packs in a row and your next pack contains no Common cards: every card is Uncommon or better. The promise is spent when that pack opens, a losing comeback pack still counts as the first loss of your next streak, and every pack type counts toward the same streak.</li><li>Friends can now send virtual cash from the Friends tab: 1p–£100 per gift, up to 10 gifts per UTC day, straight from your balance.</li><li>Secret cards sit outside the Card Index. Their daily eligibility and current chances are disclosed in Know your odds.</li><li>Secret cards carry new power-ups: up to 20% off one random pack each day, bonus Secret chance, Epic/Crown shifts and a 50p recurring pack discount.</li><li>Claim completed daily quests from Rewards; rewards and limits come from the shared game rules.</li><li>Current ordinary odds and separate special chances are shown in Know your odds.</li><li>Power-ups now scale with card quality: Uncommon cards only nudge Uncommon odds, Epic cards stay modest, and Crown and Chase cards carry the real boosts. Each +0.10% Crown now adds 10% to the chase chance instead of 25%.</li><li>Every named Chase card now carries a positive power-up, so the rarest pulls are never a downgrade.</li><li>Completed Card Index sets pay £10–£50 cash once both permanent odds caps are full, so every completed set still has a reward.</li><li>Multi-pack openings now play every special animation side by side, including a full-length Andy Burnham sequence and new Secret reveals.</li><li>The rewards dot only appears when there is something to claim. Loadout caps are now +2.50% Epic / +1.00% Crown; index caps remain +2.00% Epic / +0.40% Crown.</li></ul></section><button class="button ghost full" data-action="change-user">Switch Google account</button><button class="text-button full" data-action="logout">Log out</button>`,
     "settings-modal",
   );
 }
@@ -1792,6 +2034,26 @@ document.addEventListener("click", async (e) => {
       toast(`Loadout slot ${Number(result.account.loadout_slots)} unlocked for ${money(upgradePrices.loadoutSlots[Number(result.account.loadout_slots)])} virtual cash.`);
       return;
     }
+    if (action === "slot-stake") {
+      const amount =
+        target.dataset.amount === "max"
+          ? Math.min(
+              slotLimits.maxPence,
+              Number(state.account?.balance || slotLimits.minPence),
+            )
+          : Number(target.dataset.amount);
+      const input = $("#slot-stake");
+      if (!input) return;
+      input.value = (Math.round(amount) / 100).toFixed(2);
+      state.slotBet = Math.round(amount);
+      updateSlotStake();
+      return;
+    }
+    if (action === "slot-spin") {
+      if (!requireUser()) return;
+      await slotSpinAction();
+      return;
+    }
     if (action === "spin-wheel") {
       if (!requireUser() || state.busy) return;
       state.busy = true;
@@ -2167,6 +2429,10 @@ document.addEventListener("change", (e) => {
   collection();
 });
 document.addEventListener("input", (e) => {
+  if (e.target.id === "slot-stake") {
+    updateSlotStake();
+    return;
+  }
   if (e.target.id === "uk-search") {
     const start = e.target.selectionStart;
     const end = e.target.selectionEnd;

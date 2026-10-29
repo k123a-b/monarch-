@@ -35,6 +35,7 @@ test(
     const indexUser = { id: randomUUID(), name: "Test Index " + suffix };
     const questUser = { id: randomUUID(), name: "Test Quests " + suffix };
     const secretUser = { id: randomUUID(), name: "Test Secret " + suffix };
+    const slotUser = { id: randomUUID(), name: "Test Slots " + suffix };
     const roundId = -Date.now();
     async function request(user, path, body) {
       const req = new Request("http://localhost:8889/api/" + path, {
@@ -875,8 +876,60 @@ test(
           );
         },
       );
+      await t.test(
+        "slots debit the stake and credit the win through the ledger in one transaction",
+        async () => {
+          await request(slotUser, "me");
+          await query(
+            "UPDATE accounts SET balance=25000 WHERE id=$1",
+            [slotUser.id],
+          );
+          for (const bet of [0, 499, 1200001, 1000.5, -500, "5000"]) {
+            const rejected = await request(slotUser, "slots", { bet });
+            assert.equal(rejected.status, 400, `stake ${bet} is rejected`);
+          }
+          assert.equal(
+            Number((await request(slotUser, "me")).data.account.balance),
+            25000,
+            "an illegal stake changes nothing",
+          );
+          const spin = await request(slotUser, "slots", { bet: 5000 });
+          assert.equal(spin.status, 200);
+          const { payout, bet, reels, account, outcome } = spin.data;
+          assert.equal(bet, 5000);
+          assert.equal(payout, 5000 * outcome.multiplier);
+          assert.ok(Array.isArray(reels) && reels.length === 3);
+          assert.equal(reels.every((symbol) => symbol === reels[0]), payout > 0);
+          assert.equal(
+            Number(account.balance),
+            25000 - 5000 + payout,
+            "the balance nets the stake and the win exactly",
+          );
+          assert.ok(Number(account.balance) >= 0);
+          const rows = (
+            await query(
+              "SELECT reason, amount FROM ledger WHERE user_id=$1 ORDER BY id DESC LIMIT 2",
+              [slotUser.id],
+            )
+          ).rows;
+          assert.equal(rows.length, payout > 0 ? 2 : 1);
+          assert.equal(rows[0].reason, "Slots stake");
+          assert.equal(rows[0].amount, -5000);
+          if (payout > 0) {
+            assert.ok(rows[1].reason.startsWith("Slots win"));
+            assert.equal(rows[1].amount, payout);
+          }
+          const tooBig = await request(slotUser, "slots", { bet: 1200000 });
+          assert.equal(tooBig.status, 409);
+          assert.equal(
+            Number((await request(slotUser, "me")).data.account.balance),
+            Number(account.balance),
+            "an unaffordable stake leaves the balance alone",
+          );
+        },
+      );
     } finally {
-      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id, batchUser.id, indexUser.id, questUser.id, secretUser.id];
+      const users = [a.id, b.id, alternateLogin.id, milestoneUser.id, batchUser.id, indexUser.id, questUser.id, secretUser.id, slotUser.id];
       await query("DELETE FROM inventory WHERE owner_id=ANY($1::text[])", [
         users,
       ]);
