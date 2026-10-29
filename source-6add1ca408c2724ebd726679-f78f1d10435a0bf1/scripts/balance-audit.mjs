@@ -154,6 +154,7 @@ const report = packs.map((pack) => {
     winningPacks: `${(((samples - result.loss) / samples) * 100).toFixed(1)}%`,
     losingPacks: `${((result.loss / samples) * 100).toFixed(1)}%`,
     lossesOfAtLeast25Percent: `${((result.substantialLoss / samples) * 100).toFixed(1)}%`,
+    winsAtLeast2x: `${(((result.mediumWin + result.jackpot) / samples) * 100).toFixed(1)}%`,
     smallWinsUnder2x: `${((result.smallWin / samples) * 100).toFixed(1)}%`,
     moderateWins2xTo5x: `${((result.moderateWin / samples) * 100).toFixed(1)}%`,
     mediumWins2xTo10x: `${((result.mediumWin / samples) * 100).toFixed(1)}%`,
@@ -251,8 +252,15 @@ for (const [index, pack] of report.entries()) {
     problems.push(`${pack.pack}: both wins and losses must remain possible`);
   if (!(Number.parseFloat(pack.lossesOfAtLeast25Percent) > 0))
     problems.push(`${pack.pack}: no substantial losses observed`);
-  if (!(Number.parseFloat(pack.smallWinsUnder2x) > 0))
-    problems.push(`${pack.pack}: no small wins observed`);
+  if (!(Number.parseFloat(pack.winsAtLeast2x) >= 20))
+    problems.push(`${pack.pack}: fewer than a fifth of packs pay twice the price`);
+  if (
+    !(
+      Number.parseFloat(pack.smallWinsUnder2x) <=
+      Number.parseFloat(pack.winsAtLeast2x)
+    )
+  )
+    problems.push(`${pack.pack}: most wins only recover the price`);
   if (!(Number.isFinite(rtp) && rtp > 0))
     problems.push(`${pack.pack}: invalid simulated return`);
   if (!packs[index].jackpot || !cardMap[packs[index].jackpot])
