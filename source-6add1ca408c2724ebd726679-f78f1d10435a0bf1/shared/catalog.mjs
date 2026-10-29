@@ -269,11 +269,11 @@ const chases = [
   ["apex-crown", "Apex Crown", 150000, "⚡", "royal"],
   ["kim", "Kim Jong Un", 1500000, "🌏", "world"],
   // Payday cards only ever come from their own pack's separate 1-in-25 roll.
-  ["payday-vault", "The Vault Key", 4200, "🗝", "royal"],
-  ["payday-apex", "Apex Sigil", 17500, "🔱", "royal"],
-  ["payday-fortnite", "Golden Llama", 20500, "🦙", "fortnite"],
-  ["payday-fastfood", "Golden Receipt", 48000, "🧾", "fastfood"],
-  ["payday-uk", "The Golden Ticket", 105000, "", "uk"],
+  ["payday-vault", "The Vault Key", 5200, "🗝", "royal"],
+  ["payday-apex", "Apex Sigil", 31000, "🔱", "royal"],
+  ["payday-fortnite", "Golden Llama", 26000, "🦙", "fortnite"],
+  ["payday-fastfood", "Golden Receipt", 62000, "🧾", "fastfood"],
+  ["payday-uk", "The Golden Ticket", 126000, "", "uk"],
 ].map(([id, name, value, emoji, set]) => ({
   id,
   name,
@@ -300,7 +300,7 @@ const windfalls = [
   ["brainrot", "Algorithm Windfall", "brainrot", 1100],
   ["royalty", "Royal Dividend", "royal", 3300],
   ["vault", "Treasury Windfall", "royal", 13750],
-  ["apex", "Sovereign Dividend", "royal", 55000],
+  ["apex", "Sovereign Dividend", "royal", 82500],
   ["fortnite", "Victory Windfall", "fortnite", 68750],
   ["world", "World Dividend", "world", 5500],
   ["fastfood", "Franchise Dividend", "fastfood", 165000],
@@ -616,10 +616,10 @@ const liftedValues = new Map([
   ["mythic-apex", 2400000],
   ["mythic-fortnite", 1600000],
   ["mystery-gold", 36500],
-  ["payday-vault", 4200],
-  ["payday-apex", 17500],
-  ["payday-fortnite", 20500],
-  ["payday-fastfood", 48000],
+  ["payday-vault", 5200],
+  ["payday-apex", 31000],
+  ["payday-fortnite", 26000],
+  ["payday-fastfood", 62000],
 ]);
 const fortniteFixedEpics = new Set([
   "fortnite-fishstick",
@@ -636,6 +636,62 @@ function bandValue(value, [sourceLow, sourceHigh, low, high]) {
   const clamped = Math.min(sourceHigh, Math.max(sourceLow, value));
   const t = sourceHigh === sourceLow ? 0 : (clamped - sourceLow) / (sourceHigh - sourceLow);
   return Math.round(low + t * (high - low));
+}
+// A pack only reads as a gamble when its tiers straddle the price: dust well
+// under it, a mid tier near it and a carrier tier above it. These factors slide
+// each set's pullable pool onto that ladder so roughly half the packs lose and
+// a third of them pay two times or more. Headline cards keep authored values.
+const tierScales = {
+  "brainrot:Common": 1.47,
+  "brainrot:Uncommon": 0.62,
+  "brainrot:Crown": 0.46,
+  "royal:Common": 0.67,
+  "royal:Uncommon": 0.95,
+  "royal:Epic": 1.79,
+  "royal:Crown": 2.47,
+  "fortnite:Common": 0.2,
+  "fortnite:Uncommon": 0.3,
+  "fortnite:Epic": 1.69,
+  "fortnite:Crown": 0.18,
+  "world:Common": 0.35,
+  "world:Uncommon": 0.25,
+  "world:Crown": 0.69,
+  "fastfood:Common": 0.47,
+  "fastfood:Uncommon": 0.45,
+  "fastfood:Epic": 0.93,
+  "fastfood:Crown": 0.47,
+  "uk:Common": 0.53,
+  "uk:Uncommon": 0.93,
+  "uk:Epic": 0.57,
+  "uk:Crown": 0.66,
+};
+const authoredValues = new Set([
+  "kim",
+  "world-former-keir-starmer",
+  "fortnite-renegade-raider",
+  "world-b8356339d506f77d",
+  "world-38b1a8656815ee75",
+  "world-israel-flag",
+  "world-c6af8a1c1faf4aae",
+  "world-4a1d751b1005de43",
+]);
+function tierScale(card) {
+  return (
+    authoredValues.has(card.id) ||
+    card.id.startsWith("windfall-") ||
+    // Nation flags are authored as penny collectables and stay at those prices.
+    card.id.startsWith("world-flag-") ||
+    card.rarity === "Alpha" ||
+    card.rarity === "Chase" ||
+    card.rarity === "Mythic" ||
+    card.rarity === "Secret"
+  )
+    ? 1
+    : (tierScales[`${card.set}:${card.rarity}`] ?? 1);
+}
+function scaleValue(value, factor) {
+  if (factor === 1) return value;
+  return Math.sign(value) * Math.max(1, Math.round(Math.abs(value) * factor));
 }
 function liftValue(card, value) {
   if (liftedValues.has(card.id)) return liftedValues.get(card.id);
@@ -722,7 +778,10 @@ export const catalog = [
       !portraits[c.id] &&
       !c.image),
   ),
-})).map((c) => ({ ...c, value: liftValue(c, c.value) }));
+})).map((c) => ({
+  ...c,
+  value: scaleValue(liftValue(c, c.value), tierScale(c)),
+}));
 export const cardMap = Object.fromEntries(catalog.map((c) => [c.id, c]));
 const rarityPowerups = Object.freeze({
   // Cheap cards may nudge Uncommon odds or offer a discount, but they never
@@ -739,24 +798,26 @@ const rarityPowerups = Object.freeze({
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
     { name: "No power-up", epicBonus: 0 },
-    { name: "Small lucky lift", epicBonus: 10000 },
-    { name: "Uncommon nudge", epicBonus: 0, uncommonBonus: 25000 },
+    { name: "Small lucky lift", epicBonus: 20000 },
+    { name: "Uncommon nudge", epicBonus: 0, uncommonBonus: 35000 },
     { name: "Slight stumble", epicBonus: -10000 },
     { name: "Thrifty crown", epicBonus: 0, packDiscount: 10 },
   ],
   Uncommon: [
-    { name: "Uncommon lift", epicBonus: 0, uncommonBonus: 60000 },
-    { name: "A little luck", epicBonus: 0, uncommonBonus: 40000 },
-    { name: "Steady hands", epicBonus: 15000 },
-    { name: "Gentle stumble", epicBonus: -25000 },
+    { name: "Uncommon lift", epicBonus: 0, uncommonBonus: 80000 },
+    { name: "A little luck", epicBonus: 0, uncommonBonus: 55000 },
+    { name: "Steady hands", epicBonus: 30000 },
+    { name: "Gentle stumble", epicBonus: -20000 },
     { name: "No power-up", epicBonus: 0 },
   ],
+  // Epic cards are the first loadout tier a player can really build around, so
+  // five of them now reach most of the +2.50% Epic cap instead of a quarter.
   Epic: [
-    { name: "Court's favor", epicBonus: 120000 },
-    { name: "Measured momentum", epicBonus: 90000 },
-    { name: "Uncommon boost", epicBonus: 0, uncommonBonus: 120000 },
+    { name: "Court's favor", epicBonus: 400000 },
+    { name: "Measured momentum", epicBonus: 320000 },
+    { name: "Uncommon boost", epicBonus: 0, uncommonBonus: 200000 },
     { name: "No power-up", epicBonus: 0 },
-    { name: "Small setback", epicBonus: -30000 },
+    { name: "Small setback", epicBonus: -40000 },
   ],
   Crown: [
     { name: "Royal decree", epicBonus: 600000, crownBonus: 50000 },
@@ -778,14 +839,14 @@ const rarityPowerups = Object.freeze({
   ],
   // Chase cards are all upside; the rarest pulls should never be a downgrade.
   Chase: [
-    { name: "Chase energy", epicBonus: 500000 },
+    { name: "Chase energy", epicBonus: 650000 },
     {
       name: "Chase insight",
       epicBonus: 0,
-      uncommonBonus: 100000,
-      crownBonus: 100000,
+      uncommonBonus: 150000,
+      crownBonus: 150000,
     },
-    { name: "Chase instinct", epicBonus: 300000, crownBonus: 50000 },
+    { name: "Chase instinct", epicBonus: 450000, crownBonus: 100000 },
   ],
   Mythic: [
     {
@@ -865,10 +926,12 @@ const secretPowerups = Object.freeze({
     name: "The secret menu",
     packDiscount: 50,
   },
+  // The UK Secret sits on the Vault tier: it guards the priciest pack.
   "secret-uk": {
     name: "A little hope",
-    epicBonus: 1000000,
-    randomPackDiscount: 10,
+    epicBonus: 1500000,
+    crownBonus: 300000,
+    randomPackDiscount: 20,
     secretBonus: 200,
   },
 });
@@ -877,17 +940,17 @@ const secretPowerups = Object.freeze({
 const chasePowerups = Object.freeze({
   crocodilo: {
     name: "Crocodile surge",
-    epicBonus: 400000,
-    uncommonBonus: 100000,
+    epicBonus: 600000,
+    uncommonBonus: 150000,
   },
-  signet: { name: "Gilded edge", epicBonus: 300000, crownBonus: 100000 },
+  signet: { name: "Gilded edge", epicBonus: 500000, crownBonus: 150000 },
   sovereign: {
     name: "Vault leverage",
-    epicBonus: 200000,
-    uncommonBonus: 150000,
-    crownBonus: 50000,
+    epicBonus: 400000,
+    uncommonBonus: 200000,
+    crownBonus: 100000,
   },
-  "apex-crown": { name: "Apex instinct", epicBonus: 500000, crownBonus: 100000 },
+  "apex-crown": { name: "Apex instinct", epicBonus: 700000, crownBonus: 150000 },
 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export function cardPowerup(card) {
@@ -1027,7 +1090,7 @@ export const packs = [
     price: 200,
     count: 4,
     set: "brainrot",
-    odds: [63960000, 12000000, 24000000, 40000, 0],
+    odds: [70000000, 16000000, 9000000, 5000000, 0],
     chase: "crocodilo",
     chaseOdds: 800,
     secret: "secret-brainrot",
@@ -1046,7 +1109,7 @@ export const packs = [
     price: 600,
     count: 4,
     set: "royal",
-    odds: [56190000, 20400000, 23250000, 160000, 0],
+    odds: [66860000, 22510000, 10500000, 130000, 0],
     chase: "signet",
     chaseOdds: 1000,
     secret: "secret-royal",
@@ -1065,7 +1128,7 @@ export const packs = [
     price: 2500,
     count: 5,
     set: "royal",
-    odds: [0, 20589000, 78910000, 500000, 1000],
+    odds: [0, 66499000, 29000000, 4500000, 1000],
     chase: "sovereign",
     chaseOdds: 1000,
     payday: "payday-vault",
@@ -1083,10 +1146,10 @@ export const packs = [
     name: "Apex Alpha Pack",
     short: "APEX ALPHA",
     subtitle: "For those who were born to reign.",
-    price: 10000,
+    price: 15000,
     count: 5,
     set: "royal",
-    odds: [0, 0, 31155000, 68840000, 5000],
+    odds: [0, 0, 69500000, 30000000, 500000],
     chase: "apex-crown",
     chaseOdds: 2000,
     payday: "payday-apex",
@@ -1108,7 +1171,7 @@ export const packs = [
     price: 12500,
     count: 4,
     set: "fortnite",
-    odds: [21029000, 71668990, 7300000, 2000, 10],
+    odds: [44349990, 41620000, 7130000, 6900000, 10],
     chase: "fortnite-renegade-raider",
     chaseOdds: 40000,
     payday: "payday-fortnite",
@@ -1129,7 +1192,7 @@ export const packs = [
     price: 1000,
     count: 4,
     set: "world",
-    odds: [53750000, 22000000, 24130000, 120000, 0],
+    odds: [44000000, 42000000, 11000000, 3000000, 0],
     chase: "kim",
     chaseOdds: 45000,
     secret: "secret-world",
@@ -1148,7 +1211,7 @@ export const packs = [
     price: 30000,
     count: 5,
     set: "fastfood",
-    odds: [41748000, 51499000, 6750000, 3000, 0],
+    odds: [42000000, 34000000, 19000000, 5000000, 0],
     chase: "food-mcdonalds",
     chaseOdds: 50000,
     payday: "payday-fastfood",
@@ -1169,7 +1232,7 @@ export const packs = [
     price: 60000,
     count: 5,
     set: "uk",
-    odds: [48000000, 32000000, 19900000, 100000, 0],
+    odds: [64120000, 11040000, 19660000, 5180000, 0],
     chase: "uk-celebrity-paul-mccartney",
     chaseOdds: 25000,
     payday: "payday-uk",
