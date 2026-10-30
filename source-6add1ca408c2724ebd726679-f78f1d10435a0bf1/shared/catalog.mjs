@@ -664,7 +664,7 @@ const tierScales = {
   "fastfood:Crown": 0.47,
   "uk:Common": 0.53,
   "uk:Uncommon": 0.93,
-  "uk:Epic": 0.57,
+  "uk:Epic": 2.0,
   "uk:Crown": 0.66,
 };
 const authoredValues = new Set([
@@ -1234,7 +1234,7 @@ export const packs = [
     price: 60000,
     count: 5,
     set: "uk",
-    odds: [59500000, 22000000, 11000000, 7500000, 0],
+    odds: [65500000, 22000000, 11000000, 1500000, 0],
     chase: "uk-celebrity-paul-mccartney",
     chaseOdds: 25000,
     payday: "payday-uk",
