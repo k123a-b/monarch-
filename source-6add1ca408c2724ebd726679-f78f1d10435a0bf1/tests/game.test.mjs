@@ -60,6 +60,9 @@ import {
   validSlotBet,
   chestLootSegments,
   chestSpin,
+  chestTiers,
+  chestSegmentsFor,
+  avatarCosmetics,
 } from "../shared/rules.mjs";
 import { rateLeader } from "../shared/leader-ratings.mjs";
 import leaderData from "../shared/leaders.json" with { type: "json" };
@@ -216,9 +219,9 @@ test("Fortnite Drop Pack keeps a descending rarity ladder without inflating its 
   assert.equal(new Set(fortniteCards.map((card) => card.id)).size, 30);
   assert.ok(
     fortniteCards.every((card) =>
-      /^https:\/\/fortnite-api\.com\/images\/cosmetics\/br\/[^/]+\/icon\.png$/.test(card.image),
+      card.image.startsWith("data:image/svg+xml;charset=utf-8,"),
     ),
-    "all 30 distinct Fortnite cards point to a cosmetic portrait",
+    "all 30 distinct Fortnite cards use original in-app SVG artwork",
   );
   assert.equal(cardMap["mythic-fortnite"].rarity, "Mythic");
   assert.equal(cardMap["mythic-fortnite"].set, "fortnite");
@@ -472,6 +475,31 @@ test("treasure chest odds preserve a 0.1% Pirate Token", () => {
     }).id, segment.id);
     boundary += segment.weight;
   }
+});
+test("treasure chest tiers scale rewards without changing odds", () => {
+  assert.deepEqual(chestTiers.map((tier) => tier.scale), [1, 2, 3, 5]);
+  for (const tier of chestTiers) {
+    const segments = chestSegmentsFor(tier.id);
+    assert.equal(segments.reduce((sum, segment) => sum + segment.weight, 0), 1000000);
+    assert.equal(segments.find((segment) => segment.id === "pirate").weight, 1000);
+    assert.equal(
+      segments.find((segment) => segment.id === "pirate").reward,
+      50000 * tier.scale,
+    );
+    assert.equal(
+      chestSpin((max) => {
+        assert.equal(max, 1000000);
+        return 999999;
+      }, tier.id).id,
+      "pirate",
+    );
+  }
+});
+test("avatar cosmetics are original, priced, and unique", () => {
+  assert.equal(new Set(avatarCosmetics.map((item) => item.id)).size, avatarCosmetics.length);
+  assert.equal(avatarCosmetics[0].price, 0);
+  assert.ok(avatarCosmetics.every((item) => Number.isSafeInteger(item.price) && item.price >= 0));
+  assert.ok(avatarCosmetics.every((item) => /^#[0-9a-f]{6}$/i.test(item.accent)));
 });
 
 test("daily rewards wheel preserves eight IDs, 40% misses and an exact 0.1% £50 silver prize", () => {

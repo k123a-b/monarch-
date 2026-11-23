@@ -18,7 +18,7 @@ The Vercel and Supabase migration has not been deployed or run against a live da
 
 ## Treasure Chest
 
-The Rewards tab includes an original, once-per-UTC-day gizmo/frontier-themed Treasure Chest. It uses server-side cryptographic odds totaling one million parts. Rewards are fictional virtual cash: 40% Map Dust, 25% Moon Coins, 15% Star Crystals, 10% Gizmo Cache, 7% Frontier Relic, 2.9% Crown Chest, and 0.1% Pirate Token. The Pirate Token is presented as a £500 virtual-value token, not real-world currency or redeemable value. Apply `db/migrations/20261123090000_treasure_chest.sql` before enabling the live API; the frontend and rule tests remain usable without the migration.
+The Rewards tab includes four original once-per-UTC-day loot chests: Frontier Gizmo, Storm Drop, Grand Voyage and Epic Voyage. They use the same server-side cryptographic odds totaling one million parts, while their virtual rewards scale by 1×, 2×, 3× and 5×. Loot chances are 40% Map Dust, 25% Moon Coins, 15% Star Crystals, 10% Gizmo Cache, 7% Frontier Relic, 2.9% Crown Chest, and 0.1% Pirate Token. The base Pirate Token is £500 of virtual value; scaled chest tiers display that same one-in-one-thousand chance with the tier reward multiplier. Apply `db/migrations/20261123090000_treasure_chest.sql` and `db/migrations/20261123191100_avatar_and_chest_tracks.sql` before enabling the live tier and avatar APIs.
 
 ## Accounts and Google login
 

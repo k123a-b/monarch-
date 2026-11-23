@@ -40,6 +40,9 @@ import {
   slotOutcomes,
   chestLootSegments,
   chestSpin,
+  chestTiers,
+  chestSegmentsFor,
+  avatarCosmetics,
 } from "../shared/rules.mjs";
 const ordinaryPullNote = "Stronger ordinary pulls, real wins and losses; sell cards to credit your balance.";
 const secretRollNote = () =>
@@ -142,6 +145,7 @@ let state = {
   slotBet: 1000,
   slotLast: null,
   slotStats: { spins: 0, wagered: 0, returned: 0 },
+  chestTier: "frontier",
   muted: false,
   busy: false,
 };
@@ -156,6 +160,7 @@ let syncRequest = 0;
 const IMAGE_SIZES = [400, 500, 650];
 const image = (src, w = 500) => {
   const source = imageSource(src);
+  if (source.startsWith("data:image/svg+xml")) return source;
   if (source.startsWith("https://cdn.jsdelivr.net/npm/simple-icons@")) return source;
   const size = IMAGE_SIZES.reduce(
     (best, candidate) =>
@@ -1190,7 +1195,18 @@ function rewardsView() {
   const silver = silverPrize();
   $(".rewards-layout").insertAdjacentHTML(
     "beforeend",
-    `${questMarkup}<section class="panel treasure-chest"><div class="chest-visual"><span class="chest-sparks">✦ · · ✧</span><div class="chest-box"><span class="chest-lid"></span><span class="chest-lock">◆</span></div></div><div class="chest-copy"><span class="eyebrow">ORIGINAL FRONTIER-STYLE LOOT</span><h2>The Gizmo Treasure Chest</h2><p>Open a daily crate of map dust, moon coins, relics and strange gizmos. The 1-in-1,000 Pirate Token is worth £500 of fictional value.</p><div class="chest-odds">${chestLootSegments.map((segment) => `<span><i style="background:${segment.color}"></i><b>${esc(segment.label)}</b><small>${(segment.weight / 10000).toFixed(segment.weight % 10000 ? 2 : 1)}% · ${money(segment.reward)}</small></span>`).join("")}</div>${!state.user ? '<button class="button" data-action="auth">Sign in to open ' + icon("arrow") + "</button>" : a?.chest_day === todayKey() ? '<button class="button ghost" disabled>Chest opened today</button>' : '<button class="button" data-action="open-chest">Open today’s chest ' + icon("spark") + "</button>"}</div></section><section class="panel daily-spin"><div class="spin-heading"><div><span class="eyebrow">A LITTLE DAILY LUCK</span><h2>Your daily spin</h2><p>One free spin each day. Give the wheel a turn and see what the treasury has in store.</p></div><span class="spin-daily-badge">${icon("spark")} ONCE A DAY</span></div><div class="spin-content"><div class="spin-wheel-column">${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p></div><div class="spin-prize-panel"><div class="spin-jackpot">    <span>THE SILVER JACKPOT</span><strong>${esc(silver.label)}</strong><small>${spinPercent(silver.weight)}% · 1 in ${(spinWeight() / silver.weight).toLocaleString()} spins · ${money(silver.reward)} virtual cash</small></div><div class="spin-prizes">${spinPrizeRows.map((segment) => `<div class="spin-prize-row ${segment.id === "no-prize" ? "no-prize" : ""} ${segment.id === "silver" ? "silver-prize" : ""}"><i aria-hidden="true"></i><span>${esc(segment.label)}</span><b>${segment.reward ? money(segment.reward) : "Try again"}</b><small>${spinPercent(segment.weight)}%</small></div>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin ' + icon("arrow") + "</button>" : spunToday ? `<button class="button ghost full" disabled>Come back tomorrow</button><p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></div></div></section>`,
+    `${questMarkup}<section class="panel loot-bounty"><div class="loot-heading"><div><span class="eyebrow">DAILY LOOT TRACK</span><h2>Choose a chest</h2><p>Four original bounty lines. No proprietary skins or copied game art.</p></div><span class="spin-daily-badge">${icon("spark")} ONE LINE PER CHEST</span></div><div class="chest-track" role="tablist" aria-label="Chest tiers">${chestTiers.map((tier) => {
+      const tierDays = a?.chest_tier_days || {};
+      const opened = tier.id === "frontier" ? a?.chest_day === todayKey() : tierDays[tier.id] === todayKey();
+      return `<button class="chest-tier ${state.chestTier === tier.id ? "active" : ""} ${opened ? "opened" : ""}" role="tab" aria-selected="${state.chestTier === tier.id}" data-action="chest-tier" data-tier="${tier.id}" style="--tier-accent:${tier.accent}"><span>${tier.eyebrow}</span><strong>${tier.name}</strong><small>${opened ? "Opened today" : tier.reward}</small></button>`;
+    }).join("")}</div><div class="chest-line" data-chest-line>${(() => {
+      const tier = chestTiers.find((entry) => entry.id === state.chestTier) || chestTiers[0];
+      return `<div class="loot-reel-header"><div><span class="eyebrow">${tier.eyebrow}</span><h3>${tier.name}</h3></div><span class="loot-multiplier">${tier.scale}× rewards</span></div><div class="loot-reel" aria-label="${tier.name} loot line"><span class="loot-pointer" aria-hidden="true"></span>${chestSegmentsFor(tier.id).map((segment) => `<div class="loot-reel-item" style="--loot:${segment.color}"><i></i><b>${esc(segment.label)}</b><small>${money(segment.reward)}</small><em>${(segment.weight / 10000).toFixed(segment.weight % 10000 ? 2 : 1)}%</em></div>`).join("")}</div>`;
+    })()}</div><div class="loot-reel-action">${!state.user ? '<button class="button" data-action="auth">Sign in to open ' + icon("arrow") + "</button>" : (() => {
+      const tier = chestTiers.find((entry) => entry.id === state.chestTier) || chestTiers[0];
+      const opened = tier.id === "frontier" ? a?.chest_day === todayKey() : (a?.chest_tier_days || {})[tier.id] === todayKey();
+      return opened ? '<button class="button ghost" disabled>Chest opened today</button>' : `<button class="button" data-action="open-chest" data-tier="${tier.id}">Open ${esc(tier.name)} ${icon("spark")}</button>`;
+    })()}</div><p class="fine-print">Odds are the same for every chest tier. The displayed reward scales by ${chestTiers.map((tier) => tier.scale + "×").join(", ")}. Pirate Token odds stay 0.1% (1 in 1,000). All GBP is fictional virtual value.</p></section><section class="panel daily-spin"><div class="spin-heading"><div><span class="eyebrow">A LITTLE DAILY LUCK</span><h2>Your daily spin</h2><p>One free spin each day. Give the wheel a turn and see what the treasury has in store.</p></div><span class="spin-daily-badge">${icon("spark")} ONCE A DAY</span></div><div class="spin-content"><div class="spin-wheel-column">${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p></div><div class="spin-prize-panel"><div class="spin-jackpot">    <span>THE SILVER JACKPOT</span><strong>${esc(silver.label)}</strong><small>${spinPercent(silver.weight)}% · 1 in ${(spinWeight() / silver.weight).toLocaleString()} spins · ${money(silver.reward)} virtual cash</small></div><div class="spin-prizes">${spinPrizeRows.map((segment) => `<div class="spin-prize-row ${segment.id === "no-prize" ? "no-prize" : ""} ${segment.id === "silver" ? "silver-prize" : ""}"><i aria-hidden="true"></i><span>${esc(segment.label)}</span><b>${segment.reward ? money(segment.reward) : "Try again"}</b><small>${spinPercent(segment.weight)}%</small></div>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin ' + icon("arrow") + "</button>" : spunToday ? `<button class="button ghost full" disabled>Come back tomorrow</button><p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></div></div></section>`,
   );
 }
 function dailySpinWheel() {
@@ -1351,13 +1367,23 @@ async function profileView() {
           return `<div class="profile-highlight"><span>${esc(template.emoji || "♛")}</span><strong>${esc(template.name)}</strong><small>${esc(template.rarity)} · ${money(template.value)}</small></div>`;
         }).join("")
       : '<p class="muted">Open a pack to fill your inventory highlights.</p>';
+    const avatarId = ["nova", ...(state.account.avatar_items || [])].includes(state.account.avatar_equipped)
+      ? state.account.avatar_equipped
+      : "nova";
+    const avatar = avatarCosmetics.find((item) => item.id === avatarId) || avatarCosmetics[0];
+    const ownedAvatarItems = new Set(["nova", ...(state.account.avatar_items || [])]);
+    const avatarMarkup = `<section class="panel monarch-avatar-panel"><div class="monarch-avatar" style="--avatar-accent:${avatar.accent}" aria-label="${esc(avatar.name)} equipped"><div class="avatar-aura"></div><div class="avatar-figure"><div class="avatar-head"><span>${esc(state.account.username[0])}</span></div><div class="avatar-body"></div><div class="avatar-crown"><i></i><i></i><i></i></div></div><strong>${esc(avatar.name)}</strong></div><div class="avatar-shop"><div class="section-heading"><div><span class="eyebrow">AVATAR ARMORY</span><h2>Choose a look</h2></div></div>${avatarCosmetics.map((item) => {
+      const owned = ownedAvatarItems.has(item.id);
+      const equipped = avatarId === item.id;
+      return `<button class="avatar-item ${equipped ? "equipped" : ""}" data-action="avatar-buy" data-id="${item.id}" ${equipped ? "disabled" : ""}><i style="--item-accent:${item.accent}"></i><span><strong>${esc(item.name)}</strong><small>${equipped ? "Equipped" : owned ? "Owned · equip" : money(item.price) + " virtual"}</small></span></button>`;
+    }).join("")}</div></section>`;
     $("#main").innerHTML =
       title(
         "YOUR ROYAL RECORD",
         esc(state.account.username),
         "Every penny accounted for. Every questionable decision, documented.",
       ) +
-      `<section class="profile-hero panel"><div class="profile-avatar"><span>${esc(state.account.username[0])}</span><small>LV.${level}</small></div><div class="profile-identity"><span class="eyebrow">MONARCH PROFILE</span><h2>${esc(state.account.username)}</h2><p>${state.inventory.length} cards owned · ${state.account.packs} packs opened</p><div class="profile-progress"><span style="width:${profileProgress}%"></span></div><small>${profileProgress}% to the next 10-pack rank</small></div><div class="profile-actions"><button class="button ghost small" data-action="settings">${icon("settings")} Edit profile</button><button class="text-button" data-action="copy-code">Copy friend code · ${esc(state.account.friend_code)}</button></div></section><div class="stats-row"><div><span>VIRTUAL BALANCE</span><strong>${money(state.account.balance)}</strong></div><div><span>PACKS OPENED</span><strong>${state.account.packs}</strong></div><div><span>ALL-TIME SALES</span><strong>${money(state.account.sold)}</strong></div><div><span>CARDS OWNED</span><strong>${state.inventory.length}</strong></div></div><div class="profile-grid"><section class="panel"><div class="section-heading"><h2>Equipped loadout</h2><a class="text-button" href="#loadout">Manage ${icon("arrow")}</a></div><div class="profile-loadout">${loadoutMarkup}</div></section><section class="panel"><h2>Top inventory highlights</h2><div class="profile-highlights">${highlightMarkup}</div></section></div><div class="section-heading"><h2>Your accounting ledger</h2><button class="button ghost small" data-action="logout">Sign out</button></div><section class="panel ledger">${rows.map((r) => `<div class="list-row"><div><strong>${esc(r.reason)}</strong><small>${new Date(r.created_at).toLocaleString("en-GB")}</small></div><b class="${Number(r.amount) > 0 ? "positive" : "negative"}">${Number(r.amount) > 0 ? "+" : ""}${money(Number(r.amount))}</b><span>Balance ${money(Number(r.balance))}</span></div>`).join("")}</section>`;
+      `<section class="profile-hero panel"><div class="profile-avatar"><span>${esc(state.account.username[0])}</span><small>LV.${level}</small></div><div class="profile-identity"><span class="eyebrow">MONARCH PROFILE</span><h2>${esc(state.account.username)}</h2><p>${state.inventory.length} cards owned · ${state.account.packs} packs opened</p><div class="profile-progress"><span style="width:${profileProgress}%"></span></div><small>${profileProgress}% to the next 10-pack rank</small></div><div class="profile-actions"><button class="button ghost small" data-action="settings">${icon("settings")} Edit profile</button><button class="text-button" data-action="copy-code">Copy friend code · ${esc(state.account.friend_code)}</button></div></section><div class="stats-row"><div><span>VIRTUAL BALANCE</span><strong>${money(state.account.balance)}</strong></div><div><span>PACKS OPENED</span><strong>${state.account.packs}</strong></div><div><span>ALL-TIME SALES</span><strong>${money(state.account.sold)}</strong></div><div><span>CARDS OWNED</span><strong>${state.inventory.length}</strong></div></div>${avatarMarkup}<div class="profile-grid"><section class="panel"><div class="section-heading"><h2>Equipped loadout</h2><a class="text-button" href="#loadout">Manage ${icon("arrow")}</a></div><div class="profile-loadout">${loadoutMarkup}</div></section><section class="panel"><h2>Top inventory highlights</h2><div class="profile-highlights">${highlightMarkup}</div></section></div><div class="section-heading"><h2>Your accounting ledger</h2><button class="button ghost small" data-action="logout">Sign out</button></div><section class="panel ledger">${rows.map((r) => `<div class="list-row"><div><strong>${esc(r.reason)}</strong><small>${new Date(r.created_at).toLocaleString("en-GB")}</small></div><b class="${Number(r.amount) > 0 ? "positive" : "negative"}">${Number(r.amount) > 0 ? "+" : ""}${money(Number(r.amount))}</b><span>Balance ${money(Number(r.balance))}</span></div>`).join("")}</section>`;
   } catch (e) {
     if (version === renderVersion && request === viewRequest) errorView(e);
   }
@@ -2033,6 +2059,35 @@ document.addEventListener("click", async (e) => {
     }
     if (action === "profile") return navigate("profile");
     if (action === "settings") return settingsModal();
+    if (action === "chest-tier") {
+      state.chestTier = target.dataset.tier;
+      rewardsView();
+      return;
+    }
+    if (action === "avatar-buy") {
+      if (!requireUser() || state.busy) return;
+      const item = avatarCosmetics.find((entry) => entry.id === id);
+      if (!item) return;
+      const owned = state.account?.avatar_items || [];
+      if (!owned.includes(item.id) && item.price > Number(state.account?.balance || 0)) {
+        toast(`You need ${money(item.price)} virtual cash to unlock ${item.name}.`);
+        return;
+      }
+      state.busy = true;
+      target.disabled = true;
+      try {
+        const result = await api("avatar/buy", { item: item.id });
+        state.account = result.account;
+        await sync();
+        await profileView();
+        toast(`${item.name} equipped.`);
+      } catch (e) {
+        toast(e.message);
+      } finally {
+        state.busy = false;
+      }
+      return;
+    }
     if (action === "go-packs") return navigate("packs");
     if (action === "loadout-preview") {
       if (!requireUser()) return;
@@ -2201,7 +2256,13 @@ document.addEventListener("click", async (e) => {
       state.busy = true;
       target.disabled = true;
       try {
-        const result = await api("rewards/chest", {});
+        const tier = target.dataset.tier || state.chestTier || "frontier";
+        const reel = $("[data-chest-line] .loot-reel");
+        reel?.classList.add("is-opening");
+        if (!slotReducedMotion()) {
+          await new Promise((resolve) => setTimeout(resolve, 900));
+        }
+        const result = await api("rewards/chest", { tier });
         state.account = result.account;
         showModal(
           `<div class="chest-reveal ${result.prize.id === "pirate" ? "pirate-reveal" : ""}"><span class="eyebrow">${result.prize.id === "pirate" ? "EXTREMELY RARE · 1 IN 1,000" : "TREASURE CHEST"}</span><div class="chest-orb">${result.prize.id === "pirate" ? "☠" : "◆"}</div><h2>${esc(result.prize.label)}</h2><strong>${money(result.prize.reward)} virtual cash</strong><p>${result.prize.id === "pirate" ? "The Pirate Token is worth loads in the collection economy — and it has only a 0.1% chance per chest." : "A frontier-ready gizmo for the journey ahead."}</p><button class="button full" data-action="close">Back to the bounty</button></div>`,

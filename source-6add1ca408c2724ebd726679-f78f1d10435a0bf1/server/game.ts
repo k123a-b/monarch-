@@ -40,6 +40,8 @@ import {
   slotReels,
   validSlotBet,
   chestSpin,
+  chestTiers,
+  avatarCosmetics,
 } from "../shared/rules.mjs";
 
 type Client = any;
@@ -449,6 +451,28 @@ export async function handle(
           );
           return { account: await account() };
         }
+        if (route === "avatar/buy" && req.method === "POST") {
+          const item = avatarCosmetics.find((entry) => entry.id === body.item);
+          if (!item) fail("Unknown avatar cosmetic.");
+          const current = await account();
+          const owned = new Set([
+            "nova",
+            ...((current.avatar_items || []) as string[]),
+          ]);
+          if (owned.has(item.id)) {
+            await c.query(
+              "UPDATE accounts SET avatar_equipped=$2 WHERE id=$1",
+              [id, item.id],
+            );
+            return { account: await account(), equipped: item.id };
+          }
+          await change(c, id, -item.price, `Avatar cosmetic: ${item.name}`);
+          await c.query(
+            "UPDATE accounts SET avatar_items=array_append(COALESCE(avatar_items,ARRAY[]::text[]),$2),avatar_equipped=$2 WHERE id=$1",
+            [id, item.id],
+          );
+          return { account: await account(), equipped: item.id };
+        }
         if (route === "loadout" && req.method === "POST") {
           const selected = ids(body.ids);
           const currentAccount = await account();
@@ -567,15 +591,34 @@ export async function handle(
         if (route === "rewards/chest" && req.method === "POST") {
           const today = new Date().toISOString().slice(0, 10);
           const current = await account();
-          if (current.chest_day === today)
-            fail("You have already opened the treasure chest today.", 409);
-          const prize = chestSpin(randomInt);
+          const tierId =
+            typeof body.tier === "string" && chestTiers.some((tier) => tier.id === body.tier)
+              ? body.tier
+              : "frontier";
+          if (tierId === "frontier") {
+            if (current.chest_day === today)
+              fail("You have already opened the frontier chest today.", 409);
+          } else {
+            const tierDays = current.chest_tier_days || {};
+            if (tierDays[tierId] === today)
+              fail("You have already opened that chest today.", 409);
+          }
+          const prize = chestSpin(randomInt, tierId);
           if (prize.reward > 0)
             await change(c, id, prize.reward, "Treasure Chest · " + prize.label);
-          await c.query(
-            "UPDATE accounts SET chest_day=$2,chest_reward=$3 WHERE id=$1",
-            [id, today, prize.reward],
-          );
+          if (tierId === "frontier") {
+            await c.query(
+              "UPDATE accounts SET chest_day=$2,chest_reward=$3 WHERE id=$1",
+              [id, today, prize.reward],
+            );
+          } else {
+            const tierDays = current.chest_tier_days || {};
+            tierDays[tierId] = today;
+            await c.query(
+              "UPDATE accounts SET chest_tier_days=$2::jsonb,chest_reward=$3 WHERE id=$1",
+              [id, JSON.stringify(tierDays), prize.reward],
+            );
+          }
           return { prize, account: await account() };
         }
         if (route === "slots" && req.method === "POST") {

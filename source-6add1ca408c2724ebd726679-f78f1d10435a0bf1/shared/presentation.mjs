@@ -3,6 +3,8 @@
 export function imageSource(source) {
   if (!source) return "/img/leader-placeholder.svg";
   if (source.startsWith("/")) return source;
+  if (source.startsWith("data:image/svg+xml")) return source;
+  if (source.startsWith("data:image/svg+xml")) return source;
   const url = new URL(source);
   if (["thumb.wikimedia.org", "upload.wikimedia.org"].includes(url.hostname)) {
     url.hostname = "upload.wikimedia.org";
