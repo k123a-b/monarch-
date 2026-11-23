@@ -264,6 +264,8 @@ const fastFoodCards = fastFoodChains.map(([slug, name], index) => {
 
 const chases = [
   ["crocodilo", "Bombardiro Crocodilo", 10000, "🐊", "brainrot"],
+  ["frontier-compass", "Frontier Compass", 150000, "🧭", "royal"],
+  ["pirate-crown", "The Pirate Crown", 300000, "☠️", "royal"],
   ["signet", "Gilded Signet", 20000, "🖋", "royal"],
   ["sovereign", "Vault Sovereign", 50000, "🏛", "royal"],
   ["apex-crown", "Apex Crown", 150000, "⚡", "royal"],
@@ -297,6 +299,8 @@ const chases = [
     : {}),
 }));
 const windfalls = [
+  ["frontier", "Wayfinder Windfall", "royal", 27500],
+  ["pirate", "Pirate Dividend", "royal", 41250],
   ["brainrot", "Algorithm Windfall", "brainrot", 1100],
   ["royalty", "Royal Dividend", "royal", 3300],
   ["vault", "Treasury Windfall", "royal", 13750],
@@ -321,6 +325,22 @@ const windfalls = [
 // pack's separate jackpot roll. Their values are authored in pence and are not
 // scaled with the rest of the catalogue.
 const mythics = [
+  [
+    "mythic-frontier",
+    "The Wayfinder Engine",
+    "royal",
+    750000,
+    "🧭",
+    "An original frontier gizmo that points toward impossible collections.",
+  ],
+  [
+    "mythic-pirate",
+    "The Black Crown",
+    "royal",
+    1800000,
+    "🏴",
+    "A pirate-era mythic relic forged for the loudest loyalists.",
+  ],
   [
     "mythic-brainrot",
     "The Final Algorithm",
@@ -401,6 +421,24 @@ const mythics = [
 // Secret window, boosted by equipped Crown cards, so they never enter normal
 // rarity pools, chase rolls, jackpot rolls, or the Card Index.
 const secretCards = [
+  [
+    "secret-frontier",
+    "The Uncharted Gizmo",
+    "royal",
+    65000,
+    "🛠",
+    "An original frontier-engineering Secret.",
+    "The blueprint appears without a sender.",
+  ],
+  [
+    "secret-pirate",
+    "The Void Compass",
+    "royal",
+    130000,
+    "🧭",
+    "A compass that refuses to point north.",
+    "The sea keeps its own map.",
+  ],
   [
     "secret-brainrot",
     "The Forbidden Meme",
@@ -602,6 +640,9 @@ const worldEpicBand = new Map(
   ]),
 );
 function worldEpicValue(card) {
+  if (card.name === "King Charles III") return 7500;
+  if (card.name === "Flag of Israel") return 5000;
+  if (card.name === "Andy Burnham") return 7787;
   return (
     worldEpicBand.get(card.id) ?? Math.round(Math.abs(card.value) * 0.73)
   );
@@ -609,6 +650,8 @@ function worldEpicValue(card) {
 const liftedValues = new Map([
   ["crocodilo", 1500],
   ["signet", 2190],
+  ["frontier-compass", 150000],
+  ["pirate-crown", 300000],
   ["apex-crown", 66000],
   ["mythic-brainrot", 9000],
   ["mythic-royal", 100000],
@@ -744,7 +787,7 @@ export const catalog = [
     c.set === "uk"
       ? c.value
       : c.name === "Donald Trump"
-        ? 50000
+        ? 23000
         : c.set === "fastfood"
           ? c.value
           : c.set === "world" && c.rarity === "Epic"
@@ -936,6 +979,17 @@ const secretPowerups = Object.freeze({
     randomPackDiscount: 20,
     secretBonus: 200,
   },
+  "secret-frontier": {
+    name: "Wayfinder access",
+    uncommonBonus: 150000,
+    epicBonus: 500000,
+    secretBonus: 200,
+  },
+  "secret-pirate": {
+    name: "Black-sail covenant",
+    epicBonus: 650000,
+    crownBonus: 250000,
+  },
 });
 // Named chase cards each keep a distinct, positive effect so a rare pull is
 // always an upgrade over the generic rarity profile.
@@ -953,6 +1007,16 @@ const chasePowerups = Object.freeze({
     crownBonus: 100000,
   },
   "apex-crown": { name: "Apex instinct", epicBonus: 700000, crownBonus: 150000 },
+  "frontier-compass": {
+    name: "Wayfinder signal",
+    uncommonBonus: 150000,
+    epicBonus: 450000,
+  },
+  "pirate-crown": {
+    name: "Black-sail instinct",
+    epicBonus: 550000,
+    crownBonus: 150000,
+  },
 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export function cardPowerup(card) {
@@ -1164,6 +1228,44 @@ export const packs = [
     art: "apex",
     color: "#d9bb72",
     tag: "CROWN OR BETTER GUARANTEED",
+  },
+  {
+    id: "frontier",
+    name: "Frontier Gizmo Crate",
+    short: "FRONTIER GIZMOS",
+    subtitle: "Wayfinders, engines, and strange mechanical loot.",
+    price: 5000,
+    count: 5,
+    set: "royal",
+    odds: [0, 61000000, 22000000, 12000000, 5000000],
+    chase: "frontier-compass",
+    chaseOdds: 30000,
+    secret: "secret-frontier",
+    windfall: "windfall-frontier",
+    jackpot: "mythic-frontier",
+    jackpotOdds: 120000,
+    art: "vault",
+    color: "#72a89a",
+    tag: "ORIGINAL FRONTIER LOOT",
+  },
+  {
+    id: "pirate",
+    name: "Pirate Crown Chest Pack",
+    short: "PIRATE CROWN",
+    subtitle: "Black-market treasure with a legendary chase.",
+    price: 7500,
+    count: 5,
+    set: "royal",
+    odds: [0, 63500000, 20000000, 13000000, 3500000],
+    chase: "pirate-crown",
+    chaseOdds: 25000,
+    secret: "secret-pirate",
+    windfall: "windfall-pirate",
+    jackpot: "mythic-pirate",
+    jackpotOdds: 90000,
+    art: "apex",
+    color: "#c58b5b",
+    tag: "RARE PIRATE TREASURE",
   },
   {
     id: "fortnite",

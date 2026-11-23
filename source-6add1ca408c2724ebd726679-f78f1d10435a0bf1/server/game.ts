@@ -39,6 +39,7 @@ import {
   slotSpin,
   slotReels,
   validSlotBet,
+  chestSpin,
 } from "../shared/rules.mjs";
 
 type Client = any;
@@ -559,6 +560,20 @@ export async function handle(
             await change(c, id, prize.reward, "Daily rewards wheel");
           await c.query(
             "UPDATE accounts SET spin_day=$2,spin_reward=$3 WHERE id=$1",
+            [id, today, prize.reward],
+          );
+          return { prize, account: await account() };
+        }
+        if (route === "rewards/chest" && req.method === "POST") {
+          const today = new Date().toISOString().slice(0, 10);
+          const current = await account();
+          if (current.chest_day === today)
+            fail("You have already opened the treasure chest today.", 409);
+          const prize = chestSpin(randomInt);
+          if (prize.reward > 0)
+            await change(c, id, prize.reward, "Treasure Chest · " + prize.label);
+          await c.query(
+            "UPDATE accounts SET chest_day=$2,chest_reward=$3 WHERE id=$1",
             [id, today, prize.reward],
           );
           return { prize, account: await account() };

@@ -27,6 +27,8 @@ export const accounts = pgTable("accounts", {
   starterClaimed: boolean("starter_claimed").notNull().default(false),
   spinDay: text("spin_day").notNull().default(""),
   spinReward: integer("spin_reward"),
+  chestDay: text("chest_day").notNull().default(""),
+  chestReward: integer("chest_reward"),
   loadout: integer().array().notNull().default([]),
   fortniteCollection: text("fortnite_collection").array().notNull().default([]),
   characterIndex: text("character_index").array().notNull().default([]),
