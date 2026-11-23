@@ -142,9 +142,16 @@ add(
   [3000, 3500, 4000, 4500, 5000, 5500, 6000],
   ["👑"],
 );
+const originalFighterImage = (id, name, rarity, colors) => {
+  const safeName = name.replace(/[&<>"']/g, "").slice(0, 18);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient></defs><rect width="400" height="400" rx="48" fill="#111827"/><circle cx="200" cy="172" r="112" fill="url(#g)" stroke="#f3e4ad" stroke-width="8"/><path d="M112 340c12-82 164-82 176 0" fill="${colors[0]}" stroke="#f3e4ad" stroke-width="8"/><circle cx="158" cy="156" r="16" fill="#111827"/><circle cx="242" cy="156" r="16" fill="#111827"/><path d="M160 224c28 22 52 22 80 0" fill="none" stroke="#111827" stroke-width="12" stroke-linecap="round"/><text x="200" y="374" fill="#f3e4ad" font-family="Arial" font-size="22" font-weight="700" text-anchor="middle">${safeName.toUpperCase()}</text><text x="340" y="58" fill="#f3e4ad" font-family="Arial" font-size="18" text-anchor="middle">${rarity.slice(0,1)}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+};
 const fortniteCard = (id, name, rarity, value, cosmeticId, emoji, pattern, colors, flavor) => ({
   id, name, set: "fortnite", rarity, value, emoji, pattern, colors,
-  image: `https://fortnite-api.com/images/cosmetics/br/${cosmeticId}/icon.png`,
+  image: originalFighterImage(id, name, rarity, colors),
+  imageSource: "Original in-app SVG artwork",
+  cosmeticId,
   flavor,
 });
 const fortniteCards = [

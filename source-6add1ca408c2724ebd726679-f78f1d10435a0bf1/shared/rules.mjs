@@ -49,11 +49,60 @@ export const chestLootSegments = Object.freeze([
   { id: "crown", label: "Crown Chest", reward: 5000, weight: 29000, color: "#d8bc73" },
   { id: "pirate", label: "Pirate Token", reward: 50000, weight: 1000, color: "#ede6bd" },
 ]);
-export function chestSpin(randomInt) {
-  const total = chestLootSegments.reduce((sum, segment) => sum + segment.weight, 0);
+export const chestTiers = Object.freeze([
+  {
+    id: "frontier",
+    name: "Frontier Gizmo Chest",
+    eyebrow: "NORMAL FRONTIER DROP",
+    reward: "Every UTC day",
+    accent: "#87a39a",
+    scale: 1,
+  },
+  {
+    id: "storm",
+    name: "Storm Drop Chest",
+    eyebrow: "STORM VAULT",
+    reward: "Win streak",
+    accent: "#79a9c9",
+    scale: 2,
+  },
+  {
+    id: "voyage",
+    name: "Grand Voyage Chest",
+    eyebrow: "PIRATE ADVENTURE",
+    reward: "Quest reward",
+    accent: "#d0b16d",
+    scale: 3,
+  },
+  {
+    id: "epic-voyage",
+    name: "Epic Voyage Chest",
+    eyebrow: "LEGENDARY VOYAGE",
+    reward: "Rare unlock",
+    accent: "#b58de0",
+    scale: 5,
+  },
+]);
+export const avatarCosmetics = Object.freeze([
+  { id: "nova", name: "Nova Crown", price: 0, accent: "#d9b96f", kind: "crown" },
+  { id: "pilot", name: "Frontier Helmet", price: 2500, accent: "#78a99d", kind: "helmet" },
+  { id: "voyager", name: "Voyager Hood", price: 5000, accent: "#7c91bd", kind: "hood" },
+  { id: "pirate", name: "Pirate Halo", price: 15000, accent: "#d7ca91", kind: "pirate" },
+  { id: "starlord", name: "Star Monarch", price: 30000, accent: "#9d82cb", kind: "star" },
+]);
+export function chestSegmentsFor(tierId = "frontier") {
+  const tier = chestTiers.find((entry) => entry.id === tierId) || chestTiers[0];
+  return chestLootSegments.map((segment) => ({
+    ...segment,
+    reward: segment.reward * tier.scale,
+  }));
+}
+export function chestSpin(randomInt, tierId = "frontier") {
+  const segments = chestSegmentsFor(tierId);
+  const total = segments.reduce((sum, segment) => sum + segment.weight, 0);
   if (total !== 1000000) throw Error("Chest odds must total one million parts.");
   let roll = randomInt(total);
-  for (const segment of chestLootSegments) {
+  for (const segment of segments) {
     if (roll < segment.weight) return segment;
     roll -= segment.weight;
   }
