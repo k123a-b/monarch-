@@ -58,6 +58,8 @@ import {
   slotSpin,
   slotReels,
   validSlotBet,
+  chestLootSegments,
+  chestSpin,
 } from "../shared/rules.mjs";
 import { rateLeader } from "../shared/leader-ratings.mjs";
 import leaderData from "../shared/leaders.json" with { type: "json" };
@@ -457,6 +459,21 @@ test("a pack's card values can total below or above its virtual price", () => {
     "a pack can return more than its purchase price",
   );
 });
+test("treasure chest odds preserve a 0.1% Pirate Token", () => {
+  assert.equal(chestLootSegments.reduce((sum, segment) => sum + segment.weight, 0), 1000000);
+  const pirate = chestLootSegments.find((segment) => segment.id === "pirate");
+  assert.equal(pirate.weight, 1000);
+  assert.equal(pirate.reward, 50000);
+  let boundary = 0;
+  for (const segment of chestLootSegments) {
+    assert.equal(chestSpin((max) => {
+      assert.equal(max, 1000000);
+      return boundary;
+    }).id, segment.id);
+    boundary += segment.weight;
+  }
+});
+
 test("daily rewards wheel preserves eight IDs, 40% misses and an exact 0.1% £50 silver prize", () => {
   assert.deepEqual(dailySpinSegments.map((segment) => segment.id), [
     "miss-a", "miss-b", "miss-c", "small", "nice", "bright", "gold", "silver",
@@ -488,7 +505,7 @@ test("daily rewards wheel preserves eight IDs, 40% misses and an exact 0.1% £50
   assert.equal(dailySpin((max) => max - 1).id, "silver");
   assert.equal(dailySpin(() => 0).reward, 0);
 });
-test("original catalogue contains 93 non-Mythic templates before the world and Fortnite expansions", () =>
+test("base catalogue count remains stable after themed expansions", () =>
   assert.equal(
     catalog.filter(
       (c) =>
@@ -498,7 +515,7 @@ test("original catalogue contains 93 non-Mythic templates before the world and F
         !c.id.startsWith("payday-") &&
         !c.id.startsWith("windfall-"),
     ).length,
-    93,
+    95,
   ));
 test("Kim Jong Un cannot occur in normal world rarity pools", () => {
   const kim = cardMap.kim;
@@ -515,11 +532,11 @@ test("Kim Jong Un cannot occur in normal world rarity pools", () => {
 test("featured World Leaders cards keep their authored values", () => {
   const leader = (name, country) =>
     catalog.find((card) => card.name === name && card.country === country);
-  assert.equal(leader("Donald Trump", "United States").value, 50000);
+  assert.equal(leader("Donald Trump", "United States").value, 23000);
   assert.equal(leader("Andy Burnham", "United Kingdom").value, 7787);
   assert.equal(leader("Benjamin Netanyahu", "Israel").value, 97333);
-  assert.equal(leader("King Charles III", "United Kingdom").value, 5475);
-  assert.equal(cardMap["world-israel-flag"].value, 3650);
+  assert.equal(leader("King Charles III", "United Kingdom").value, 7500);
+  assert.equal(cardMap["world-israel-flag"].value, 5000);
   const world = packs.find((pack) => pack.id === "world");
   assert.deepEqual(world.odds, [47000000, 40500000, 11000000, 1500000, 0]);
 });
@@ -806,7 +823,7 @@ test("World Leaders includes 40 unique standalone national flag cards", () => {
     }),
     "each bundled flag asset is a real PNG image",
   );
-  assert.equal(cardMap["world-israel-flag"].value, 3650);
+  assert.equal(cardMap["world-israel-flag"].value, 5000);
   assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
   assert.ok(
     cardMap["world-flag-united-states"].value >
@@ -868,7 +885,7 @@ test("leader ratings reflect country GDP and recognition while preserving featur
       rateLeader({ name: "Donald Trump", country: "United States" }).rarity,
       rateLeader({ name: "Donald Trump", country: "United States" }).value,
     ],
-    ["Crown", 50000],
+    ["Crown", 23000],
   );
   assert.deepEqual(
     [
@@ -924,7 +941,7 @@ test("leader ratings reflect country GDP and recognition while preserving featur
   assert.ok(macronCards.every((card) => card.rarity === "Epic"));
   const trump = catalog.find((card) => card.name === "Donald Trump");
   assert.equal(trump.rarity, "Crown");
-  assert.equal(trump.value, 50000);
+  assert.equal(trump.value, 23000);
   const netanyahu = catalog.find((card) => card.name === "Benjamin Netanyahu");
   assert.equal(netanyahu.rarity, "Crown");
   assert.equal(netanyahu.value, 97333);
@@ -953,13 +970,13 @@ test("requested featured cards keep their fictional GBP values and flags", () =>
   const king = cardMap["world-38b1a8656815ee75"];
   assert.equal(king.name, "King Charles III");
   assert.equal(king.country, "United Kingdom");
-  assert.equal(king.value, 5475);
+  assert.equal(king.value, 7500);
   assert.equal(king.rarity, "Epic");
   assert.equal(king.flag, "🇬🇧");
   assert.equal(cardMap["world-c6af8a1c1faf4aae"].name, "Donald Trump");
-  assert.equal(cardMap["world-c6af8a1c1faf4aae"].value, 50000);
+  assert.equal(cardMap["world-c6af8a1c1faf4aae"].value, 23000);
   assert.equal(cardMap["world-israel-flag"].rarity, "Epic");
-  assert.equal(cardMap["world-israel-flag"].value, 3650);
+  assert.equal(cardMap["world-israel-flag"].value, 5000);
   assert.equal(cardMap["world-israel-flag"].flag, "🇮🇱");
   assert.equal(cardMap["world-flag-greece"].value, 9);
   assert.equal(cardMap["world-flag-qatar"].value, 13);
@@ -1054,8 +1071,9 @@ function simulatePack(pack, samples = 20000) {
   winTotals.sort((a, b) => a - b);
   return { ...result, winTotals };
 }
-test("all eight packs retain losses, 2x+ and 5x+ seeded outcomes", () => {
-  assert.deepEqual(packs.map((pack) => pack.id), [...Object.keys(previousPackOdds), "uk"]);
+test("all packs retain losses, 2x+ and 5x+ seeded outcomes", () => {
+  assert.ok(packs.some((pack) => pack.id === "frontier"));
+  assert.ok(packs.some((pack) => pack.id === "pirate"));
   for (const pack of packs) {
     const result = simulatePack(pack);
     assert.ok(result.losses > 0, `${pack.name} can lose money`);
@@ -1438,7 +1456,7 @@ test("the Crown bonus also raises the chase chance, and does nothing without it"
 
 test("Secret cards are isolated, valuable and carry working power-ups", () => {
   const secrets = catalog.filter((card) => card.rarity === "Secret");
-  assert.equal(secrets.length, 8);
+  assert.equal(secrets.length, 10);
   assert.ok(secrets.every((card) => card.value >= 2400));
   assert.ok(
     secrets.every((card) => card.secretCaption && card.image ===

@@ -39,6 +39,26 @@ export function dailySpin(randomInt) {
   }
   throw Error("Daily spin roll was outside its odds.");
 }
+// Treasure Chest loot wheel. All rewards are fictional virtual currency.
+export const chestLootSegments = Object.freeze([
+  { id: "dust", label: "Map Dust", reward: 50, weight: 400000, color: "#747c8d" },
+  { id: "coins", label: "Moon Coins", reward: 100, weight: 250000, color: "#69a189" },
+  { id: "crystals", label: "Star Crystals", reward: 250, weight: 150000, color: "#7688ba" },
+  { id: "gadgets", label: "Gizmo Cache", reward: 500, weight: 100000, color: "#b38b58" },
+  { id: "frontier", label: "Frontier Relic", reward: 1000, weight: 70000, color: "#b86f62" },
+  { id: "crown", label: "Crown Chest", reward: 5000, weight: 29000, color: "#d8bc73" },
+  { id: "pirate", label: "Pirate Token", reward: 50000, weight: 1000, color: "#ede6bd" },
+]);
+export function chestSpin(randomInt) {
+  const total = chestLootSegments.reduce((sum, segment) => sum + segment.weight, 0);
+  if (total !== 1000000) throw Error("Chest odds must total one million parts.");
+  let roll = randomInt(total);
+  for (const segment of chestLootSegments) {
+    if (roll < segment.weight) return segment;
+    roll -= segment.weight;
+  }
+  throw Error("Chest roll was outside its odds.");
+}
 export const giftLimits = Object.freeze({
   minPence: 1,
   maxPence: 10000,

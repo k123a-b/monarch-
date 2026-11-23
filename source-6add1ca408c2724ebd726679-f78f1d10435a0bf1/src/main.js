@@ -38,6 +38,8 @@ import {
   upgradePrices,
   slotLimits,
   slotOutcomes,
+  chestLootSegments,
+  chestSpin,
 } from "../shared/rules.mjs";
 const ordinaryPullNote = "Stronger ordinary pulls, real wins and losses; sell cards to credit your balance.";
 const secretRollNote = () =>
@@ -416,7 +418,11 @@ function ukFeaturedBanner() {
 }
 function shop() {
   const visible = packs.filter((p) =>
-    state.filter === "all" ? true : p.set === state.filter,
+    state.filter === "all"
+      ? true
+      : ["frontier", "pirate"].includes(state.filter)
+        ? p.id === state.filter
+        : p.set === state.filter,
   );
   $("#main").innerHTML =
     `<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="tiny-crown">${icon("crown")}</span> WELCOME TO YOUR KINGDOM</div><h1>Chaos is<br><span>collectible.</span></h1><p>Ridiculous cards. Royal-level pulls.<br>Open packs, trade with your court, and play for the pot.</p><div class="hero-buttons"><a href="#shop" class="button" data-action="scroll-shop">Explore packs ${icon("arrow")}</a><button class="button ghost" data-action="how">How it works ${icon("info")}</button></div><div class="hero-note"><span class="green-dot"></span> Real fun. Fictional money. <span>Always.</span></div></div><div class="hero-stage" aria-label="Featured collectible cards"><div class="orbital"></div><span class="stage-star s1">✦</span><span class="stage-star s2">✧</span><div class="hero-card back-left"><div class="ornate-corner"></div><img src="${image("/img/royal.png")}" alt="Royal crown"><span>THE ROYAL COURT</span><strong>Crown of Eternity</strong><b>CROWN • ${money(4500)}</b></div><div class="hero-card back-right"><img src="${image("/img/apex.png")}" alt="Mystery Gold crown"><span>THE ONE. THE ONLY.</span><strong>Mystery Gold</strong><b>ALPHA • SERIAL № 001</b></div><div class="hero-card front"><div class="hero-card-top">${icon("crown")} THE BRAINROT COLLECTION <span>001</span></div><img src="${image("/img/brainrot.png", 650)}" alt="Tralalero Tralala, a crowned shark wearing blue sneakers"><div class="hero-card-bottom"><span>COMMON</span><strong>Tralalero<br>Tralala</strong><small>All hail the king of absolutely nothing.</small><div><span>SELL VALUE</span><b>${money(cardMap["brainrot-common-0"].value)}</b></div></div></div><div class="floating-label">${icon("spark")} Your next legendary pull?</div></div></section><section class="trust-strip"><div>${icon("rewards")}<span><strong>£5 on the house</strong><small>Your welcome bonus awaits.</small></span></div><div>${icon("collection")}<span><strong>Collect. Trade. Reign.</strong><small>Build a collection fit for a monarch.</small></span></div><div>${icon("coin")}<span><strong>Growing play rewards</strong><small>Earn more the longer you play.</small></span></div><span class="play-label">100% VIRTUAL<br><strong>0% REAL MONEY</strong></span></section><section id="shop" class="shop-section"><div class="section-heading"><div><span class="eyebrow">THE ROYAL PACK SHOP</span><h2>Pick your poison.<span> Or your crown.</span></h2><p>${ordinaryPullNote}</p></div><button class="text-button odds-link" data-action="all-odds">${icon("info")} Transparent odds. Always.</button></div><div class="shop-promises">${guaranteeProgress()}${lossStreakProgress()}</div><div class="shop-filters" role="group" aria-label="Pack collection"><div>${[
@@ -427,6 +433,8 @@ function shop() {
       ["uk", "UK collection"],
       ["fortnite", "Fortnite"],
       ["fastfood", "Fast Food"],
+      ["frontier", "Frontier Gizmos"],
+      ["pirate", "Pirate Crown"],
     ]
       .map(
         ([id, label]) =>
@@ -1182,7 +1190,7 @@ function rewardsView() {
   const silver = silverPrize();
   $(".rewards-layout").insertAdjacentHTML(
     "beforeend",
-    `${questMarkup}<section class="panel daily-spin"><div class="spin-heading"><div><span class="eyebrow">A LITTLE DAILY LUCK</span><h2>Your daily spin</h2><p>One free spin each day. Give the wheel a turn and see what the treasury has in store.</p></div><span class="spin-daily-badge">${icon("spark")} ONCE A DAY</span></div><div class="spin-content"><div class="spin-wheel-column">${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p></div><div class="spin-prize-panel"><div class="spin-jackpot"><span>THE SILVER JACKPOT</span><strong>${esc(silver.label)}</strong><small>${spinPercent(silver.weight)}% · 1 in ${(spinWeight() / silver.weight).toLocaleString()} spins · ${money(silver.reward)} virtual cash</small></div><div class="spin-prizes">${spinPrizeRows.map((segment) => `<div class="spin-prize-row ${segment.id === "no-prize" ? "no-prize" : ""} ${segment.id === "silver" ? "silver-prize" : ""}"><i aria-hidden="true"></i><span>${esc(segment.label)}</span><b>${segment.reward ? money(segment.reward) : "Try again"}</b><small>${spinPercent(segment.weight)}%</small></div>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin ' + icon("arrow") + "</button>" : spunToday ? `<button class="button ghost full" disabled>Come back tomorrow</button><p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></div></div></section>`,
+    `${questMarkup}<section class="panel treasure-chest"><div class="chest-visual"><span class="chest-sparks">✦ · · ✧</span><div class="chest-box"><span class="chest-lid"></span><span class="chest-lock">◆</span></div></div><div class="chest-copy"><span class="eyebrow">ORIGINAL FRONTIER-STYLE LOOT</span><h2>The Gizmo Treasure Chest</h2><p>Open a daily crate of map dust, moon coins, relics and strange gizmos. The 1-in-1,000 Pirate Token is worth £500 of fictional value.</p><div class="chest-odds">${chestLootSegments.map((segment) => `<span><i style="background:${segment.color}"></i><b>${esc(segment.label)}</b><small>${(segment.weight / 10000).toFixed(segment.weight % 10000 ? 2 : 1)}% · ${money(segment.reward)}</small></span>`).join("")}</div>${!state.user ? '<button class="button" data-action="auth">Sign in to open ' + icon("arrow") + "</button>" : a?.chest_day === todayKey() ? '<button class="button ghost" disabled>Chest opened today</button>' : '<button class="button" data-action="open-chest">Open today’s chest ' + icon("spark") + "</button>"}</div></section><section class="panel daily-spin"><div class="spin-heading"><div><span class="eyebrow">A LITTLE DAILY LUCK</span><h2>Your daily spin</h2><p>One free spin each day. Give the wheel a turn and see what the treasury has in store.</p></div><span class="spin-daily-badge">${icon("spark")} ONCE A DAY</span></div><div class="spin-content"><div class="spin-wheel-column">${dailySpinWheel()}<p id="spin-status" class="spin-result" aria-live="polite"></p></div><div class="spin-prize-panel"><div class="spin-jackpot">    <span>THE SILVER JACKPOT</span><strong>${esc(silver.label)}</strong><small>${spinPercent(silver.weight)}% · 1 in ${(spinWeight() / silver.weight).toLocaleString()} spins · ${money(silver.reward)} virtual cash</small></div><div class="spin-prizes">${spinPrizeRows.map((segment) => `<div class="spin-prize-row ${segment.id === "no-prize" ? "no-prize" : ""} ${segment.id === "silver" ? "silver-prize" : ""}"><i aria-hidden="true"></i><span>${esc(segment.label)}</span><b>${segment.reward ? money(segment.reward) : "Try again"}</b><small>${spinPercent(segment.weight)}%</small></div>`).join("")}</div>${!state.user ? '<button class="button full" data-action="auth">Sign in to spin ' + icon("arrow") + "</button>" : spunToday ? `<button class="button ghost full" disabled>Come back tomorrow</button><p class="spin-result" role="status">${Number(a.spin_reward) ? `Today’s spin paid ${money(Number(a.spin_reward))}.` : "No prize this time. Your next spin is available tomorrow."}</p>` : '<button class="button full" data-action="spin-wheel">Spin for today’s prize ' + icon("spark") + "</button>"}<p class="fine-print">Virtual GBP only. One spin per account per UTC day. Odds shown; no purchase required.</p></div></div></section>`,
   );
 }
 function dailySpinWheel() {
@@ -1323,13 +1331,33 @@ async function profileView() {
   try {
     const rows = await api("ledger");
     if (version !== renderVersion || request !== viewRequest) return;
+    const loadout = (state.account.loadout || [])
+      .map((id) => state.inventory.find((card) => Number(card.id) === Number(id)))
+      .filter(Boolean);
+    const highlights = [...state.inventory]
+      .sort((a, b) => Number(b.value) - Number(a.value))
+      .slice(0, 3);
+    const level = 1 + Math.floor(Number(state.account.packs || 0) / 10);
+    const profileProgress = (Number(state.account.packs || 0) % 10) * 10;
+    const loadoutMarkup = loadout.length
+      ? loadout.map((card) => {
+          const template = cardMap[card.template_id] || card;
+          return `<div class="profile-loadout-card"><span class="rarity-dot rarity-${template.rarity.toLowerCase()}"></span><strong>${esc(template.name)}</strong><small>${esc(template.rarity)} · ${money(template.value)}</small></div>`;
+        }).join("")
+      : '<p class="muted">Equip cards from Loadout to give every pack a little royal leverage.</p>';
+    const highlightMarkup = highlights.length
+      ? highlights.map((card) => {
+          const template = cardMap[card.template_id] || card;
+          return `<div class="profile-highlight"><span>${esc(template.emoji || "♛")}</span><strong>${esc(template.name)}</strong><small>${esc(template.rarity)} · ${money(template.value)}</small></div>`;
+        }).join("")
+      : '<p class="muted">Open a pack to fill your inventory highlights.</p>';
     $("#main").innerHTML =
       title(
         "YOUR ROYAL RECORD",
         esc(state.account.username),
         "Every penny accounted for. Every questionable decision, documented.",
       ) +
-      `<div class="stats-row"><div><span>VIRTUAL BALANCE</span><strong>${money(state.account.balance)}</strong></div><div><span>PACKS OPENED</span><strong>${state.account.packs}</strong></div><div><span>ALL-TIME SALES</span><strong>${money(state.account.sold)}</strong></div><div><span>FRIEND CODE</span><strong>${esc(state.account.friend_code)}</strong></div></div><div class="section-heading"><h2>Your accounting ledger</h2><button class="button ghost small" data-action="logout">Sign out</button></div><section class="panel ledger">${rows.map((r) => `<div class="list-row"><div><strong>${esc(r.reason)}</strong><small>${new Date(r.created_at).toLocaleString("en-GB")}</small></div><b class="${Number(r.amount) > 0 ? "positive" : "negative"}">${Number(r.amount) > 0 ? "+" : ""}${money(Number(r.amount))}</b><span>Balance ${money(Number(r.balance))}</span></div>`).join("")}</section>`;
+      `<section class="profile-hero panel"><div class="profile-avatar"><span>${esc(state.account.username[0])}</span><small>LV.${level}</small></div><div class="profile-identity"><span class="eyebrow">MONARCH PROFILE</span><h2>${esc(state.account.username)}</h2><p>${state.inventory.length} cards owned · ${state.account.packs} packs opened</p><div class="profile-progress"><span style="width:${profileProgress}%"></span></div><small>${profileProgress}% to the next 10-pack rank</small></div><div class="profile-actions"><button class="button ghost small" data-action="settings">${icon("settings")} Edit profile</button><button class="text-button" data-action="copy-code">Copy friend code · ${esc(state.account.friend_code)}</button></div></section><div class="stats-row"><div><span>VIRTUAL BALANCE</span><strong>${money(state.account.balance)}</strong></div><div><span>PACKS OPENED</span><strong>${state.account.packs}</strong></div><div><span>ALL-TIME SALES</span><strong>${money(state.account.sold)}</strong></div><div><span>CARDS OWNED</span><strong>${state.inventory.length}</strong></div></div><div class="profile-grid"><section class="panel"><div class="section-heading"><h2>Equipped loadout</h2><a class="text-button" href="#loadout">Manage ${icon("arrow")}</a></div><div class="profile-loadout">${loadoutMarkup}</div></section><section class="panel"><h2>Top inventory highlights</h2><div class="profile-highlights">${highlightMarkup}</div></section></div><div class="section-heading"><h2>Your accounting ledger</h2><button class="button ghost small" data-action="logout">Sign out</button></div><section class="panel ledger">${rows.map((r) => `<div class="list-row"><div><strong>${esc(r.reason)}</strong><small>${new Date(r.created_at).toLocaleString("en-GB")}</small></div><b class="${Number(r.amount) > 0 ? "positive" : "negative"}">${Number(r.amount) > 0 ? "+" : ""}${money(Number(r.amount))}</b><span>Balance ${money(Number(r.balance))}</span></div>`).join("")}</section>`;
   } catch (e) {
     if (version === renderVersion && request === viewRequest) errorView(e);
   }
@@ -2148,6 +2176,45 @@ document.addEventListener("click", async (e) => {
       }
       return;
     }
+    if (action === "confirm-gift") {
+      if (state.busy) return;
+      state.busy = true;
+      try {
+        const result = await api("friends/gift", {
+          id: String(id),
+          amount: Number(target.dataset.amount),
+        });
+        state.account = result.account;
+        await sync();
+        closeModal();
+        await friendsView();
+        toast(`Sent ${money(result.sent)} to ${result.to}.`);
+      } catch (e) {
+        toast(e.message);
+      } finally {
+        state.busy = false;
+      }
+      return;
+    }
+    if (action === "open-chest") {
+      if (!requireUser() || state.busy) return;
+      state.busy = true;
+      target.disabled = true;
+      try {
+        const result = await api("rewards/chest", {});
+        state.account = result.account;
+        showModal(
+          `<div class="chest-reveal ${result.prize.id === "pirate" ? "pirate-reveal" : ""}"><span class="eyebrow">${result.prize.id === "pirate" ? "EXTREMELY RARE · 1 IN 1,000" : "TREASURE CHEST"}</span><div class="chest-orb">${result.prize.id === "pirate" ? "☠" : "◆"}</div><h2>${esc(result.prize.label)}</h2><strong>${money(result.prize.reward)} virtual cash</strong><p>${result.prize.id === "pirate" ? "The Pirate Token is worth loads in the collection economy — and it has only a 0.1% chance per chest." : "A frontier-ready gizmo for the journey ahead."}</p><button class="button full" data-action="close">Back to the bounty</button></div>`,
+          "chest-modal",
+        );
+        if (state.view === "rewards") render();
+      } catch (e) {
+        toast(e.message);
+      } finally {
+        state.busy = false;
+      }
+      return;
+    }
     if (action === "mute") {
       state.muted = !state.muted;
       target.innerHTML =
@@ -2414,14 +2481,13 @@ document.addEventListener("submit", async (e) => {
     if (form.id === "gift-form") {
       const amount = pence("amount");
       if (amount > 10000) throw Error("Gifts are capped at £100.00 each.");
-      const result = await api("friends/gift", {
-        id: String(data.get("friend")),
-        amount,
-      });
-      state.account = result.account;
-      await sync();
-      await friendsView();
-      toast(`Sent ${money(result.sent)} to ${result.to}.`);
+      const friendId = String(data.get("friend"));
+      const friend = state.friends?.friends?.find((entry) => entry.id === friendId);
+      if (!friend) throw Error("Choose a friend to gift.");
+      showModal(
+        `<span class="eyebrow">CHECK THE RECIPIENT</span><h2>Send ${money(amount)} to ${esc(friend.username)}?</h2><p>This moves fictional virtual cash from your balance. It cannot be cancelled after sending.</p><div class="gift-confirm-actions"><button class="button ghost" data-action="close">Keep reviewing</button><button class="button" data-action="confirm-gift" data-id="${esc(friend.id)}" data-amount="${amount}">Confirm gift ${icon("arrow")}</button></div>`,
+        "gift-confirm-modal",
+      );
     }
     if (form.id === "join-table") {
       await api("tables/join", { code: String(data.get("code")) });

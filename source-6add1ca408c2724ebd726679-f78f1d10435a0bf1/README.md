@@ -16,6 +16,10 @@ Use Node.js 22 or later. Install dependencies with `npm install`, copy `.env.exa
 
 The Vercel and Supabase migration has not been deployed or run against a live database from the environment it was written in; verify sign-in, a pack purchase and image loading on a preview deployment first.
 
+## Treasure Chest
+
+The Rewards tab includes an original, once-per-UTC-day gizmo/frontier-themed Treasure Chest. It uses server-side cryptographic odds totaling one million parts. Rewards are fictional virtual cash: 40% Map Dust, 25% Moon Coins, 15% Star Crystals, 10% Gizmo Cache, 7% Frontier Relic, 2.9% Crown Chest, and 0.1% Pirate Token. The Pirate Token is presented as a £500 virtual-value token, not real-world currency or redeemable value. Apply `db/migrations/20261123090000_treasure_chest.sql` before enabling the live API; the frontend and rule tests remain usable without the migration.
+
 ## Accounts and Google login
 
 Sign-in is Google only; email/password accounts were removed with Netlify Identity. Each Google login must have a verified email. The Google subject remains the primary account key, and a unique verified-email link lets the same Google account recover its existing game account if its Auth.js subject changes. A new account is suggested a unique username based on the Google profile name, then must save a public username in the first-sign-in prompt. Open **Settings** to change the name, switch Google accounts, or log out. A new account receives a single £5.00 welcome credit when its game account is first provisioned. No age field is collected. Accounts created under Netlify Identity are not carried over: ids differ, so players start fresh.
